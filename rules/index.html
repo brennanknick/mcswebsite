@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rules — MCS</title>
+<meta name="description" content="How MCS matches work: getting into a game, positions, tackling, scoring, set pieces and every game mode." />
+<meta name="theme-color" content="#070c0a" />
+
+<link rel="icon" href="../favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" href="../assets/img/icon-512.png" sizes="512x512" />
+<link rel="apple-touch-icon" href="../assets/img/icon-180.png" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="MCS" />
+<meta property="og:title" content="Rules — MCS" />
+<meta property="og:description" content="Every rule the MCS referee enforces, in plain English." />
+<meta property="og:url" content="https://mcsoccer.net/rules/" />
+<meta property="og:image" content="https://mcsoccer.net/assets/img/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css" />
+<script>
+  document.documentElement.classList.add("reveal-on");
+  setTimeout(function () {
+    if (!window.__mcsRevealReady) document.documentElement.classList.remove("reveal-on");
+  }, 3000);
+</script>
+</head>
+<body>
+
+<nav class="nav" aria-label="Main">
+  <div class="container">
+    <a class="nav-brand" href="../" aria-label="MCS home">
+      <img src="../assets/img/logo.png" alt="" width="64" height="64" />
+      <span class="nav-brand-text"><b>MCS</b><span>Minecraft Soccer</span></span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="../">Home</a></li>
+      <li><a href="./" aria-current="page">Rules</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
+      <li><a data-discord-link href="../#discord">Discord</a></li>
+    </ul>
+
+    <div class="nav-cta">
+      <button class="btn address-btn" type="button" data-copy-address aria-label="Copy the server address">
+        <span class="slot">
+          <span class="slot-main" data-address>PLAY.MCSOCCER.NET</span>
+          <span class="slot-alt" aria-live="polite">Copied to clipboard!</span>
+        </span>
+      </button>
+    </div>
+
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="drawer" aria-expanded="false" data-drawer-open>
+      <svg viewBox="0 0 30 22" fill="none" aria-hidden="true"><path d="M2 3h26M2 11h26M2 19h26"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="scrim" data-scrim></div>
+<aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true" inert>
+  <div class="drawer-head">
+    <img src="../assets/img/logo.png" alt="MCS" />
+    <button class="drawer-close" type="button" aria-label="Close menu" data-drawer-close><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+  </div>
+  <ul>
+    <li><a href="../">Home</a></li>
+    <li><a href="./" aria-current="page">Rules</a></li>
+    <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+    <li><a data-discord-link href="../#discord">Discord</a></li>
+  </ul>
+  <button class="btn" type="button" data-open-connect>Join Now</button>
+</aside>
+
+<main class="page">
+  <div class="container">
+
+    <h1 class="page-title" data-reveal="up">Match <span class="grad">Rules</span></h1>
+    <p class="page-intro" data-reveal="up" style="--delay:.15s">
+      MCS plays by real football rules, and the server referees every one of
+      them. Here's everything you need before your first match.
+    </p>
+    <p class="callout" data-reveal="up" style="--delay:.25s">
+      Pitches can switch individual rules off. In game, <code>/rules</code> opens
+      the full rule book, and its last page lists anything that's different on
+      the pitch you're standing on.
+    </p>
+
+    <!-- ── getting started ── -->
+    <section class="rule-group" id="start" aria-labelledby="g-start">
+      <h2 id="g-start" data-reveal="up">Getting started</h2>
+      <p data-reveal="up">From spawn to your first touch of the ball.</p>
+
+      <details class="acc" data-reveal="up" open>
+        <summary>Getting into a match <span class="tag">Ready zones</span></summary>
+        <div class="acc-body">
+          <p>Walk into a pitch's <b>ready zone</b>, the ring of particles near the
+          pitch. A hologram above it shows who's ready. Once enough players are
+          standing inside, a countdown starts: rising chimes, a ring that shrinks
+          to the centre, then <b>3, 2, 1, GO!</b> and the match starts itself.</p>
+          <p>Step out and you drop from the count. If it falls below the minimum,
+          the countdown is cancelled until someone comes back. Players already on
+          the pitch's teams count as ready, so a half-full match can be topped up
+          from the zone.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Picking your side</summary>
+        <div class="acc-body">
+          <p>When the countdown hits GO, walk to the end you want to defend and
+          stay in that half for <b>5 seconds</b>. Anyone who hasn't chosen by then
+          is put on the shorter side.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Positions <span class="tag">/position</span></summary>
+        <div class="acc-body">
+          <p>Seven per team: <b>GK</b> goalkeeper, <b>CB</b> centre back,
+          <b>LD</b> and <b>RD</b> left and right defence, <b>LW</b> and <b>RW</b>
+          left and right wing, and <b>FW</b> forward.</p>
+          <p><code>/position</code> opens a picker laid out like the pitch, or type
+          a code, like <code>/position fw</code>. One player per position per
+          team. If you don't pick, you're handed a free one at kickoff and told
+          which. Every kickoff and every goal puts you back on your position's
+          spot.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Having the ball</summary>
+        <div class="acc-body">
+          <p>The ball is a <b>spectral arrow</b>. Hold it and you have the ball: you
+          glow in your team's colour, visible through walls, and the action bar
+          shows who has it.</p>
+          <ul>
+            <li>Shoot the bow to pass or shoot.</li>
+            <li>Hit a teammate and it's a <b>pass</b>. Hit an opponent and it's an
+            <b>interception</b>.</li>
+            <li>Land it anywhere else and the ball rests on the ground with a
+            glowing marker. <b>Walk over it</b> to pick it up.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Tackling</summary>
+        <div class="acc-body">
+          <p>Hit the player carrying the ball <b>three times</b> and it pops loose
+          to you. Both of you see a live hit counter on the action bar, and the
+          sound rises as the steal gets closer. Every click counts, and two
+          teammates closing down the same carrier never cancel out each other's
+          hits.</p>
+          <p>Nobody can die. A hit that would kill is simply voided.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ── on the pitch ── -->
+    <section class="rule-group" id="pitch" aria-labelledby="g-pitch">
+      <h2 id="g-pitch" data-reveal="up">On the pitch</h2>
+      <p data-reveal="up">What the referee enforces while you play.</p>
+
+      <details class="acc" data-reveal="up">
+        <summary>Kickoff</summary>
+        <div class="acc-body">
+          <p>At the start of each half everyone lines up in formation in their own
+          half. The kicking team's forward starts on the centre spot, facing their
+          own goal, and must <b>pass the ball backward</b> into their own half.</p>
+          <p>Until that pass lands, nobody may cross the halfway line. A kickoff
+          shot forward, at goal, out of play or into an opponent is retaken. When
+          the pass lands, everyone sees <b>Play on!</b> and the restriction lifts.
+          Scrims have no kickoff rule.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Scoring</summary>
+        <div class="acc-body">
+          <p>Shoot the ball into the net. A goal only counts if the shot was taken:</p>
+          <ul>
+            <li>from <b>beyond the halfway line</b>, and</li>
+            <li>from <b>outside the box</b> in front of that goal.</li>
+          </ul>
+          <p><b>Own goals always count.</b> A shot that breaks a rule is <b>NO
+          GOAL</b>: a red sign over the net says why, and the defending team gets
+          a goal kick. While you carry the ball, the action bar warns you whenever
+          you're standing somewhere a shot wouldn't count.</p>
+          <p>The ball has to be travelling <i>into</i> the net, so a shot from
+          behind the goal can never score.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Self-pass</summary>
+        <div class="acc-body">
+          <p>You can't instantly collect your own shot. Playing the ball to yourself
+          hands the other team a set piece, and where it happened decides which,
+          judged from their side:</p>
+          <ul>
+            <li>Inside the box they're attacking, or past the penalty line:
+            a <b>penalty</b>.</li>
+            <li>Past halfway but short of the penalty line: a <b>free kick</b> they
+            can score from directly.</li>
+            <li>In their own half: a <b>free kick</b> with no direct shot at goal.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Free kicks</summary>
+        <div class="acc-body">
+          <p>Taken from the exact spot where it was given. The defending team may
+          form a <b>wall 7 blocks</b> in front of the taker, and the team taking the
+          kick can't hit or shove anyone in it. A free kick from your own half
+          can't go straight in; once a second player touches the ball, it can.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Box time limit</summary>
+        <div class="acc-body">
+          <p>Win the ball inside <b>your own box</b> and a countdown starts on your
+          action bar. Pass it out before it runs out, or the other team gets a
+          <b>corner</b>. It's there to stop teams sitting on the ball at the back.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Out of bounds</summary>
+        <div class="acc-body">
+          <p>The ball is only out once it <b>settles</b> outside the lines, not the
+          moment it flies over them. Then:</p>
+          <ul>
+            <li>Out in the last toucher's <b>own half</b>: a <b>corner</b> to the
+            other team, from the nearest corner.</li>
+            <li>Out in the <b>other half</b>: a <b>pass-in</b> to the other team,
+            from where it crossed the line.</li>
+          </ul>
+          <p>A ball that never settles is called after three seconds. Walk
+          <b>fully</b> off the pitch while carrying the ball and it's a pass-in to
+          the other team, taken from where you crossed.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Restarts</summary>
+        <div class="acc-body">
+          <p>On corners, goal kicks and pass-ins nobody is moved. The ball is
+          placed at the spot, glowing in the colour of the team that gets it, and
+          only that team can pick it up. After about 20 seconds anyone can, so play
+          never stalls.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>After a goal</summary>
+        <div class="acc-body">
+          <p>The scorer's name and the score pop up over the net, with lightning
+          and the team's sounds. Everyone goes straight back to their formation
+          spot, the conceding team's forward gets the ball on the centre spot,
+          and play restarts at once. There's no kickoff restriction after a goal.</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- ── game modes ── -->
+    <section class="rule-group" id="modes" aria-labelledby="g-modes">
+      <h2 id="g-modes" data-reveal="up">Game modes</h2>
+      <p data-reveal="up">What a ready zone or a referee can start.</p>
+
+      <details class="acc" data-reveal="up">
+        <summary>Match <span class="tag">2 × 10 min</span></summary>
+        <div class="acc-body">
+          <p>Two timed halves, ten minutes each by default, with no score limit
+          and a short break between them. A coin flip decides who kicks off; ends
+          swap at half time, and whoever didn't start with the ball kicks off the
+          second half. Every half opens with the backward-pass kickoff.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Knockout <span class="tag">Extra time + penalties</span></summary>
+        <div class="acc-body">
+          <p>A match that can't end level, built for tournaments. A tie goes to
+          <b>extra time</b>, two five-minute halves, then a <b>penalty
+          shootout</b>. Each team picks three takers and a keeper, the teams
+          alternate kicks, best of three, then sudden death.</p>
+          <p>A preliminary match, by contrast, can end in a draw.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Scrim <span class="tag">No clock</span></summary>
+        <div class="acc-body">
+          <p>First team to the goal limit wins, with no clock. It opens with a
+          <b>lob</b>: the ball goes up from the centre spot and everyone scrambles
+          for it. After that, goals restart as normal, and there's no kickoff
+          rule.</p>
+        </div>
+      </details>
+
+      <details class="acc" data-reveal="up">
+        <summary>Quick game <span class="tag">First to 5</span></summary>
+        <div class="acc-body">
+          <p>No clock and no halves. The first team to the win score takes it:
+          five goals, unless the pitch is set up otherwise.</p>
+        </div>
+      </details>
+    </section>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <ul class="footer-links">
+      <li><a href="../">Home</a></li>
+      <li><a href="./" aria-current="page">Rules</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+      <li><a data-discord-link href="../#discord">Discord</a></li>
+      <li><a href="#" data-open-connect>How to join</a></li>
+    </ul>
+
+    <div class="footer-row">
+      <div class="footer-brand">
+        <img src="../assets/img/logo.png" alt="MCS" loading="lazy" />
+        <p class="footer-legal">
+          &copy; <span data-year>2026</span> MCS. All rights reserved.<br>
+          Not an official Minecraft product.<br>
+          Not approved by or associated with Mojang or Microsoft.
+        </p>
+      </div>
+      <ul class="footer-social">
+        <li><a data-discord-link href="../#discord" aria-label="Discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.3 5.3A16.6 16.6 0 0 0 15.2 4l-.2.4a15.5 15.5 0 0 1 3.6 1.2 12.6 12.6 0 0 0-10.9 0A15.5 15.5 0 0 1 11.2 4.4L11 4a16.6 16.6 0 0 0-4.1 1.3C4.3 9.2 3.6 13 4 16.7a16.7 16.7 0 0 0 5 2.6l.7-1.2a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 9.3 0l.4.3a10.8 10.8 0 0 1-1.7.8l.7 1.2a16.7 16.7 0 0 0 5-2.6c.5-4.3-.6-8.1-2.8-11.4ZM9.6 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.8 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg></a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<div class="modal" id="connect" role="dialog" aria-modal="true" aria-labelledby="connect-title" aria-hidden="true" inert>
+  <div class="modal-box">
+    <button class="modal-close" type="button" aria-label="Close" data-close-connect><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+    <div class="modal-head">
+      <img src="../assets/img/logo.png" alt="" />
+      <div>
+        <h2 id="connect-title">Connect to the <span class="grad">server</span></h2>
+      </div>
+    </div>
+    <ol class="steps">
+      <li>Open <b>Minecraft: Java Edition</b> and go to <b>Multiplayer</b>.</li>
+      <li>Click <b>Add Server</b> and enter
+        <button class="chip" type="button" data-copy-address aria-label="Copy the server address">
+          <span data-address>play.mcsoccer.net</span>
+          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg>
+        </button>
+      </li>
+      <li>Join, and <b>accept the resource pack</b>. It carries the kits, crests and goals, so the server needs it.</li>
+      <li>Walk into a pitch's <b>ready zone</b> and the match starts itself.</li>
+    </ol>
+    <p class="modal-note">Click the address to copy it.</p>
+    <button class="btn" type="button" data-close-connect>
+      Got it
+      <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script src="../site.config.js"></script>
+<script src="../assets/js/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MCS</title>
+<meta name="description" content="MCS is a soccer server for Minecraft: Java Edition, in open alpha. Join at play.mcsoccer.net." />
+<meta name="theme-color" content="#070c0a" />
+
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" href="assets/img/icon-512.png" sizes="512x512" />
+<link rel="apple-touch-icon" href="assets/img/icon-180.png" />
+
+<!-- social embed: og:image must be absolute -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="MCS" />
+<meta property="og:title" content="MCS" />
+<meta property="og:description" content="A soccer server for Minecraft: Java Edition. Join at play.mcsoccer.net." />
+<meta property="og:url" content="https://mcsoccer.net/" />
+<meta property="og:image" content="https://mcsoccer.net/assets/img/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css" />
+<script>
+  /* Hide reveal targets before first paint, but only if site.js then
+     arms the observers. If it never does, show everything anyway. */
+  document.documentElement.classList.add("reveal-on");
+  setTimeout(function () {
+    if (!window.__mcsRevealReady) document.documentElement.classList.remove("reveal-on");
+  }, 3000);
+</script>
+</head>
+<body>
+
+<!-- ═════════════════════════════ NAV ═════════════════════════════ -->
+<nav class="nav" aria-label="Main">
+  <div class="container">
+    <a class="nav-brand" href="./" aria-label="MCS home">
+      <img src="assets/img/logo.png" alt="" width="64" height="64" />
+      <span class="nav-brand-text"><b>MCS</b><span>Minecraft Soccer</span></span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="./" aria-current="page">Home</a></li>
+      <li><a href="rules/">Rules</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
+      <li><a data-discord-link href="#discord">Discord</a></li>
+    </ul>
+
+    <div class="nav-cta">
+      <button class="btn address-btn" type="button" data-copy-address aria-label="Copy the server address">
+        <span class="slot">
+          <span class="slot-main" data-address>PLAY.MCSOCCER.NET</span>
+          <span class="slot-alt" aria-live="polite">Copied to clipboard!</span>
+        </span>
+      </button>
+    </div>
+
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="drawer" aria-expanded="false" data-drawer-open>
+      <svg viewBox="0 0 30 22" fill="none" aria-hidden="true"><path d="M2 3h26M2 11h26M2 19h26"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="scrim" data-scrim></div>
+<aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true" inert>
+  <div class="drawer-head">
+    <img src="assets/img/logo.png" alt="MCS" />
+    <button class="drawer-close" type="button" aria-label="Close menu" data-drawer-close><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+  </div>
+  <ul>
+    <li><a href="./" aria-current="page">Home</a></li>
+    <li><a href="rules/">Rules</a></li>
+    <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+    <li><a data-discord-link href="#discord">Discord</a></li>
+  </ul>
+  <button class="btn" type="button" data-open-connect>Join Now</button>
+</aside>
+
+<main>
+
+<!-- ═════════════════════════════ HERO ════════════════════════════ -->
+<header class="hero">
+  <div class="hero-media" data-hero-media>
+    <!-- Stand-in until a gameplay clip is set in site.config.js:
+         a floodlit night match, seen through a blur. -->
+    <div class="standin" aria-hidden="true">
+      <div class="standin-sky"></div>
+
+      <div class="standin-pitch">
+        <svg viewBox="0 0 1050 680" preserveAspectRatio="none">
+          <defs>
+            <filter id="soft" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="4"/></filter>
+          </defs>
+          <g filter="url(#soft)">
+            <rect width="1050" height="680" fill="#1d6b3c"/>
+            <g fill="#237a45">
+              <rect x="0" width="105" height="680"/><rect x="210" width="105" height="680"/>
+              <rect x="420" width="105" height="680"/><rect x="630" width="105" height="680"/>
+              <rect x="840" width="105" height="680"/>
+            </g>
+            <g fill="none" stroke="#e9f5ec" stroke-opacity=".75" stroke-width="7">
+              <rect x="30" y="30" width="990" height="620"/>
+              <line x1="525" y1="30" x2="525" y2="650"/>
+              <circle cx="525" cy="340" r="92"/>
+              <rect x="30" y="138" width="165" height="404"/>
+              <rect x="855" y="138" width="165" height="404"/>
+              <rect x="30" y="248" width="55" height="184"/>
+              <rect x="965" y="248" width="55" height="184"/>
+            </g>
+            <g fill="#e9f5ec" fill-opacity=".8">
+              <circle cx="525" cy="340" r="7"/><circle cx="140" cy="340" r="6"/><circle cx="910" cy="340" r="6"/>
+            </g>
+          </g>
+        </svg>
+
+        <div class="standin-players">
+          <i style="--c:var(--team-1);left:30%;top:36%;--s:4.5vw;--d:14s;--x1:5vw;--y1:-2vh;--x2:-3vw;--y2:3vh"></i>
+          <i style="--c:var(--team-1);left:38%;top:58%;--s:4.2vw;--d:17s;--o:-4s;--x1:4vw;--y1:3vh;--x2:-5vw;--y2:-2vh"></i>
+          <i style="--c:var(--team-1);left:22%;top:50%;--s:4vw;--d:19s;--o:-8s;--x1:6vw;--y1:-3vh;--x2:2vw;--y2:4vh"></i>
+          <i style="--c:var(--team-1);left:44%;top:30%;--s:3.8vw;--d:15s;--o:-2s;--x1:-4vw;--y1:4vh;--x2:5vw;--y2:-1vh"></i>
+          <i style="--c:var(--team-2);left:62%;top:40%;--s:4.5vw;--d:16s;--o:-6s;--x1:-5vw;--y1:2vh;--x2:3vw;--y2:-3vh"></i>
+          <i style="--c:var(--team-2);left:70%;top:60%;--s:4.2vw;--d:18s;--o:-3s;--x1:-3vw;--y1:-4vh;--x2:4vw;--y2:2vh"></i>
+          <i style="--c:var(--team-2);left:56%;top:52%;--s:4vw;--d:13s;--o:-9s;--x1:5vw;--y1:3vh;--x2:-6vw;--y2:-1vh"></i>
+          <i style="--c:var(--team-2);left:78%;top:34%;--s:3.8vw;--d:20s;--o:-5s;--x1:-6vw;--y1:3vh;--x2:1vw;--y2:4vh"></i>
+          <!-- the ball: a spectral arrow, so it glows -->
+          <i style="--c:#fff7c2;left:50%;top:46%;--s:2.6vw;--d:9s;--o:-1s;--x1:-7vw;--y1:3vh;--x2:8vw;--y2:-2vh"></i>
+        </div>
+      </div>
+
+      <div class="standin-lights">
+        <i style="left:4%;top:7%;--s:9vw;--d:4.5s"></i>
+        <i style="left:15%;top:11%;--s:5vw;--d:6s;--o:-2s"></i>
+        <i style="left:81%;top:6%;--s:10vw;--d:5.5s;--o:-1s"></i>
+        <i style="left:91%;top:12%;--s:5vw;--d:4s;--o:-3s"></i>
+      </div>
+
+      <div class="standin-grade"></div>
+    </div>
+  </div>
+
+  <div class="container hero-stack">
+    <p class="hero-sub" data-reveal="up" data-version>Java Edition | Open Alpha</p>
+    <h1 class="hero-title" data-reveal="up" style="--delay:.18s">
+      The home of<br><span class="grad">Minecraft soccer.</span>
+    </h1>
+    <div data-reveal="right" style="--delay:.32s">
+      <button class="btn btn-lg hero-cta" type="button" data-open-connect>
+        Join Now
+        <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════ GAME MODES ═════════════════════════ -->
+<section class="band modes" id="modes" aria-labelledby="modes-title">
+  <div class="container">
+    <div class="section-head" data-reveal="up">
+      <h2 class="section-title" id="modes-title">Game <span class="grad">Modes</span></h2>
+      <p class="section-lead">Four ways to play, and the server referees every one.</p>
+    </div>
+
+    <div class="modes-row" data-slider>
+      <div class="modes-text">
+        <div class="mode-panel" data-mode-panel aria-live="polite">
+          <!-- filled from the MODES list in site.js -->
+          <h3 class="mode-name grad" data-mode-name>Match</h3>
+          <p class="mode-desc" data-mode-desc></p>
+          <div class="mode-meta">
+            <p class="tag" data-mode-tag></p>
+            <hr />
+            <a class="more" data-mode-link href="rules/#modes">How it works
+              <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="pager" role="group" aria-label="Choose a game mode">
+          <button class="pg-arrow" type="button" data-prev aria-label="Previous mode">
+            <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M12 0v20H9v-3H6v-3H3v-3H0V9h3V6h3V3h3V0z"/></svg>
+          </button>
+          <span class="pg-dots" data-dots style="display:flex;gap:1rem;align-items:center"></span>
+          <button class="pg-arrow" type="button" data-next aria-label="Next mode">
+            <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M0 0v20h3v-3h3v-3h3v-3h3V9H9V6H6V3H3V0z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="modes-art" aria-hidden="true">
+        <!-- one illustration per mode; the shared pitch is drawn in each -->
+        <svg class="mode-art is-on" data-art="match" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
+          <use href="#art-pitch"/>
+          <!-- keep everything inside y 60-340: `slice` crops the top and
+               bottom when the panel is wider than 16:10 -->
+          <g class="art-t1">
+            <circle cx="100" cy="200" r="9"/><circle cx="170" cy="130" r="9"/><circle cx="170" cy="270" r="9"/>
+            <circle cx="215" cy="200" r="9"/><circle cx="232" cy="118" r="9"/><circle cx="250" cy="290" r="9"/><circle cx="290" cy="225" r="9"/>
+          </g>
+          <g class="art-t2">
+            <circle cx="540" cy="200" r="9"/><circle cx="470" cy="130" r="9"/><circle cx="470" cy="270" r="9"/>
+            <circle cx="425" cy="200" r="9"/><circle cx="408" cy="118" r="9"/><circle cx="390" cy="290" r="9"/><circle cx="350" cy="225" r="9"/>
+          </g>
+          <circle class="art-ball" cx="320" cy="200" r="6"/>
+          <g class="art-board">
+            <text x="320" y="124" text-anchor="middle" class="art-score art-score-sm"><tspan class="art-t1">2</tspan><tspan class="art-ink" dx="12">-</tspan><tspan class="art-t2" dx="12">1</tspan></text>
+            <text x="320" y="146" text-anchor="middle" class="art-caption art-caption-sm">1ST HALF  07:42</text>
+          </g>
+        </svg>
+
+        <svg class="mode-art" data-art="knockout" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
+          <use href="#art-pitch"/>
+          <rect x="480" y="130" width="120" height="140" class="art-hi"/>
+          <circle class="art-ball" cx="544" cy="200" r="7"/>
+          <g class="art-board">
+            <text x="250" y="150" text-anchor="middle" class="art-caption">PENALTIES</text>
+            <g class="art-t1"><circle cx="205" cy="180" r="10"/><circle cx="235" cy="180" r="10"/><circle cx="265" cy="180" r="10" class="art-miss"/><circle cx="295" cy="180" r="10"/></g>
+            <g class="art-t2"><circle cx="205" cy="215" r="10"/><circle cx="235" cy="215" r="10" class="art-miss"/><circle cx="265" cy="215" r="10"/><circle cx="295" cy="215" r="10" class="art-open"/></g>
+            <text x="250" y="258" text-anchor="middle" class="art-caption art-dim">SUDDEN DEATH</text>
+          </g>
+        </svg>
+
+        <svg class="mode-art" data-art="scrim" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
+          <use href="#art-pitch"/>
+          <path class="art-arc" d="M320 200 Q320 30 355 150"/>
+          <circle class="art-ball" cx="355" cy="150" r="7"/>
+          <g class="art-t1"><circle cx="270" cy="170" r="9"/><circle cx="290" cy="245" r="9"/><circle cx="250" cy="215" r="9"/></g>
+          <g class="art-t2"><circle cx="385" cy="175" r="9"/><circle cx="360" cy="245" r="9"/><circle cx="400" cy="220" r="9"/></g>
+          <text x="320" y="326" text-anchor="middle" class="art-caption">LOB FROM THE CENTRE SPOT</text>
+        </svg>
+
+        <svg class="mode-art" data-art="quick" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
+          <use href="#art-pitch"/>
+          <text x="320" y="150" text-anchor="middle" class="art-score">FIRST TO 5</text>
+          <g class="art-t1"><rect x="230" y="190" width="26" height="26"/><rect x="266" y="190" width="26" height="26"/><rect x="302" y="190" width="26" height="26"/><rect x="338" y="190" width="26" height="26" class="art-open"/><rect x="374" y="190" width="26" height="26" class="art-open"/></g>
+          <g class="art-t2"><rect x="230" y="232" width="26" height="26"/><rect x="266" y="232" width="26" height="26"/><rect x="302" y="232" width="26" height="26"/><rect x="338" y="232" width="26" height="26"/><rect x="374" y="232" width="26" height="26" class="art-open"/></g>
+        </svg>
+
+        <!-- the shared pitch, drawn once -->
+        <svg width="0" height="0" style="position:absolute">
+          <defs>
+            <g id="art-pitch">
+              <rect width="640" height="400" class="art-grass-a"/>
+              <g class="art-grass-b">
+                <rect x="40" width="70" height="400"/><rect x="180" width="70" height="400"/>
+                <rect x="320" width="70" height="400"/><rect x="460" width="70" height="400"/>
+              </g>
+              <g class="art-line">
+                <rect x="40" y="40" width="560" height="320"/>
+                <line x1="320" y1="40" x2="320" y2="360"/>
+                <circle cx="320" cy="200" r="46"/>
+                <rect x="40" y="130" width="80" height="140"/>
+                <rect x="520" y="130" width="80" height="140"/>
+                <rect x="40" y="172" width="28" height="56"/>
+                <rect x="572" y="172" width="28" height="56"/>
+              </g>
+              <g class="art-dot"><circle cx="320" cy="200" r="3.5"/><circle cx="96" cy="200" r="3"/><circle cx="544" cy="200" r="3"/></g>
+            </g>
+          </defs>
+        </svg>
+      </div>
+    </div>
+
+    <div class="modes-foot" data-reveal="up" style="--delay:.4s">
+      <a class="btn btn-dark" href="rules/">
+        Read the rules
+        <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════ FEATURE: THE BOW ═════════════════════ -->
+<section class="band alt feature img-left" aria-labelledby="f-bow">
+  <div class="container">
+    <div class="card" data-reveal-group>
+      <div class="feature-body">
+        <div class="feature-render"><img src="assets/img/players/DuckyWins.png" alt="" loading="lazy" width="512" height="832" /></div>
+        <div class="feature-text">
+          <div data-reveal="from-r">
+            <h2 class="feature-title" id="f-bow">Played with a <span class="grad">bow</span></h2>
+            <p class="feature-sub">The ball is a spectral arrow.</p>
+          </div>
+          <p class="feature-para" data-reveal="from-r" style="--delay:.1s">
+            Hold the arrow and you have the ball, glowing in your team's colour so
+            everyone can see you through walls. Shoot to pass or to score: hit a
+            teammate and it's a pass, hit an opponent and it's theirs. Miss, and the
+            ball rests on the grass until someone runs over it.
+          </p>
+          <div data-reveal="from-r" style="--delay:.2s">
+            <a class="btn" href="rules/#start">
+              How to play
+              <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════ FEATURE: THE REFEREE ═══════════════════ -->
+<section class="band feature img-right" aria-labelledby="f-ref">
+  <div class="container">
+    <div class="card" data-reveal-group>
+      <div class="feature-body">
+        <div class="feature-render"><img src="assets/img/players/MrTpot.png" alt="" loading="lazy" width="512" height="832" /></div>
+        <div class="feature-text">
+          <div data-reveal="from-l">
+            <h2 class="feature-title" id="f-ref">A referee that <span class="grad">never blinks</span></h2>
+            <p class="feature-sub">Real rules, called automatically.</p>
+          </div>
+          <p class="feature-para" data-reveal="from-l" style="--delay:.1s">
+            Kickoffs go backward. Goals only count from beyond halfway and outside
+            the box, and if yours doesn't, a NO GOAL sign over the net tells you why.
+            Corners, pass-ins and goal kicks are called the moment the ball settles.
+          </p>
+          <div data-reveal="from-l" style="--delay:.2s">
+            <a class="btn" href="rules/#pitch">
+              See every rule
+              <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════ FEATURE: READY ZONES ════════════════════ -->
+<section class="band alt feature img-left" aria-labelledby="f-ready">
+  <div class="container">
+    <div class="card" data-reveal-group>
+      <div class="feature-body">
+        <div class="feature-render"><img src="assets/img/players/Chaseler.png" alt="" loading="lazy" width="512" height="832" /></div>
+        <div class="feature-text">
+          <div data-reveal="from-r">
+            <h2 class="feature-title" id="f-ready">Walk in. <span class="grad">Kick off.</span></h2>
+            <p class="feature-sub">No queue, and no waiting for staff.</p>
+          </div>
+          <p class="feature-para" data-reveal="from-r" style="--delay:.1s">
+            Step into a pitch's ready zone and a hologram counts who's in. Fill it
+            and the countdown starts: rising chimes, 3, 2, 1, then GO! and fireworks
+            in the team colours. Stand in the half you want to defend and that's
+            your side.
+          </p>
+          <div data-reveal="from-r" style="--delay:.2s">
+            <button class="btn" type="button" data-open-connect>
+              Join Now
+              <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ POSITIONS ═════════════════════════ -->
+<section class="band" aria-labelledby="positions-title">
+  <div class="container">
+    <div class="card positions-card">
+      <div data-reveal="up">
+        <h2 class="section-title" id="positions-title">Seven <span class="grad">positions</span></h2>
+        <p>
+          Goalkeeper, centre back, left and right defence, left and right wing,
+          and forward, each with its own spot on the pitch. Pick yours from a menu
+          laid out like the field. Skip it and you're handed a free one at kickoff.
+        </p>
+        <span class="cmd">/position</span>
+      </div>
+
+      <div class="pitch-picker" data-reveal="up" style="--delay:.15s">
+        <svg viewBox="0 0 680 880" aria-hidden="true">
+          <rect width="680" height="880" rx="14" class="art-grass-a"/>
+          <g class="art-grass-b">
+            <rect y="40" width="680" height="80"/><rect y="200" width="680" height="80"/>
+            <rect y="360" width="680" height="80"/><rect y="520" width="680" height="80"/><rect y="680" width="680" height="80"/>
+          </g>
+          <g class="art-line">
+            <rect x="40" y="40" width="600" height="800"/>
+            <path d="M40 40h600"/>
+            <path d="M246 40a94 94 0 0 0 188 0"/>
+            <rect x="170" y="700" width="340" height="140"/>
+            <rect x="262" y="790" width="156" height="50"/>
+          </g>
+        </svg>
+        <!-- attack at the top, keeper at the bottom, as in the in-game picker -->
+        <button class="pos" type="button" style="left:50%;top:15%">FW<span class="pos-label">Forward: takes the kickoff</span></button>
+        <button class="pos" type="button" style="left:20%;top:31%">LW<span class="pos-label">Left Wing</span></button>
+        <button class="pos" type="button" style="left:80%;top:31%">RW<span class="pos-label">Right Wing</span></button>
+        <button class="pos" type="button" style="left:50%;top:57%">CB<span class="pos-label">Centre Back</span></button>
+        <button class="pos" type="button" style="left:21%;top:66%">LD<span class="pos-label">Left Defence</span></button>
+        <button class="pos" type="button" style="left:79%;top:66%">RD<span class="pos-label">Right Defence</span></button>
+        <button class="pos" type="button" style="left:50%;top:88%">GK<span class="pos-label">Goalkeeper</span></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════ STATS + TIER LIST ═════════════════════ -->
+<section class="band alt" aria-labelledby="stats-title">
+  <div class="container">
+    <div class="card stats-card">
+      <div data-reveal="up">
+        <h2 class="section-title" id="stats-title">Every goal <span class="grad">counts</span></h2>
+        <p>
+          Your career follows you from match to match. <code>/stats</code> shows your
+          record, the best player on the pitch is named MVP at full time, and the
+          leaderboards at spawn update themselves.
+        </p>
+        <ul class="stat-list" aria-label="Tracked stats">
+          <li>Goals</li><li>Assists</li><li>Saves</li><li>Steals</li><li>Interceptions</li>
+          <li>Clean sheets</li><li>Accuracy</li><li>MVPs</li><li>Wins</li>
+        </ul>
+      </div>
+
+      <div class="tier-top" data-reveal="up" style="--delay:.15s" data-tier-top>
+        <div class="tier-top-head">
+          <h3>Top of the <span class="grad">tier list</span></h3>
+          <small data-tier-updated></small>
+        </div>
+        <ul class="tier-players" data-tier-players>
+          <li class="tier-empty">Loading the tier list&hellip;</li>
+        </ul>
+        <a class="more" data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">View the full tier list
+          <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ DISCORD ══════════════════════════ -->
+<section class="band feature img-right" id="discord" aria-labelledby="f-discord">
+  <div class="container">
+    <div class="card" data-reveal-group>
+      <div class="feature-body">
+        <div class="feature-render"><img src="assets/img/players/s8ns.png" alt="" loading="lazy" width="512" height="832" /></div>
+        <div class="feature-text">
+          <div data-reveal="from-l">
+            <h2 class="feature-title" id="f-discord">The MCS <span class="grad">Discord</span></h2>
+            <p class="feature-sub">Updates, announcements and feedback.</p>
+          </div>
+          <p class="feature-para" data-reveal="from-l" style="--delay:.1s">
+            MCS is in open alpha and it's being built with its players. Join the
+            Discord to hear about updates first, find people to play with, and tell
+            us what to fix next.
+          </p>
+          <div data-reveal="from-l" style="--delay:.2s">
+            <a class="btn btn-discord" data-discord-button href="#" target="_blank" rel="noopener">
+              <span data-discord-label>Join the Discord</span>
+              <svg viewBox="0 0 24 24" width="25" height="25" fill="currentColor" aria-hidden="true"><path d="M19.3 5.3A16.6 16.6 0 0 0 15.2 4l-.2.4a15.5 15.5 0 0 1 3.6 1.2 12.6 12.6 0 0 0-10.9 0A15.5 15.5 0 0 1 11.2 4.4L11 4a16.6 16.6 0 0 0-4.1 1.3C4.3 9.2 3.6 13 4 16.7a16.7 16.7 0 0 0 5 2.6l.7-1.2a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 9.3 0l.4.3a10.8 10.8 0 0 1-1.7.8l.7 1.2a16.7 16.7 0 0 0 5-2.6c.5-4.3-.6-8.1-2.8-11.4ZM9.6 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.8 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ════════════════════════════ FOOTER ═══════════════════════════ -->
+<footer class="footer">
+  <div class="container">
+    <ul class="footer-links">
+      <li><a href="./" aria-current="page">Home</a></li>
+      <li><a href="rules/">Rules</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+      <li><a data-discord-link href="#discord">Discord</a></li>
+      <li><a href="#" data-open-connect>How to join</a></li>
+    </ul>
+
+    <div class="footer-row">
+      <div class="footer-brand">
+        <img src="assets/img/logo.png" alt="MCS" loading="lazy" />
+        <p class="footer-legal">
+          &copy; <span data-year>2026</span> MCS. All rights reserved.<br>
+          Not an official Minecraft product.<br>
+          Not approved by or associated with Mojang or Microsoft.
+        </p>
+      </div>
+      <ul class="footer-social">
+        <li><a data-discord-link href="#discord" aria-label="Discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.3 5.3A16.6 16.6 0 0 0 15.2 4l-.2.4a15.5 15.5 0 0 1 3.6 1.2 12.6 12.6 0 0 0-10.9 0A15.5 15.5 0 0 1 11.2 4.4L11 4a16.6 16.6 0 0 0-4.1 1.3C4.3 9.2 3.6 13 4 16.7a16.7 16.7 0 0 0 5 2.6l.7-1.2a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 9.3 0l.4.3a10.8 10.8 0 0 1-1.7.8l.7 1.2a16.7 16.7 0 0 0 5-2.6c.5-4.3-.6-8.1-2.8-11.4ZM9.6 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.8 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg></a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<!-- ═════════════════════════ CONNECT MODAL ═══════════════════════ -->
+<div class="modal" id="connect" role="dialog" aria-modal="true" aria-labelledby="connect-title" aria-hidden="true" inert>
+  <div class="modal-box">
+    <button class="modal-close" type="button" aria-label="Close" data-close-connect><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+    <div class="modal-head">
+      <img src="assets/img/logo.png" alt="" />
+      <div>
+        <h2 id="connect-title">Connect to the <span class="grad">server</span></h2>
+      </div>
+    </div>
+
+    <ol class="steps">
+      <li>Open <b>Minecraft: Java Edition</b> and go to <b>Multiplayer</b>.</li>
+      <li>Click <b>Add Server</b> and enter
+        <button class="chip" type="button" data-copy-address aria-label="Copy the server address">
+          <span data-address>play.mcsoccer.net</span>
+          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg>
+        </button>
+      </li>
+      <li>Join, and <b>accept the resource pack</b>. It carries the kits, crests and goals, so the server needs it.</li>
+      <li>Walk into a pitch's <b>ready zone</b> and the match starts itself.</li>
+    </ol>
+    <p class="modal-note">Click the address to copy it.</p>
+
+    <button class="btn" type="button" data-close-connect>
+      Got it
+      <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script src="site.config.js"></script>
+<script src="assets/js/site.js"></script>
+</body>
+</html>
