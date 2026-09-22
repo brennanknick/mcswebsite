@@ -9,19 +9,38 @@
   const CFG = window.MCS || {};
   const $ = (s, root) => (root || document).querySelector(s);
   const $$ = (s, root) => [...(root || document).querySelectorAll(s)];
+  const has = (k) => Object.prototype.hasOwnProperty.call(CFG, k);
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* ── config into the page ──────────────────────────────────────── */
+  /* ── config into the page ──────────────────────────────────────────
+     A value set to "" hides whatever depends on it, as site.config.js
+     promises. A value that's missing entirely (config failed to load)
+     leaves the built-in defaults in the markup alone. */
+
+  // Captured before anything can swap the label (e.g. to "Copied!"), so a
+  // copy always puts the real address on the clipboard.
+  const firstAddress = $("[data-address]");
+  const ADDRESS = ((CFG.address || (firstAddress && firstAddress.textContent) || "") + "").trim();
 
   if (CFG.address) {
     $$("[data-address]").forEach((el) => (el.textContent = CFG.address));
+  } else if (has("address")) {
+    $$("[data-copy-address]").forEach((el) => (el.hidden = true));
   }
 
   if (CFG.versionLine) {
     $$("[data-version]").forEach((el) => (el.textContent = CFG.versionLine));
+  } else if (has("versionLine")) {
+    $$("[data-version]").forEach((el) => (el.hidden = true));
   }
 
   if (CFG.tierListUrl) {
     $$("[data-tierlist-link]").forEach((a) => (a.href = CFG.tierListUrl));
+  } else if (has("tierListUrl")) {
+    $$("[data-tierlist-link]").forEach((a) => {
+      const li = a.closest("li");
+      (li || a).hidden = true;
+    });
   }
 
   const invite = (CFG.discordInvite || "").trim();
@@ -47,28 +66,51 @@
 
   $$("[data-year]").forEach((el) => (el.textContent = String(new Date().getFullYear())));
 
+  /* ── one polite live region for status messages ────────────────── */
+
+  const status = document.createElement("div");
+  status.className = "visually-hidden";
+  status.setAttribute("role", "status");
+  document.body.appendChild(status);
+  let statusTimer = null;
+  const announce = (msg) => {
+    // Screen readers that honour aria-modal ignore everything outside an
+    // open dialog, so inside the join modal use the region that lives there.
+    const open = $(".modal.is-open [data-status]");
+    const region = open || status;
+    // clear first so repeating the same message is still announced
+    region.textContent = "";
+    clearTimeout(statusTimer);
+    setTimeout(() => (region.textContent = msg), 50);
+    statusTimer = setTimeout(() => (region.textContent = ""), 4000);
+  };
+
   /* ── hero video ────────────────────────────────────────────────── */
 
   const media = $("[data-hero-media]");
   if (media && CFG.heroVideo) {
     const v = document.createElement("video");
     v.muted = true;
-    v.autoplay = true;
-    v.loop = true;
     v.playsInline = true;
     v.setAttribute("playsinline", "");
     v.setAttribute("aria-hidden", "true");
     if (CFG.heroPoster) v.poster = CFG.heroPoster;
+    // A looping background with no pause control can't run for people who
+    // asked for reduced motion (WCAG 2.2.2): they get a still frame.
+    v.loop = !reduceMotion;
+    v.preload = reduceMotion ? "metadata" : "auto";
     v.src = CFG.heroVideo;
     // a broken or missing file falls back to the stand-in underneath
     v.addEventListener("error", () => { v.remove(); media.classList.remove("has-video"); });
     v.addEventListener("loadeddata", () => media.classList.add("has-video"), { once: true });
     media.appendChild(v);
-    // the autoplay attribute is only a request; ask explicitly as well.
-    // Muted video is allowed to autoplay, so a rejection here just means
-    // the browser is saving power, and the poster/stand-in shows instead.
-    const p = v.play();
-    if (p && p.catch) p.catch(() => {});
+    if (!reduceMotion) {
+      // the autoplay attribute is only a request; ask explicitly as well.
+      // A rejection just means the browser is saving power; the poster shows.
+      v.autoplay = true;
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {});
+    }
   }
 
   /* ── copy the server address ───────────────────────────────────── */
@@ -78,16 +120,19 @@
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
-      // clipboard API needs https or localhost; fall back to a selection
+      // clipboard API needs https or localhost; fall back to a selection,
+      // and give focus back afterwards so keyboard users keep their place
+      const prev = document.activeElement;
       const t = document.createElement("textarea");
       t.value = text;
       t.setAttribute("readonly", "");
-      t.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+      t.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
       document.body.appendChild(t);
       t.select();
       let ok = false;
       try { ok = document.execCommand("copy"); } catch {}
       t.remove();
+      if (prev && prev.focus) prev.focus({ preventScroll: true });
       return ok;
     }
   }
@@ -99,8 +144,11 @@
 
     const revert = () => btn.classList.remove("is-copied");
 
-    btn.addEventListener("mouseenter", () => (hovering = true));
-    btn.addEventListener("mouseleave", () => {
+    // Only a real mouse counts as hovering. A touch tap also fires
+    // compatibility mouse events, which would pin the label on "Copied".
+    btn.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") hovering = true; });
+    btn.addEventListener("pointerleave", (e) => {
+      if (e.pointerType !== "mouse") return;
       hovering = false;
       if (!btn.classList.contains("is-copied")) return;
       // as on hoplite: swap back on leave, but never before a full second
@@ -111,21 +159,22 @@
 
     btn.addEventListener("click", async (e) => {
       e.preventDefault();
-      const ok = await copyText(CFG.address || btn.textContent.trim());
+      if (!ADDRESS) return;
+      const ok = await copyText(ADDRESS);
       if (!ok) return;
+      announce("Server address copied");
 
       if ($(".slot", btn)) {
         copiedAt = Date.now();
         btn.classList.add("is-copied");
         clearTimeout(timer);
-        // touch and keyboard never fire mouseleave, so revert on a timer too
         timer = setTimeout(() => { if (!hovering) revert(); }, 2200);
       } else {
         // the inline chip in the join steps
         const label = $("[data-address]", btn);
         if (!label) return;
         label.textContent = "Copied!";
-        setTimeout(() => (label.textContent = CFG.address || "play.mcsoccer.net"), 1400);
+        setTimeout(() => (label.textContent = ADDRESS), 1400);
       }
     });
   });
@@ -139,6 +188,7 @@
   function openLayer(layer, extra) {
     if (!layer) return;
     layer._returnFocus = document.activeElement;
+    layer._openedAt = Date.now();
     backdropParts().forEach((el) => { if (el !== layer) el.inert = true; });
     layer.inert = false;
     layer.setAttribute("aria-hidden", "false");
@@ -167,15 +217,33 @@
   const scrim = $("[data-scrim]");
   const toggle = $("[data-drawer-open]");
 
+  const closeDrawer = () => {
+    closeLayer(drawer, scrim);
+    if (toggle) toggle.setAttribute("aria-expanded", "false");
+  };
+
   $$("[data-open-connect]").forEach((b) =>
     b.addEventListener("click", (e) => {
       e.preventDefault();
-      if (drawer && drawer.classList.contains("is-open")) closeLayer(drawer, scrim);
+      // closeDrawer, not closeLayer, so the toggle's aria-expanded resets too
+      if (drawer && drawer.classList.contains("is-open")) closeDrawer();
       openLayer(modal);
     })
   );
   $$("[data-close-connect]").forEach((b) => b.addEventListener("click", () => closeLayer(modal)));
-  if (modal) modal.addEventListener("click", (e) => { if (e.target === modal) closeLayer(modal); });
+
+  if (modal) {
+    // Close on the backdrop only when the press also STARTED there. That
+    // stops a drag-select ending outside the box, or the second click of a
+    // double-click that opened it, from closing the dialog.
+    let downOnBackdrop = false;
+    modal.addEventListener("pointerdown", (e) => { downOnBackdrop = e.target === modal; });
+    modal.addEventListener("click", (e) => {
+      if (e.target !== modal || !downOnBackdrop) return;
+      if (Date.now() - (modal._openedAt || 0) < 350) return;
+      closeLayer(modal);
+    });
+  }
 
   if (toggle) {
     toggle.addEventListener("click", () => {
@@ -183,10 +251,6 @@
       toggle.setAttribute("aria-expanded", "true");
     });
   }
-  const closeDrawer = () => {
-    closeLayer(drawer, scrim);
-    if (toggle) toggle.setAttribute("aria-expanded", "false");
-  };
   $$("[data-drawer-close]").forEach((b) => b.addEventListener("click", closeDrawer));
   if (scrim) scrim.addEventListener("click", closeDrawer);
   if (drawer) $$("a", drawer).forEach((a) => a.addEventListener("click", closeDrawer));
@@ -251,7 +315,7 @@
       b.className = "pg-dot";
       b.setAttribute("aria-label", m.name);
       b.innerHTML = "<i></i>";
-      b.addEventListener("click", () => go(i));
+      b.addEventListener("click", () => go(i, Math.sign(i - current)));
       dotsWrap.appendChild(b);
       return b;
     });
@@ -265,10 +329,12 @@
       arts.forEach((a) => a.classList.toggle("is-on", a.dataset.art === m.key));
     }
 
-    function go(i) {
+    // `dir` comes from the control the user pressed (+1 next, -1 previous),
+    // so wrapping from the first mode back to the last still slides back.
+    function go(i, dir) {
       i = (i + MODES.length) % MODES.length;
       if (i === current || busy) return;
-      const forward = i > current || (current === MODES.length - 1 && i === 0);
+      const forward = dir >= 0;
       busy = true;
 
       // text leaves one way, the new text arrives from the other
@@ -284,11 +350,11 @@
       }, 200);
     }
 
-    $("[data-prev]", slider).addEventListener("click", () => go(current - 1));
-    $("[data-next]", slider).addEventListener("click", () => go(current + 1));
+    $("[data-prev]", slider).addEventListener("click", () => go(current - 1, -1));
+    $("[data-next]", slider).addEventListener("click", () => go(current + 1, +1));
     slider.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft") go(current - 1);
-      if (e.key === "ArrowRight") go(current + 1);
+      if (e.key === "ArrowLeft") go(current - 1, -1);
+      if (e.key === "ArrowRight") go(current + 1, +1);
     });
 
     fill(0);
@@ -297,7 +363,11 @@
   /* ── top of the tier list, read live from the tier list site ───── */
 
   const tierBox = $("[data-tier-top]");
-  if (tierBox && CFG.tierListUrl) {
+  if (tierBox && !CFG.tierListUrl) {
+    // no tier list configured (or config failed to load): don't leave a
+    // "Loading…" box up forever
+    tierBox.hidden = true;
+  } else if (tierBox) {
     const list = $("[data-tier-players]", tierBox);
     const fail = (msg) => {
       list.innerHTML = "";
@@ -307,51 +377,65 @@
       list.appendChild(li);
     };
 
-    const s = document.createElement("script");
-    s.src = CFG.tierListUrl.replace(/\/?$/, "/") + "data.js";
-    s.async = true;
-    s.onload = () => {
-      // data.js declares a global `const TIER_DATA`, which is reachable by
-      // name from here even though it is not a property of window
-      let data = null;
-      try { data = typeof TIER_DATA !== "undefined" ? TIER_DATA : null; } catch {}
-      const top = data && data.tiers && data.tiers[0];
-      if (!top) return fail("The tier list couldn't be read right now.");
+    let dataUrl = null;
+    try {
+      const base = new URL(CFG.tierListUrl, location.href);
+      base.search = "";
+      base.hash = "";
+      if (!base.pathname.endsWith("/")) base.pathname += "/";
+      dataUrl = new URL("data.js", base).href;
+    } catch {}
 
-      list.innerHTML = "";
-      ["high", "low"].forEach((band) => {
-        (top[band] || []).forEach((name) => {
-          const li = document.createElement("li");
-          li.className = band === "low" ? "low" : "";
-          li.style.setProperty("--rail", top.color || "");
+    if (!dataUrl) {
+      fail("The tier list couldn't be reached right now.");
+    } else {
+      const s = document.createElement("script");
+      s.src = dataUrl;
+      s.async = true;
+      s.onload = () => {
+        // data.js declares a global `const TIER_DATA`, which is reachable by
+        // name from here even though it is not a property of window
+        let data = null;
+        try { data = typeof TIER_DATA !== "undefined" ? TIER_DATA : null; } catch {}
+        const top = data && Array.isArray(data.tiers) && data.tiers[0];
+        if (!top) return fail("The tier list couldn't be read right now.");
 
-          const img = document.createElement("img");
-          img.alt = "";
-          img.loading = "lazy";
-          img.src = `https://mc-heads.net/avatar/${encodeURIComponent(name)}/56`;
-          img.onerror = () => {
-            img.onerror = null;
-            img.src = `https://minotar.net/helm/${encodeURIComponent(name)}/56`;
-          };
+        list.innerHTML = "";
+        ["high", "low"].forEach((band) => {
+          (Array.isArray(top[band]) ? top[band] : []).forEach((name) => {
+            name = String(name);
+            const li = document.createElement("li");
+            li.className = band === "low" ? "low" : "";
+            if (typeof top.color === "string") li.style.setProperty("--rail", top.color);
 
-          const n = document.createElement("span");
-          n.textContent = name;
-          const tag = document.createElement("small");
-          tag.textContent = (band === "high" ? "HT" : "LT") + top.tier;
+            const img = document.createElement("img");
+            img.alt = "";
+            img.loading = "lazy";
+            img.src = `https://mc-heads.net/avatar/${encodeURIComponent(name)}/56`;
+            img.onerror = () => {
+              img.onerror = null;
+              img.src = `https://minotar.net/helm/${encodeURIComponent(name)}/56`;
+            };
 
-          li.append(img, n, tag);
-          list.appendChild(li);
+            const n = document.createElement("span");
+            n.textContent = name;
+            const tag = document.createElement("small");
+            tag.textContent = (band === "high" ? "HT" : "LT") + top.tier;
+
+            li.append(img, n, tag);
+            list.appendChild(li);
+          });
         });
-      });
 
-      if (!list.children.length) fail("Tier 1 is empty right now.");
+        if (!list.children.length) fail("Tier 1 is empty right now.");
 
-      const up = data.meta && data.meta.updated;
-      const upEl = $("[data-tier-updated]", tierBox);
-      if (up && upEl) upEl.textContent = "Updated " + up;
-    };
-    s.onerror = () => fail("The tier list couldn't be reached right now.");
-    document.head.appendChild(s);
+        const up = data.meta && data.meta.updated;
+        const upEl = $("[data-tier-updated]", tierBox);
+        if (up && upEl) upEl.textContent = "Updated " + up;
+      };
+      s.onerror = () => fail("The tier list couldn't be reached right now.");
+      document.head.appendChild(s);
+    }
   }
 
   /* ── scroll reveals ────────────────────────────────────────────────
@@ -365,28 +449,39 @@
       root.classList.remove("reveal-on");
     } else {
       const show = (el) => el.classList.add("is-in");
+      const showAll = () => $$("[data-reveal]").forEach(show);
 
-      // feature cards: their text groups spring in together
-      const groupIO = new IntersectionObserver((entries) => {
+      // Reveal as soon as any part of a target is on screen (a little way
+      // in from the bottom edge). An earlier version waited for 35% of each
+      // feature card, which a card taller than ~2.9 viewports can never
+      // reach: at 300-400% zoom its text and buttons stayed invisible.
+      const io = new IntersectionObserver((entries) => {
         entries.forEach((en) => {
           if (!en.isIntersecting) return;
-          $$("[data-reveal]", en.target).forEach(show);
-          groupIO.unobserve(en.target);
+          const t = en.target;
+          if (t.hasAttribute("data-reveal-group")) $$("[data-reveal]", t).forEach(show);
+          else show(t);
+          io.unobserve(t);
         });
-      }, { threshold: 0.35 });
+      }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
 
-      const soloIO = new IntersectionObserver((entries) => {
-        entries.forEach((en) => {
-          if (!en.isIntersecting) return;
-          show(en.target);
-          soloIO.unobserve(en.target);
-        });
-      }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
-
-      $$("[data-reveal-group]").forEach((g) => groupIO.observe(g));
+      $$("[data-reveal-group]").forEach((g) => io.observe(g));
       $$("[data-reveal]").forEach((el) => {
-        if (!el.closest("[data-reveal-group]")) soloIO.observe(el);
+        if (!el.closest("[data-reveal-group]")) io.observe(el);
       });
+
+      // Anything that takes keyboard focus must already be visible, and so
+      // must the rest of its card, or you'd tab onto a button with no heading.
+      document.addEventListener("focusin", (e) => {
+        if (!e.target.closest) return;
+        const group = e.target.closest("[data-reveal-group]");
+        if (group) return $$("[data-reveal]", group).forEach(show);
+        const el = e.target.closest("[data-reveal]");
+        if (el) show(el);
+      });
+
+      // Printing never scrolls, so observers never fire: show everything.
+      window.addEventListener("beforeprint", showAll);
     }
     window.__mcsRevealReady = true;
   }

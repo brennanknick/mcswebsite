@@ -53,11 +53,12 @@
     </ul>
 
     <div class="nav-cta">
-      <button class="btn address-btn" type="button" data-copy-address aria-label="Copy the server address">
+      <button class="btn address-btn" type="button" data-copy-address>
         <span class="slot">
           <span class="slot-main" data-address>PLAY.MCSOCCER.NET</span>
-          <span class="slot-alt" aria-live="polite">Copied to clipboard!</span>
+          <span class="slot-alt" aria-hidden="true">Copied to clipboard!</span>
         </span>
+        <span class="visually-hidden"> (copy server address)</span>
       </button>
     </div>
 
@@ -390,14 +391,18 @@
             <rect x="262" y="790" width="156" height="50"/>
           </g>
         </svg>
-        <!-- attack at the top, keeper at the bottom, as in the in-game picker -->
-        <button class="pos" type="button" style="left:50%;top:15%">FW<span class="pos-label">Forward: takes the kickoff</span></button>
-        <button class="pos" type="button" style="left:20%;top:31%">LW<span class="pos-label">Left Wing</span></button>
-        <button class="pos" type="button" style="left:80%;top:31%">RW<span class="pos-label">Right Wing</span></button>
-        <button class="pos" type="button" style="left:50%;top:57%">CB<span class="pos-label">Centre Back</span></button>
-        <button class="pos" type="button" style="left:21%;top:66%">LD<span class="pos-label">Left Defence</span></button>
-        <button class="pos" type="button" style="left:79%;top:66%">RD<span class="pos-label">Right Defence</span></button>
-        <button class="pos" type="button" style="left:50%;top:88%">GK<span class="pos-label">Goalkeeper</span></button>
+        <!-- attack at the top, keeper at the bottom, as in the in-game picker.
+             A plain list: these explain, they don't do anything, so they are
+             not buttons. Screen readers read each code with its full name. -->
+        <ul class="pos-list" aria-label="The seven positions">
+          <li class="pos" style="left:50%;top:15%">FW<span class="pos-label">Forward: takes the kickoff</span></li>
+          <li class="pos" style="left:20%;top:31%">LW<span class="pos-label">Left Wing</span></li>
+          <li class="pos" style="left:80%;top:31%">RW<span class="pos-label">Right Wing</span></li>
+          <li class="pos" style="left:50%;top:57%">CB<span class="pos-label">Centre Back</span></li>
+          <li class="pos" style="left:21%;top:66%">LD<span class="pos-label">Left Defence</span></li>
+          <li class="pos" style="left:79%;top:66%">RD<span class="pos-label">Right Defence</span></li>
+          <li class="pos" style="left:50%;top:88%">GK<span class="pos-label">Goalkeeper</span></li>
+        </ul>
       </div>
     </div>
   </div>
@@ -412,11 +417,12 @@
         <p>
           Your career follows you from match to match. <code>/stats</code> shows your
           record, the best player on the pitch is named MVP at full time, and the
-          leaderboards at spawn update themselves.
+          leaderboards at spawn track MVPs, clean sheets and more, updating
+          themselves.
         </p>
-        <ul class="stat-list" aria-label="Tracked stats">
+        <ul class="stat-list" aria-label="What /stats shows">
           <li>Goals</li><li>Assists</li><li>Saves</li><li>Steals</li><li>Interceptions</li>
-          <li>Clean sheets</li><li>Accuracy</li><li>MVPs</li><li>Wins</li>
+          <li>Accuracy</li><li>Wins</li><li>Time on the ball</li>
         </ul>
       </div>
 
@@ -507,15 +513,16 @@
     <ol class="steps">
       <li>Open <b>Minecraft: Java Edition</b> and go to <b>Multiplayer</b>.</li>
       <li>Click <b>Add Server</b> and enter
-        <button class="chip" type="button" data-copy-address aria-label="Copy the server address">
+        <button class="chip" type="button" data-copy-address>
           <span data-address>play.mcsoccer.net</span>
-          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg>
+          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg><span class="visually-hidden"> (copy)</span>
         </button>
       </li>
       <li>Join, and <b>accept the resource pack</b>. It carries the kits, crests and goals, so the server needs it.</li>
       <li>Walk into a pitch's <b>ready zone</b> and the match starts itself.</li>
     </ol>
     <p class="modal-note">Click the address to copy it.</p>
+    <p class="visually-hidden" role="status" data-status></p>
 
     <button class="btn" type="button" data-close-connect>
       Got it

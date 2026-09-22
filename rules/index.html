@@ -47,11 +47,12 @@
     </ul>
 
     <div class="nav-cta">
-      <button class="btn address-btn" type="button" data-copy-address aria-label="Copy the server address">
+      <button class="btn address-btn" type="button" data-copy-address>
         <span class="slot">
           <span class="slot-main" data-address>PLAY.MCSOCCER.NET</span>
-          <span class="slot-alt" aria-live="polite">Copied to clipboard!</span>
+          <span class="slot-alt" aria-hidden="true">Copied to clipboard!</span>
         </span>
+        <span class="visually-hidden"> (copy server address)</span>
       </button>
     </div>
 
@@ -103,9 +104,9 @@
           standing inside, a countdown starts: rising chimes, a ring that shrinks
           to the centre, then <b>3, 2, 1, GO!</b> and the match starts itself.</p>
           <p>Step out and you drop from the count. If it falls below the minimum,
-          the countdown is cancelled until someone comes back. Players already on
-          the pitch's teams count as ready, so a half-full match can be topped up
-          from the zone.</p>
+          the countdown is cancelled until someone comes back. While a match is
+          on, the hologram shows the score, and after full time the zone rests
+          for 30 seconds before it will start the next one.</p>
         </div>
       </details>
 
@@ -191,23 +192,23 @@
           GOAL</b>: a red sign over the net says why, and the defending team gets
           a goal kick. While you carry the ball, the action bar warns you whenever
           you're standing somewhere a shot wouldn't count.</p>
-          <p>The ball has to be travelling <i>into</i> the net, so a shot from
-          behind the goal can never score.</p>
+          <p>A shot over the line only counts once it <b>hits the net or the
+          ground</b>, so a keeper can still catch it on the line. It has to be
+          travelling <i>into</i> the net, so a shot from behind the goal can never
+          score. And you have to shoot: <b>walking the ball in</b> is refused, and
+          it's a goal kick.</p>
         </div>
       </details>
 
       <details class="acc" data-reveal="up">
         <summary>Self-pass</summary>
         <div class="acc-body">
-          <p>You can't instantly collect your own shot. Playing the ball to yourself
-          hands the other team a set piece, and where it happened decides which,
-          judged from their side:</p>
+          <p>You can't instantly collect your own shot. Play the ball to yourself
+          and the other team gets a set piece, decided by where <i>you</i> were
+          standing:</p>
           <ul>
-            <li>Inside the box they're attacking, or past the penalty line:
-            a <b>penalty</b>.</li>
-            <li>Past halfway but short of the penalty line: a <b>free kick</b> they
-            can score from directly.</li>
-            <li>In their own half: a <b>free kick</b> with no direct shot at goal.</li>
+            <li>Inside your own penalty area: a <b>penalty</b> at your own net.</li>
+            <li>Anywhere else: a <b>free kick</b> to them, from that spot.</li>
           </ul>
         </div>
       </details>
@@ -215,10 +216,8 @@
       <details class="acc" data-reveal="up">
         <summary>Free kicks</summary>
         <div class="acc-body">
-          <p>Taken from the exact spot where it was given. The defending team may
-          form a <b>wall 7 blocks</b> in front of the taker, and the team taking the
-          kick can't hit or shove anyone in it. A free kick from your own half
-          can't go straight in; once a second player touches the ball, it can.</p>
+          <p>Taken from the exact spot where it was given, and the taker may
+          <b>shoot straight at goal</b>.</p>
         </div>
       </details>
 
@@ -239,12 +238,14 @@
           <ul>
             <li>Out in the last toucher's <b>own half</b>: a <b>corner</b> to the
             other team, from the nearest corner.</li>
-            <li>Out in the <b>other half</b>: a <b>pass-in</b> to the other team,
-            from where it crossed the line.</li>
+            <li>Over a <b>sideline</b> in the other half: a <b>pass-in</b> to the
+            other team, from where it crossed.</li>
+            <li>Over the <b>goal line</b> you're attacking, like a shot wide or
+            over: a <b>goal kick</b> to the defenders.</li>
           </ul>
-          <p>A ball that never settles is called after three seconds. Walk
-          <b>fully</b> off the pitch while carrying the ball and it's a pass-in to
-          the other team, taken from where you crossed.</p>
+          <p>A ball that never settles is called after three seconds. Carry it
+          <b>fully</b> off the pitch and the same calls apply: a pass-in over a
+          sideline, a goal kick over the goal line, or a corner at your own end.</p>
         </div>
       </details>
 
@@ -263,8 +264,9 @@
         <div class="acc-body">
           <p>The scorer's name and the score pop up over the net, with lightning
           and the team's sounds. Everyone goes straight back to their formation
-          spot, the conceding team's forward gets the ball on the centre spot,
-          and play restarts at once. There's no kickoff restriction after a goal.</p>
+          spot, and the ball is placed <b>in front of the net that was just
+          beaten</b> for the conceding team to collect. Only they can pick it up
+          for the first 20 seconds. There's no kickoff restriction after a goal.</p>
         </div>
       </details>
     </section>
@@ -355,15 +357,16 @@
     <ol class="steps">
       <li>Open <b>Minecraft: Java Edition</b> and go to <b>Multiplayer</b>.</li>
       <li>Click <b>Add Server</b> and enter
-        <button class="chip" type="button" data-copy-address aria-label="Copy the server address">
+        <button class="chip" type="button" data-copy-address>
           <span data-address>play.mcsoccer.net</span>
-          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg>
+          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg><span class="visually-hidden"> (copy)</span>
         </button>
       </li>
       <li>Join, and <b>accept the resource pack</b>. It carries the kits, crests and goals, so the server needs it.</li>
       <li>Walk into a pitch's <b>ready zone</b> and the match starts itself.</li>
     </ol>
     <p class="modal-note">Click the address to copy it.</p>
+    <p class="visually-hidden" role="status" data-status></p>
     <button class="btn" type="button" data-close-connect>
       Got it
       <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>

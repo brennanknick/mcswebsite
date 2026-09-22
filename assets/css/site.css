@@ -27,7 +27,7 @@
   --heading:     #ffffff;
   --text-strong: rgba(255, 255, 255, .82);
   --text:        rgba(255, 255, 255, .65);
-  --text-faint:  rgba(255, 255, 255, .32);
+  --text-faint:  rgba(255, 255, 255, .5);   /* ~4.6:1 on the bar; .32 was 2.8:1 */
 
   /* gradient text: pale centre warming to saturated edges */
   --grad-1:      #f4ffe0;
@@ -35,9 +35,11 @@
   --grad-3:      #3fcf72;
   --accent-soft: #d4f59a;   /* active nav link, "read more" */
 
-  /* primary button (white text passes AA: 4.87:1) */
+  /* primary button. White text passes AA in every state: rest 4.87:1,
+     hover 5.41:1, pressed (--btn-lo) 8.34:1. Hover goes DARKER, not
+     lighter, because lighter green drops below 4.5:1. */
   --btn:         #188243;
-  --btn-hover:   #1d8e4b;
+  --btn-hover:   #157a3e;
   --btn-hi:      #4cc27a;   /* bevel top edge */
   --btn-lo:      #0e5a2d;   /* bevel left + bottom edges */
   --btn-shadow:  #0a4523;   /* text shadow */
@@ -188,7 +190,7 @@ p { margin: 0 0 1rem; }
 }
 
 .btn:hover { background: var(--b-hover); }
-.btn:active { background: var(--b-hi); }
+.btn:active { background: var(--b-lo); }
 
 .btn-lg { padding: .75rem 3.5rem; font-size: 1.5rem; }
 
@@ -321,17 +323,18 @@ p { margin: 0 0 1rem; }
   overflow: hidden;
 }
 
+/* Both labels share one grid cell, so the slot is exactly as wide as the
+   wider label. It used a fixed min-width, which clipped the address to
+   "LAY.MCSOCCER.NE" once WCAG text-spacing overrides were applied. */
 .slot {
   position: relative;
-  display: block;
+  display: grid;
   height: 2rem;
-  min-width: 11.5rem;
   overflow: hidden;
 }
 
 .slot span {
-  position: absolute;
-  inset: 0;
+  grid-area: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -781,12 +784,12 @@ p { margin: 0 0 1rem; }
 
 .feature-render {
   position: absolute;
-  top: 2.2rem;
+  top: 0;
   width: 380px;
   pointer-events: none;
 }
 .feature.img-left .feature-render { left: 6rem; }
-.feature.img-right .feature-render { right: 6rem; }
+.feature.img-right .feature-render { right: 3rem; }
 
 .feature-render img {
   width: 100%;
@@ -809,13 +812,18 @@ p { margin: 0 0 1rem; }
 
 /* ── positions band ──────────────────────────────────────────────── */
 
+/* 4.5rem left padding lands the text on the same edge as the text-left
+   feature cards (3rem margin + 1.5rem padding), so it doesn't jog 8px */
 .positions-card {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 3rem;
-  align-items: center;
-  padding: 3.5rem 4rem;
+  align-items: start;
+  padding: 3rem 4rem 3rem 4.5rem;
 }
+.positions-card > div:first-child { padding-top: 1rem; }
+
+.pos-list { list-style: none; margin: 0; padding: 0; }
 
 .positions-card .cmd {
   display: inline-block;
@@ -902,7 +910,7 @@ p { margin: 0 0 1rem; }
   grid-template-columns: 5fr 6fr;
   gap: 3rem;
   align-items: center;
-  padding: 3.5rem 4rem;
+  padding: 3rem 4rem 3rem 4.5rem;
 }
 
 .stat-list {
@@ -942,7 +950,7 @@ p { margin: 0 0 1rem; }
 
 .tier-players {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: .6rem;
   margin: 0 0 1.5rem;
   padding: 0;
@@ -1064,6 +1072,8 @@ p { margin: 0 0 1rem; }
   vertical-align: 1px;
 }
 .chip svg { width: 14px; height: 14px; fill: currentColor; opacity: .7; }
+/* the notched-corner clip-path would cut off a normal outline entirely */
+.chip:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-soft); }
 .chip:hover svg { opacity: 1; }
 
 .modal-note { font-size: 14px; color: var(--text-faint); margin: -1.5rem 0 2rem; }
@@ -1330,7 +1340,9 @@ code, kbd {
 
   .modes-row { grid-template-columns: 1fr; margin-left: 0; gap: 1.5rem; }
   .modes-text { align-items: center; text-align: center; }
-  .modes-art { width: 100%; margin: 0; min-height: 14rem; order: -1; }
+  /* size by ratio, not min-height: a wide short frame made `slice` crop
+     the scoreboard and captions off the top and bottom */
+  .modes-art { width: 100%; max-width: 34rem; margin: 0 auto; min-height: 0; aspect-ratio: 16 / 10; order: -1; }
   .mode-desc { min-height: 8rem; line-height: 1.6rem; }
   .mode-meta { flex-direction: column; gap: .5rem; }
   .mode-meta hr { display: none; }
@@ -1389,7 +1401,7 @@ code, kbd {
 
 @media (max-width: 575px) {
   .nav-brand-text { display: none; }
-  .hero-title { font-size: 2.15rem; line-height: 1.2; }
+  .hero-title { font-size: min(2.5rem, 11.2vw); line-height: 1.2; }
   .pos { width: 46px; height: 46px; font-size: 13px; }
   .acc summary { padding: 1rem 3rem 1rem 1.1rem; font-size: 16px; }
   .acc-body { padding: 1rem 1.1rem; }
@@ -1399,6 +1411,21 @@ code, kbd {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
   .reveal-on [data-reveal] { opacity: 1 !important; transform: none !important; }
+}
+
+/* at 320-359px the longer mode descriptions wrap to six lines; reserve
+   them so the pager doesn't jump under your thumb between modes */
+@media (max-width: 359px) {
+  .mode-desc { min-height: 9.6rem; }
+}
+
+/* once a real video is showing, stop animating the stand-in beneath it */
+.hero-media.has-video .standin { visibility: hidden; }
+
+/* printing never scrolls, so scroll reveals would print as blank space */
+@media print {
+  .reveal-on [data-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .nav, .drawer, .scrim, .modal, body::after { display: none !important; }
 }
 
 /* ── alternate palettes ──────────────────────────────────────────────
