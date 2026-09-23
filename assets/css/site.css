@@ -629,8 +629,10 @@ p { margin: 0 0 1rem; }
 
 /* ── game modes slider ───────────────────────────────────────────── */
 
-/* the hero now fades straight into this band, so no extra lead-in */
-.modes { padding-top: 0; }
+/* whichever section follows the hero sits straight under its fade:
+   the hero already ends in a buffer and a fade, so no extra lead-in */
+.modes,
+.hero + .band { padding-top: 0; }
 
 .modes-row {
   display: grid;

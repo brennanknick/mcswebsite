@@ -1,4 +1,4 @@
-"""Stamp every CSS/JS link with a hash of that file's contents.
+"""Stamp every CSS/JS/icon link with a hash of that file's contents.
 
     python tools/stamp-assets.py
 
@@ -13,7 +13,8 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-ASSETS = ["assets/css/site.css", "assets/js/site.js", "site.config.js"]
+ASSETS = ["assets/css/site.css", "assets/js/site.js", "site.config.js",
+          "favicon.ico", "assets/img/icon.svg"]
 PAGES = ["index.html", "rules/index.html", "404.html"]
 
 

@@ -7,8 +7,8 @@
 <meta name="description" content="MCS is a soccer server for Minecraft: Java Edition, in open alpha. Join at play.mcsoccer.net." />
 <meta name="theme-color" content="#070c0a" />
 
-<link rel="icon" href="favicon.ico" sizes="any" />
-<link rel="icon" type="image/png" href="assets/img/icon-512.png" sizes="512x512" />
+<link rel="icon" href="favicon.ico?v=e4392b99" sizes="32x32" />
+<link rel="icon" type="image/svg+xml" href="assets/img/icon.svg?v=e9b7e52a" />
 <link rel="apple-touch-icon" href="assets/img/icon-180.png" />
 
 <!-- social embed: og:image must be absolute -->
@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=ccbe24c3" />
+<link rel="stylesheet" href="assets/css/site.css?v=9e5f8eb2" />
 <script>
   /* Hide reveal targets before first paint, but only if site.js then
      arms the observers. If it never does, show everything anyway. */
@@ -159,169 +159,6 @@
   </div>
 </header>
 
-<!-- ══════════════════════════ GAME MODES ═════════════════════════ -->
-<section class="band modes" id="modes" aria-labelledby="modes-title">
-  <div class="container">
-    <div class="section-head" data-reveal="up">
-      <h2 class="section-title" id="modes-title">Game <span class="grad">Modes</span></h2>
-      <p class="section-lead">Four ways to play, and the server referees every one.</p>
-    </div>
-
-    <div class="modes-row" data-slider>
-      <div class="modes-text">
-        <div class="mode-panel" data-mode-panel aria-live="polite">
-          <!-- filled from the MODES list in site.js -->
-          <h3 class="mode-name grad" data-mode-name>Match</h3>
-          <p class="mode-desc" data-mode-desc></p>
-          <div class="mode-meta">
-            <p class="tag" data-mode-tag></p>
-            <hr />
-            <a class="more" data-mode-link href="rules/#modes">How it works
-              <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg>
-            </a>
-          </div>
-        </div>
-
-        <div class="pager" role="group" aria-label="Choose a game mode">
-          <button class="pg-arrow" type="button" data-prev aria-label="Previous mode">
-            <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M12 0v20H9v-3H6v-3H3v-3H0V9h3V6h3V3h3V0z"/></svg>
-          </button>
-          <span class="pg-dots" data-dots style="display:flex;gap:1rem;align-items:center"></span>
-          <button class="pg-arrow" type="button" data-next aria-label="Next mode">
-            <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M0 0v20h3v-3h3v-3h3v-3h3V9H9V6H6V3H3V0z"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="modes-art" aria-hidden="true">
-        <!-- one illustration per mode; the shared pitch is drawn in each -->
-        <svg class="mode-art is-on" data-art="match" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
-          <use href="#art-pitch"/>
-          <!-- keep everything inside y 60-340: `slice` crops the top and
-               bottom when the panel is wider than 16:10 -->
-          <g class="art-t1">
-            <circle cx="100" cy="200" r="9"/><circle cx="170" cy="130" r="9"/><circle cx="170" cy="270" r="9"/>
-            <circle cx="215" cy="200" r="9"/><circle cx="232" cy="118" r="9"/><circle cx="250" cy="290" r="9"/><circle cx="290" cy="225" r="9"/>
-          </g>
-          <g class="art-t2">
-            <circle cx="540" cy="200" r="9"/><circle cx="470" cy="130" r="9"/><circle cx="470" cy="270" r="9"/>
-            <circle cx="425" cy="200" r="9"/><circle cx="408" cy="118" r="9"/><circle cx="390" cy="290" r="9"/><circle cx="350" cy="225" r="9"/>
-          </g>
-          <circle class="art-ball" cx="320" cy="200" r="6"/>
-          <g class="art-board">
-            <text x="320" y="124" text-anchor="middle" class="art-score art-score-sm"><tspan class="art-t1">2</tspan><tspan class="art-ink" dx="12">-</tspan><tspan class="art-t2" dx="12">1</tspan></text>
-            <text x="320" y="146" text-anchor="middle" class="art-caption art-caption-sm">1ST HALF  07:42</text>
-          </g>
-        </svg>
-
-        <svg class="mode-art" data-art="knockout" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
-          <use href="#art-pitch"/>
-          <rect x="480" y="130" width="120" height="140" class="art-hi"/>
-          <circle class="art-ball" cx="544" cy="200" r="7"/>
-          <g class="art-board">
-            <text x="250" y="150" text-anchor="middle" class="art-caption">PENALTIES</text>
-            <g class="art-t1"><circle cx="205" cy="180" r="10"/><circle cx="235" cy="180" r="10"/><circle cx="265" cy="180" r="10" class="art-miss"/><circle cx="295" cy="180" r="10"/></g>
-            <g class="art-t2"><circle cx="205" cy="215" r="10"/><circle cx="235" cy="215" r="10" class="art-miss"/><circle cx="265" cy="215" r="10"/><circle cx="295" cy="215" r="10" class="art-open"/></g>
-            <text x="250" y="258" text-anchor="middle" class="art-caption art-dim">SUDDEN DEATH</text>
-          </g>
-        </svg>
-
-        <svg class="mode-art" data-art="scrim" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
-          <use href="#art-pitch"/>
-          <path class="art-arc" d="M320 200 Q320 30 355 150"/>
-          <circle class="art-ball" cx="355" cy="150" r="7"/>
-          <g class="art-t1"><circle cx="270" cy="170" r="9"/><circle cx="290" cy="245" r="9"/><circle cx="250" cy="215" r="9"/></g>
-          <g class="art-t2"><circle cx="385" cy="175" r="9"/><circle cx="360" cy="245" r="9"/><circle cx="400" cy="220" r="9"/></g>
-          <text x="320" y="326" text-anchor="middle" class="art-caption">LOB FROM THE CENTRE SPOT</text>
-        </svg>
-
-        <svg class="mode-art" data-art="quick" viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice">
-          <use href="#art-pitch"/>
-          <text x="320" y="150" text-anchor="middle" class="art-score">FIRST TO 5</text>
-          <g class="art-t1"><rect x="230" y="190" width="26" height="26"/><rect x="266" y="190" width="26" height="26"/><rect x="302" y="190" width="26" height="26"/><rect x="338" y="190" width="26" height="26" class="art-open"/><rect x="374" y="190" width="26" height="26" class="art-open"/></g>
-          <g class="art-t2"><rect x="230" y="232" width="26" height="26"/><rect x="266" y="232" width="26" height="26"/><rect x="302" y="232" width="26" height="26"/><rect x="338" y="232" width="26" height="26"/><rect x="374" y="232" width="26" height="26" class="art-open"/></g>
-        </svg>
-
-        <!-- the shared pitch, drawn once -->
-        <svg width="0" height="0" style="position:absolute">
-          <defs>
-            <g id="art-pitch">
-              <rect width="640" height="400" class="art-grass-a"/>
-              <g class="art-grass-b">
-                <rect x="40" width="70" height="400"/><rect x="180" width="70" height="400"/>
-                <rect x="320" width="70" height="400"/><rect x="460" width="70" height="400"/>
-              </g>
-              <g class="art-line">
-                <rect x="40" y="40" width="560" height="320"/>
-                <line x1="320" y1="40" x2="320" y2="360"/>
-                <circle cx="320" cy="200" r="46"/>
-                <rect x="40" y="130" width="80" height="140"/>
-                <rect x="520" y="130" width="80" height="140"/>
-                <rect x="40" y="172" width="28" height="56"/>
-                <rect x="572" y="172" width="28" height="56"/>
-              </g>
-              <g class="art-dot"><circle cx="320" cy="200" r="3.5"/><circle cx="96" cy="200" r="3"/><circle cx="544" cy="200" r="3"/></g>
-            </g>
-          </defs>
-        </svg>
-      </div>
-    </div>
-
-    <div class="modes-foot" data-reveal="up" style="--delay:.4s">
-      <a class="btn btn-dark" href="rules/">
-        Read the rules
-        <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════ POSITIONS ═════════════════════════ -->
-<section class="band alt" aria-labelledby="positions-title">
-  <div class="container">
-    <div class="card positions-card">
-      <div data-reveal="up">
-        <h2 class="section-title" id="positions-title">Seven <span class="grad">positions</span></h2>
-        <p>
-          Goalkeeper, centre back, left and right defence, left and right wing,
-          and forward, each with its own spot on the pitch. Pick yours from a menu
-          laid out like the field. Skip it and you're handed a free one at kickoff.
-        </p>
-        <span class="cmd">/position</span>
-      </div>
-
-      <div class="pitch-picker" data-reveal="up" style="--delay:.15s">
-        <svg viewBox="0 0 680 880" aria-hidden="true">
-          <rect width="680" height="880" rx="14" class="art-grass-a"/>
-          <g class="art-grass-b">
-            <rect y="40" width="680" height="80"/><rect y="200" width="680" height="80"/>
-            <rect y="360" width="680" height="80"/><rect y="520" width="680" height="80"/><rect y="680" width="680" height="80"/>
-          </g>
-          <g class="art-line">
-            <rect x="40" y="40" width="600" height="800"/>
-            <path d="M40 40h600"/>
-            <path d="M246 40a94 94 0 0 0 188 0"/>
-            <rect x="170" y="700" width="340" height="140"/>
-            <rect x="262" y="790" width="156" height="50"/>
-          </g>
-        </svg>
-        <!-- attack at the top, keeper at the bottom, as in the in-game picker.
-             A plain list: these explain, they don't do anything, so they are
-             not buttons. Screen readers read each code with its full name. -->
-        <ul class="pos-list" aria-label="The seven positions">
-          <li class="pos" style="left:50%;top:15%">FW<span class="pos-label">Forward: takes the kickoff</span></li>
-          <li class="pos" style="left:20%;top:31%">LW<span class="pos-label">Left Wing</span></li>
-          <li class="pos" style="left:80%;top:31%">RW<span class="pos-label">Right Wing</span></li>
-          <li class="pos" style="left:50%;top:57%">CB<span class="pos-label">Centre Back</span></li>
-          <li class="pos" style="left:21%;top:66%">LD<span class="pos-label">Left Defence</span></li>
-          <li class="pos" style="left:79%;top:66%">RD<span class="pos-label">Right Defence</span></li>
-          <li class="pos" style="left:50%;top:88%">GK<span class="pos-label">Goalkeeper</span></li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ═══════════════════════ STATS + TIER LIST ═════════════════════ -->
 <section class="band" aria-labelledby="stats-title">
   <div class="container">
@@ -368,10 +205,7 @@
             <p class="feature-sub">Knockout football, where every match has a winner.</p>
           </div>
           <p class="feature-para" data-reveal="from-r" style="--delay:.1s">
-            When the stakes go up, so does the format. A knockout can't end level:
-            a tie goes to extra time, then a penalty shootout, and staff referees
-            can run the whole thing from the touchline. Keep an eye on the Discord
-            for the next one.
+            No draws. A tie goes to extra time, then penalties.
           </p>
           <div data-reveal="from-r" style="--delay:.2s">
             <a class="btn" href="rules/#modes">
@@ -397,10 +231,7 @@
             <p class="feature-sub">MCS is in open alpha, and you can play it today.</p>
           </div>
           <p class="feature-para" data-reveal="from-l" style="--delay:.1s">
-            You're early. The pitches are open, the referee is strict, and the game
-            is still being built, so what you find now shapes what comes next.
-            Spot something odd? <code>/feedback</code> in game tells you where to
-            report it.
+            You're early, and what you find now shapes what comes next.
           </p>
           <div data-reveal="from-l" style="--delay:.2s">
             <button class="btn" type="button" data-open-connect>
