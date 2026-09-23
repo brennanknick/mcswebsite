@@ -427,10 +427,11 @@ p { margin: 0 0 1rem; }
      in the first screen rather than in the taller box. svh is the height
      with mobile browser bars showing, so phones get the same result. */
   --hero-fade: 16vh;
-  min-height: calc(100vh + var(--hero-fade));
-  min-height: calc(100svh + var(--hero-fade));
+  --hero-buffer: 8vh;    /* clear scene below the fold before the fade begins */
+  min-height: calc(100vh + var(--hero-buffer) + var(--hero-fade));
+  min-height: calc(100svh + var(--hero-buffer) + var(--hero-fade));
   padding-top: var(--nav-h);
-  padding-bottom: var(--hero-fade);
+  padding-bottom: calc(var(--hero-buffer) + var(--hero-fade));
   overflow: hidden;
   isolation: isolate;
   background:
@@ -556,7 +557,7 @@ p { margin: 0 0 1rem; }
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(120% 90% at 50% 45%, transparent 40%, rgba(0, 0, 0, .45) 100%),
+    radial-gradient(75% 160% at 50% 40%, transparent 55%, rgba(0, 0, 0, .42) 100%),
     rgba(4, 10, 7, .38);
 }
 
