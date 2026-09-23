@@ -421,8 +421,16 @@ p { margin: 0 0 1rem; }
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 94vh;
+  /* One full screen, plus the fade, which sits entirely BELOW the fold:
+     on load you see the whole scene, and it only fades into the stripes
+     once you scroll. The matching bottom padding keeps the text centred
+     in the first screen rather than in the taller box. svh is the height
+     with mobile browser bars showing, so phones get the same result. */
+  --hero-fade: 16vh;
+  min-height: calc(100vh + var(--hero-fade));
+  min-height: calc(100svh + var(--hero-fade));
   padding-top: var(--nav-h);
+  padding-bottom: var(--hero-fade);
   overflow: hidden;
   isolation: isolate;
   background:
@@ -436,8 +444,8 @@ p { margin: 0 0 1rem; }
   z-index: -1;
   background: #0a1a12;
   /* the fade starts well below the CTA, so the hero reads as a full scene */
-  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 84%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0, #000 84%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--hero-fade)), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - var(--hero-fade)), transparent 100%);
 }
 
 .hero-media video {
@@ -1235,7 +1243,7 @@ code, kbd {
 
 /* ── 404: "that page is offside" ─────────────────────────────────── */
 
-.hero-lost { min-height: 92vh; }
+.hero-lost { min-height: 92vh; padding-bottom: 3rem; }
 
 .lost-copy {
   max-width: 34rem;
@@ -1332,7 +1340,6 @@ code, kbd {
 }
 
 @media (max-width: 980px) {
-  .hero { min-height: 84vh; }
   .hero-sub { font-size: 1rem; margin-bottom: .5rem; }
   .hero-title { font-size: 2.5rem; line-height: 48px; }
   .hero-cta { margin-top: .25rem; }
