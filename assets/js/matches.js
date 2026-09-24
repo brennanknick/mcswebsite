@@ -582,8 +582,6 @@
     bar.hidden = !index || !API;
     tabs.hidden = !index || !API;
     counters.hidden = !index || !API || !counters.children.length;
-    // the Players tab has its own search box: don't show two
-    searchSlot.parentElement.hidden = r.view === "players";
     $$("a", tabs).forEach((a) => {
       if (a.dataset.tab === r.view) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
@@ -1949,30 +1947,50 @@
 
   /* ── view: players ─────────────────────────────────────────────── */
 
+  // The search lives in the bar on every tab. This tab lists what an Enter
+  // in it found (?q=), and the regulars.
   async function viewPlayers(r, token) {
-    const [meta, d] = await Promise.all([
+    const valid = NAME_RE.test(r.q);
+    const [meta, found, d] = await Promise.all([
       getMeta().catch(() => null),
+      r.q && valid ? get("/players", { q: r.q }, 30000).catch(() => null) : null,
       get("/leaders", { stat: "games", limit: 30 }, 60000).catch(() => null),
     ]);
     if (token !== S.token) return null;
     if (meta) renderCounters(meta);
-    setTitle("Players");
-    const box = searchBox(true, r.q);
+    setTitle(r.q ? `Players matching ${r.q}` : "Players");
+    // show what was searched for in the box it came from
+    const box = $("input", searchSlot);
+    if (box && document.activeElement !== box) box.value = r.q || "";
+
+    const out = [];
+    if (r.q) {
+      const hits = arr(found && found.items).filter((x) => UUID_RE.test(str(x.uuid)));
+      const sub = !valid ? "Minecraft names are letters, numbers and _ only."
+        : !found ? "Search isn't working right now. Try again in a moment."
+        : hits.length ? hits.length + (hits.length === 1 ? " player" : " players") + ", old names included."
+        : `Nobody called "${r.q}" has played yet.`;
+      out.push(h("section", { class: "mh-card mh-find", "aria-labelledby": "mh-fp" },
+        h("h2", { class: "mh-sec-title", id: "mh-fp" }, "Players matching \u201c" + r.q + "\u201d"),
+        h("p", { class: "mh-sec-sub" }, sub),
+        hits.length ? h("ul", { class: "mh-sresults is-inline" }, hits.map((x) =>
+          h("li", null, h("a", { href: toPlayer(x.uuid), "data-go": true }, avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)))))) : null));
+    }
+
     const regulars = d && str(d.stat) === "games" ? arr(d.items) : [];
-    return [
-      h("section", { class: "mh-card mh-find", "aria-labelledby": "mh-fp" },
-        h("h2", { class: "mh-sec-title", id: "mh-fp" }, "Find a player"),
-        h("p", { class: "mh-sec-sub" }, "Search by Minecraft name. Old names work too."),
-        box),
-      regulars.length ? h("section", { class: "mh-regulars", "aria-labelledby": "mh-rg" },
+    if (regulars.length) {
+      out.push(h("section", { class: "mh-regulars", "aria-labelledby": "mh-rg" },
         h("h2", { class: "mh-sec-title", id: "mh-rg" }, "Regulars"),
         h("p", { class: "mh-sec-sub" }, "The most matches played to a result."),
         h("ul", { class: "mh-reg-grid" }, regulars.map((x, i) => h("li", { style: { "--i": Math.min(i, 16) } },
           h("a", { href: toPlayer(x.uuid), "data-go": true, title: nameOf(x) },
             avatar(x.uuid, nameOf(x), 40),
             h("b", null, nameOf(x)),
-            h("small", null, num(x.games) + (num(x.games) === 1 ? " match" : " matches"))))))) : null,
-    ];
+            h("small", null, num(x.games) + (num(x.games) === 1 ? " match" : " matches"))))))));
+    } else if (!r.q) {
+      out.push(note("wait", "No regulars yet", "Players show up here once they've played a match to the end. Search for anyone with the box above.", []));
+    }
+    return out;
   }
 
   /* ── player search: a combobox in the page head, a plain list on

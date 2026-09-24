@@ -1440,7 +1440,8 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-find { max-width: 42rem; }
 .mh-find .mh-sec-sub { margin-bottom: 1.25rem; }
 
-.mh-regulars { margin-top: 2.5rem; }
+.mh-regulars { margin-top: .5rem; }
+.mh-find + .mh-regulars { margin-top: 2.5rem; }
 .mh-regulars .mh-sec-sub { margin-bottom: 1.25rem; }
 .mh-reg-grid {
   display: grid;
