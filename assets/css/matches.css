@@ -27,7 +27,7 @@
 
 /* ── page frame ──────────────────────────────────────────────────── */
 
-.mh { padding-top: calc(var(--nav-h) + 4rem); overflow: clip; }
+.mh { padding-top: calc(var(--nav-h) + 3rem); overflow: clip; }
 .mh > .container { max-width: 1180px; }
 
 /* floodlights over the pitch stripes, as in the home hero */
@@ -49,14 +49,16 @@
   color: #fff;
 }
 
-.mh-head {
-  display: grid;
-  grid-template-columns: 1fr minmax(260px, 360px);
-  gap: 2rem 3rem;
-  align-items: end;
+/* tabs on the left, the player search on the right */
+.mh-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin-bottom: 1.5rem;
 }
-.mh-head .page-title { margin-bottom: 1rem; }
-.mh-head .page-intro { max-width: 36rem; margin: 0; }
+.mh-bar-search { flex: 0 1 360px; min-width: 260px; }
 
 .mh-dim { color: var(--text-faint); }
 
@@ -72,7 +74,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: .75rem;
-  margin: 3rem 0 0;
+  margin: 3.5rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -103,7 +105,7 @@
 
 /* ── live now ────────────────────────────────────────────────────── */
 
-.mh-live { margin-top: 2.5rem; }
+.mh-live { margin-bottom: 2.5rem; }
 
 .mh-live-title {
   display: flex;
@@ -217,7 +219,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: .5rem;
-  margin: 3rem 0 1.5rem;
 }
 
 .mh-tabs a {
@@ -253,8 +254,7 @@
 }
 
 .mh-view { position: relative; min-height: 24rem; }
-/* no tabs yet (match history not connected): keep the head's breathing room */
-.mh-head:not([hidden]) ~ .mh-tabs[hidden] ~ .mh-view { margin-top: 3rem; }
+
 .mh-view.is-loading > * { opacity: .45; transition: opacity .2s; pointer-events: none; }
 
 /* each block rises in, one after another */
@@ -1435,7 +1435,7 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-sresults.is-inline a:focus-visible { outline: 2px solid transparent; outline-offset: -2px; box-shadow: inset 0 0 0 2px var(--accent-soft); }
 .mh-smsg { margin: .5rem 0 0; font-size: 13px; color: var(--text-faint); }
 .mh-smsg:empty { display: none; }
-.mh-head .mh-smsg { position: absolute; }
+.mh-bar .mh-smsg { position: absolute; }
 
 .mh-find { max-width: 42rem; }
 .mh-find .mh-sec-sub { margin-bottom: 1.25rem; }
@@ -1479,7 +1479,7 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 
 @media (max-width: 980px) {
   .mh { padding-top: calc(var(--nav-h) + 2.5rem); }
-  .mh-head { grid-template-columns: 1fr; }
+  .mh-bar-search { flex: 1 1 100%; min-width: 0; }
   .mh-hero-score { font-size: 72px; }
   .mh-crest-xl { --s: 64px; }
   .mh-hero-name { font-size: 1.35rem; }
@@ -1548,7 +1548,8 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   .mh-counters span { font-size: 11px; letter-spacing: .1em; }
   .mh-counters .is-since { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: flex-start; gap: .1rem .6rem; padding-block: .5rem; }
   .mh-counters .is-since b { font-size: 1rem; margin-top: 0; }
-  .mh-live, .mh-tabs { margin-top: 1.75rem; }
+  .mh-live { margin-bottom: 1.75rem; }
+  .mh-bar { margin-bottom: 1.25rem; }
 
   /* report scoreboard: teams either side of the score, the result
      lines across the full width underneath */

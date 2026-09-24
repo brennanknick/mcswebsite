@@ -30,6 +30,7 @@
   const view = $("[data-mh-view]");
   const head = $("[data-mh-head]");
   const tabs = $("[data-mh-tabs]");
+  const bar = $("[data-mh-bar]");
   const counters = $("[data-mh-counters]");
   const liveBox = $("[data-mh-live]");
   const liveList = $("[data-mh-live-list]");
@@ -578,6 +579,7 @@
   function setChrome(r) {
     const index = r.view === "list" || r.view === "leaders" || r.view === "players";
     head.hidden = !index;
+    bar.hidden = !index || !API;
     tabs.hidden = !index || !API;
     counters.hidden = !index || !API || !counters.children.length;
     // the Players tab has its own search box: don't show two
@@ -586,7 +588,8 @@
       if (a.dataset.tab === r.view) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     });
-    if (r.view === "list") liveStart();
+    // live matches lead every index view, not only the list
+    if (index) liveStart();
     else liveStop();
   }
 
@@ -1027,6 +1030,12 @@
     Live.prev = seen;
 
     if (!Live.on) return;
+    // rise in when it first appears, rather than just shoving the page down
+    if (list.length && liveBox.hidden) {
+      liveBox.classList.remove("mh-in");
+      void liveBox.offsetWidth;
+      liveBox.classList.add("mh-in");
+    }
     liveBox.hidden = !list.length;
     liveList.replaceChildren(...list.map(liveCard));
     clearInterval(Live.tick);

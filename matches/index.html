@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=e0707807" />
-<link rel="stylesheet" href="../assets/css/matches.css?v=b3d6691b" />
+<link rel="stylesheet" href="../assets/css/matches.css?v=248e03f0" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -84,34 +84,28 @@
   <div class="mh-glow" aria-hidden="true"></div>
   <div class="container">
 
-    <!-- the index views (matches, leaderboards, players) share this head;
-         a match report or player page replaces it with its own -->
+    <!-- the index views (matches, leaderboards, players): the live strip
+         first, then the tabs with the player search; the page's h1 is for
+         screen readers only. A match report or player page has its own. -->
     <header class="mh-head" data-mh-head>
-      <div class="mh-head-text">
-        <p class="mh-eyebrow" data-reveal="up">Every match, every goal</p>
-        <h1 class="page-title" data-reveal="up" style="--delay:.1s">Match <span class="grad">History</span></h1>
-        <p class="page-intro" data-reveal="up" style="--delay:.2s">
-          Every match on MCS is recorded the moment the whistle goes. Find a
-          result, open the full report, or look anyone up.
-        </p>
-      </div>
-      <div class="mh-head-side" data-reveal="up" style="--delay:.3s">
-        <div class="mh-search" data-mh-search hidden></div>
-      </div>
+      <h1 class="visually-hidden">Match History</h1>
     </header>
-
-    <ul class="mh-counters" data-mh-counters hidden></ul>
 
     <section class="mh-live" data-mh-live hidden aria-labelledby="mh-live-title">
       <h2 class="mh-live-title" id="mh-live-title"><span class="mh-live-dot" aria-hidden="true"></span>Live now</h2>
       <ul class="mh-live-list" data-mh-live-list></ul>
     </section>
 
-    <nav class="mh-tabs" data-mh-tabs aria-label="Match history" hidden>
-      <a href="./" data-tab="list">Matches</a>
-      <a href="./?tab=leaders" data-tab="leaders">Leaderboards</a>
-      <a href="./?tab=players" data-tab="players">Players</a>
-    </nav>
+    <div class="mh-bar" data-mh-bar>
+      <nav class="mh-tabs" data-mh-tabs aria-label="Match history" hidden>
+        <a href="./" data-tab="list">Matches</a>
+        <a href="./?tab=leaders" data-tab="leaders">Leaderboards</a>
+        <a href="./?tab=players" data-tab="players">Players</a>
+      </nav>
+      <div class="mh-bar-search">
+        <div class="mh-search" data-mh-search hidden></div>
+      </div>
+    </div>
 
     <p class="mh-stale" data-mh-stale hidden>
       The game server isn't answering right now, so these are saved results
@@ -126,6 +120,9 @@
         </div>
       </noscript>
     </div>
+
+    <!-- the numbers, at the foot of the index views -->
+    <ul class="mh-counters" data-mh-counters hidden aria-label="Match history in numbers"></ul>
 
   </div>
 </main>
@@ -188,6 +185,6 @@
 
 <script src="../site.config.js?v=5a3590c2"></script>
 <script src="../assets/js/site.js?v=731bf898"></script>
-<script src="../assets/js/matches.js?v=d7cd9d00"></script>
+<script src="../assets/js/matches.js?v=6645035d"></script>
 </body>
 </html>
