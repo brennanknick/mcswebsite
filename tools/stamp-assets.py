@@ -14,8 +14,9 @@ import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ASSETS = ["assets/css/site.css", "assets/js/site.js", "site.config.js",
+          "assets/css/matches.css", "assets/js/matches.js",
           "favicon.ico", "assets/img/icon.svg"]
-PAGES = ["index.html", "rules/index.html", "404.html"]
+PAGES = ["index.html", "rules/index.html", "matches/index.html", "404.html"]
 
 
 def digest(rel):

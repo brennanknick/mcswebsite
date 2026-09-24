@@ -5,6 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Offside — MCS</title>
 <meta name="robots" content="noindex" />
+<script>
+  // The game's chat links use /matches/<id>, /matches/player/<uuid>,
+  // /matches/leaders and /matches/players. Every match view lives on
+  // /matches/ itself, so send those paths there before anything shows.
+  (function () {
+    var p = location.pathname, m, to = null;
+    if ((m = p.match(/^\/matches\/(\d{8}-\d{6}-[a-z0-9_]{1,40})\/?$/))) to = "?m=" + m[1];
+    else if ((m = p.match(/^\/matches\/player\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\/?$/))) to = "?p=" + m[1].toLowerCase();
+    else if (/^\/matches\/leaders\/?$/.test(p)) to = "?tab=leaders";
+    else if (/^\/matches\/players\/?$/.test(p)) to = "?tab=players";
+    if (to) {
+      document.documentElement.style.visibility = "hidden";
+      location.replace("/matches/" + to);
+    }
+  })();
+</script>
 <meta name="theme-color" content="#070c0a" />
 <!-- GitHub Pages serves this at whatever path was missing, so every
      path here is root-absolute. -->
@@ -13,7 +29,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/site.css?v=9e5f8eb2" />
+<link rel="stylesheet" href="/assets/css/site.css?v=db54cc9a" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -33,6 +49,7 @@
     <ul class="nav-links">
       <li><a href="/">Home</a></li>
       <li><a href="/rules/">Rules</a></li>
+      <li><a href="/matches/">Matches</a></li>
       <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
       <li><a data-discord-link href="/#discord">Discord</a></li>
     </ul>
@@ -62,6 +79,7 @@
   <ul>
     <li><a href="/">Home</a></li>
     <li><a href="/rules/">Rules</a></li>
+      <li><a href="/matches/">Matches</a></li>
     <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
     <li><a data-discord-link href="/#discord">Discord</a></li>
   </ul>
@@ -145,7 +163,7 @@
   </div>
 </footer>
 
-<script src="/site.config.js?v=a826fd00"></script>
+<script src="/site.config.js?v=cb3eb05e"></script>
 <script src="/assets/js/site.js?v=4ea864cd"></script>
 </body>
 </html>

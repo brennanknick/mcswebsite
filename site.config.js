@@ -26,4 +26,12 @@ window.MCS = {
   // shows an animated floodlit-pitch stand-in.
   heroVideo: "",   // "assets/video/hero.mp4"
   heroPoster: "",  // "assets/video/hero-poster.jpg"
+
+  // Match history (/matches/). The game server publishes every match,
+  // but only over plain http://, which browsers won't let an https://
+  // site read. Put the HTTPS proxy's address here (the Cloudflare
+  // Worker in tools/matches-proxy/worker.js), e.g.
+  // "https://api.mcsoccer.net". While it's empty, the page says match
+  // history is on its way.
+  matchesApi: "",
 };

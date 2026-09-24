@@ -1333,7 +1333,9 @@ code, kbd {
   .feature.img-left .feature-render { left: 3rem; }
   .feature.img-right .feature-render { right: 3rem; }
   .feature-render { width: 30%; }
-  .nav-links a { padding: .5rem 1rem; }
+  /* five links still fit on one line down to the 992px menu switch */
+  .nav-links a { padding: .5rem .75rem; white-space: nowrap; }
+  .nav-brand { margin-right: 1.5rem; }
 }
 
 @media (max-width: 991px) {
