@@ -33,5 +33,5 @@ window.MCS = {
   // Worker in tools/matches-proxy/worker.js), e.g.
   // "https://api.mcsoccer.net". While it's empty, the page says match
   // history is on its way.
-  matchesApi: "",
+  matchesApi: "https://api.mcsoccer.net",
 };
