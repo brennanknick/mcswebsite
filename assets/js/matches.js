@@ -417,10 +417,10 @@
     return h("span", { class: "mh-club", style: sideVars(side) }, shield(side, "xs"), h("span", null, club.name));
   }
 
-  function ratingBadge(r, big) {
+  function ratingBadge(r, big, labelled) {
     r = num(r);
     const tier = r >= 8 ? "top" : r >= 7 ? "good" : r >= 6 ? "ok" : "low";
-    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: "Match rating" }, vh("Rating "), r.toFixed(1));
+    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: "Match rating" }, labelled ? null : vh("Rating "), r.toFixed(1));
   }
 
   // goals, assists: an icon, the count when it's more than one, and words
@@ -437,7 +437,10 @@
   }
 
   const modeName = (m) => MODES[m] || (str(m) ? str(m).charAt(0) + str(m).slice(1).toLowerCase() : "Match");
-  function modeTag(mode, knockout) {
+  const QUEUE_RE = /^[34]v[34]$/;
+  function modeTag(mode, knockout, queue) {
+    // a ranked match is labelled by its queue, not its mode (doc 2.3)
+    if (QUEUE_RE.test(str(queue))) return h("span", { class: "mh-tag is-ranked" }, "Ranked " + queue);
     return h("span", { class: "mh-tag is-" + str(mode).toLowerCase() }, knockout && mode === "MATCH" ? "Knockout" : modeName(mode));
   }
 
@@ -447,6 +450,7 @@
   function statusShort(o) {
     if (o.outcome !== "COMPLETED") return OUTCOME[o.outcome] || str(o.outcome) || "Unfinished";
     const by = obj(o.result).decidedBy;
+    if (by === "FORFEIT") return "Forfeit";
     if (by === "EXTRA_TIME") return "AET";
     if (by === "SHOOTOUT") return "Pens";
     if (by === "COIN_FLIP") return "Coin flip";
@@ -502,7 +506,7 @@
     if (tab === "leaders") {
       const stat = str(q.get("stat")).toLowerCase();
       const lim = parseInt(q.get("limit"), 10);
-      return { view: "leaders", stat: Object.hasOwn(STAT, stat) ? stat : "goals", mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25 };
+      return { view: "leaders", stat: stat in STAT ? stat : "goals", mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25 };
     }
     if (tab === "players") return { view: "players", q: str(q.get("q")).trim().slice(0, 16) };
     const field = str(q.get("field")).trim();
@@ -574,7 +578,7 @@
 
   // finished: matches seen ending on the live strip (their Summary rows),
   // shown at the top of page 1 even if a cached list doesn't have them yet
-  const S = { route: null, token: 0, lastList: "./", firstRender: true, finished: [], staleRetryAt: 0 };
+  const S = { route: null, token: 0, lastList: "./", firstRender: true, finished: [], staleRetryAt: 0, noted: false };
 
   function setChrome(r) {
     const index = r.view === "list" || r.view === "leaders" || r.view === "players";
@@ -604,9 +608,11 @@
       });
     }
     staleNote.hidden = !staleSeen;
-    // a report or player page showing saved data has no live poll to notice
-    // the server coming back, so look again in a while
-    if (staleSeen && S.route && (S.route.view === "match" || S.route.view === "player")) retryLater(30000);
+    // Views without the live poll can't notice the server coming back, so
+    // look again in a while, for real (not from memory). A match report is
+    // the exception: records never change (doc 4.17), so a saved one is as
+    // good as a fresh one.
+    if (staleSeen && S.route && S.route.view !== "list" && S.route.view !== "match") retryLater(30000, true);
   }
 
   function skeleton(kind) {
@@ -639,10 +645,13 @@
     setChrome(r);
 
     const same = prev && prev.view === r.view && prev.id === r.id && prev.uuid === r.uuid;
-    const active = document.activeElement;
-    const focusKey = active && active.dataset && active.dataset.focus;
-    const focusInMain = !!active && active !== document.body && main.contains(active);
-    const pagerUsed = !!focusKey && focusKey.startsWith("pg:") && same;
+    // where keyboard focus is; read again once the view has loaded, since
+    // the reader may have moved on during a slow load or a retry
+    const readFocus = () => {
+      const a = document.activeElement;
+      return { key: (a && a.dataset && a.dataset.focus) || "", inMain: !!a && a !== document.body && main.contains(a) };
+    };
+    let focus = readFocus();
 
     if (!API) {
       setTitle("Match History");
@@ -668,34 +677,43 @@
     try {
       const nodes = await VIEWS[r.view](r, token);
       if (token !== S.token || !nodes) return;
+      const f2 = readFocus();
+      if (f2.inMain) focus = f2;
       swap(nodes, same);
+      S.noted = false;
       // the list is back: don't leave the live strip waiting out its backoff
       if (r.view === "list" && Live.on && Live.fails) livePoll();
     } catch (e) {
       if (token !== S.token) return;
-      console.warn("[matches]", e);
+      if (e && e.kind !== "notfound") console.warn("[matches]", e);
+      const f2 = readFocus();
+      if (f2.inMain) focus = f2;
       swap(problem(e, r));
+      S.noted = r.view === "list";
     }
 
     if (token !== S.token) return;
-    // keyboard users keep their place: a new page of rows takes focus (the
-    // arrow they pressed may be gone); otherwise refocus the control they
-    // used, or land on the view's heading after a page change, or when the
-    // control they were on has disappeared
-    if (pagerUsed) {
-      const rows = $(".mh-pg-list, .mh-list", view);
-      if (rows) { rows.setAttribute("tabindex", "-1"); rows.focus({ preventScroll: true }); }
+    // Keyboard users keep their place. After a pager press (a real
+    // navigation), the new rows take focus and the page count is read out;
+    // otherwise the control they used is refocused, or, after a page change
+    // or when that control is gone, the view's heading. A background refresh
+    // only ever restores the control: it never moves focus or speaks.
+    const nav = !!opts.nav;
+    const lost = () => !document.activeElement || document.activeElement === document.body;
+    const rows = $(".mh-pg-list, .mh-list", view);
+    if (nav && same && focus.key.startsWith("pg:") && rows) {
+      rows.setAttribute("tabindex", "-1");
+      rows.focus({ preventScroll: true });
       const c = $(".mh-pg-count", view);
       if (c) announce(c.textContent);
     } else {
-      const again = focusKey && $(`[data-focus="${CSS.escape(focusKey)}"]`, main);
+      const again = focus.key && $(`[data-focus="${CSS.escape(focus.key)}"]`, main);
       if (again) again.focus({ preventScroll: true });
-      else if ((opts.nav && !same) || (focusInMain && (!document.activeElement || document.activeElement === document.body))) {
+      else if ((nav && !same) || (focus.inMain && lost())) {
         const hd = $("h1, h2", view) || (!head.hidden && $("h1", head));
         if (hd) { hd.setAttribute("tabindex", "-1"); hd.focus({ preventScroll: true }); }
       }
-      // say where we are, unless nothing a listener would care about changed
-      if (opts.nav && !S.firstRender && !(same && document.title === prevTitle)) announce(document.title.replace(/ — MCS$/, ""));
+      if (nav && !S.firstRender && !(same && document.title === prevTitle)) announce(document.title.replace(/ — MCS$/, ""));
     }
     S.firstRender = false;
   }
@@ -724,19 +742,24 @@
 
   // Try again later, but never while the tab is hidden: wait for it to be
   // shown again instead (a timer that just skipped would never retry).
-  function retryLater(ms) {
-    const tok = S.token;
-    const go_ = () => { if (tok === S.token) render(); };
-    setTimeout(() => {
-      if (tok !== S.token) return;
-      if (!document.hidden) return go_();
-      document.addEventListener("visibilitychange", function vis() {
-        if (document.hidden) return;
-        document.removeEventListener("visibilitychange", vis);
-        go_();
-      });
+  // One pending retry at a time; `fresh` drops cached lists first.
+  const Retry = { timer: 0, tok: -1, fresh: false };
+  function retryNow() {
+    if (Retry.tok !== S.token) return;
+    Retry.tok = -1;
+    if (Retry.fresh) forgetLists();
+    render();
+  }
+  window.addEventListener("online", retryNow);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && Retry.tok === S.token && !Retry.timer) retryNow(); });
+  function retryLater(ms, fresh) {
+    clearTimeout(Retry.timer);
+    Retry.tok = S.token;
+    Retry.fresh = !!fresh;
+    Retry.timer = setTimeout(() => {
+      Retry.timer = 0;
+      if (!document.hidden) retryNow(); // else the visibilitychange above picks it up
     }, ms);
-    window.addEventListener("online", go_, { once: true });
   }
 
   function problem(e, r) {
@@ -845,7 +868,7 @@
       } else {
         out.push(note("off", "That page is past the end",
           list.pages === 1 ? "There is only 1 page of matches." : `There are ${list.pages} pages of matches.`,
-          [arrowBtn(list.pages === 1 ? "Go to page 1" : "Go to the last page", { href: href(Object.assign({}, r, { page: list.pages })), "data-go": true })]));
+          [arrowBtn(list.pages === 1 ? "Go to page 1" : "Go to the last page", { href: href(Object.assign({}, r, { page: list.pages })), "data-go": true, "data-focus": "pg:last" })]));
       }
       return out;
     }
@@ -899,7 +922,8 @@
     const sc = obj(m.score);
     const so = m.shootout;
 
-    const hiddenWin = !!win && (res.decidedBy === "COIN_FLIP" || res.decidedBy === "REFEREE");
+    // a winner the score can't show: coin flip, referee, or a ranked forfeit
+    const hiddenWin = !!win && (res.decidedBy === "COIN_FLIP" || res.decidedBy === "REFEREE" || res.decidedBy === "FORFEIT");
     const a = toMatch(m.id, m.number);
     // a just-finished match flashes once, on the render that first shows it
     const fresh = justFinished.delete(m.id);
@@ -925,7 +949,7 @@
           done ? vh(res.draw ? ", a draw" : win ? ", " + (win === "RED" ? red : blue).name + " won" : "") : null),
         sideCell(blue, "away", win === "BLUE", win === "RED", hiddenWin && win === "BLUE")),
       h("div", { class: "mh-row-meta" },
-        modeTag(m.mode, m.knockout),
+        modeTag(m.mode, m.knockout, m.queue),
         h("span", { class: "mh-row-pitch" }, str(m.fieldName) || str(m.fieldId) || "Unknown pitch")),
       h("div", { class: "mh-row-mvp" },
         m.mvp && UUID_RE.test(str(m.mvp.uuid))
@@ -1000,9 +1024,11 @@
       showLive(arr(d.live));
       // the game server is answering again: refresh a list still showing
       // saved results (at most every 30 s)
-      if (!staleNote.hidden && S.route && S.route.view === "list" && Date.now() - S.staleRetryAt > 30000) {
+      // (or a note, while the strip is already back above it)
+      if (S.route && S.route.view === "list" && (!staleNote.hidden || S.noted) && Date.now() - S.staleRetryAt > 30000) {
         S.staleRetryAt = Date.now();
         forgetLists();
+        getMeta(true).then(renderCounters).catch(() => {});
         render({ keep: true });
       }
     } catch {
@@ -1057,7 +1083,7 @@
     return h("li", { class: "mh-live-card", style: { "--red": vivid(red.color), "--blue": vivid(blue.color) } },
       h("div", { class: "mh-live-top" },
         h("span", null, str(L.fieldName) || str(L.fieldId)),
-        modeTag(L.mode, false)),
+        modeTag(L.mode, false, L.queue)),
       h("div", { class: "mh-live-board" },
         h("span", { class: "mh-live-side", style: sideVars(red) }, shield(red, "sm"), h("span", null, red.name)),
         h("span", { class: "mh-live-score" }, num(sc.RED), h("i", { "aria-hidden": "true" }, "–"), vh(" to "), num(sc.BLUE)),
@@ -1161,7 +1187,7 @@
           h("p", { class: "mh-hero-result" + (done ? "" : " is-void") }, resultLine(rec, sides))),
         heroSide(blue, win === "BLUE", win && win !== "BLUE", scorerList("BLUE"))),
       h("ul", { class: "mh-hero-chips" },
-        h("li", null, modeTag(rec.mode, rec.knockout)),
+        h("li", null, modeTag(rec.mode, rec.knockout, rec.queue)),
         // side names alone can't prove a fixture (doc 4.15); the source can
         rec.source === "fixture" ? h("li", null, "Club fixture") : null,
         h("li", null, str(obj(rec.field).name) || "Unknown pitch"),
@@ -1207,6 +1233,7 @@
       SHOOTOUT: `${n} win on penalties`,
       COIN_FLIP: `${n} win on a coin flip`,
       REFEREE: `${n} win on the referee's call`,
+      FORFEIT: `${n} win by forfeit`,
     }[res.decidedBy] || (rec.mode === "MATCH" ? `Full time · ${n} win` : `${n} win`);
   }
 
@@ -1237,6 +1264,7 @@
       RULES_CHANGED: "The rules were changed partway through this match.",
       SHOOTOUT_FORCED: "A referee sent this match straight to penalties.",
     };
+    if (res.decidedBy === "FORFEIT") say.push("Every player on one side left and stayed away, so the other side won by forfeit. The score is what it was when they went.");
     arr(rec.flags).forEach((f) => {
       if (f === "TEST") return;
       say.push(FLAGS[f] || "Flagged: " + str(f).toLowerCase().replace(/_/g, " ") + ".");
@@ -1689,12 +1717,12 @@
   function infoCard(rec, sides) {
     const f = obj(rec.field), r = obj(rec.rules);
     const src = {
-      queue: "The pitch's ready zone", referee: "A referee", menu: "The referee menu", fixture: "A club fixture", test: "A practice shootout",
+      queue: "The pitch's ready zone", ranked: "The ranked queue", referee: "A referee", menu: "The referee menu", fixture: "A club fixture", test: "A practice shootout",
     }[rec.source] || "Unknown";
     const played = arr(rec.halves).reduce((t, x) => t + num(x.seconds), 0);
     const rows = [
       ["Pitch", [str(f.name) || str(f.id), num(f.length) && num(f.width) ? h("small", null, ` ${Math.round(f.length)} × ${Math.round(f.width)} blocks`) : null]],
-      ["Mode", modeName(rec.mode) + (rec.knockout ? " (knockout)" : "") + (rec.source === "fixture" ? " · club fixture" : "")],
+      ["Mode", modeName(rec.mode) + (rec.knockout ? " (knockout)" : "") + (rec.source === "fixture" ? " · club fixture" : "") + (QUEUE_RE.test(str(rec.queue)) ? " · ranked " + rec.queue : "")],
       ["Rules", [rulesLine(rec), num(r.scorePerGoal) > 1 ? ` · goals worth ${r.scorePerGoal} points` : ""]],
       ["Started by", rec.startedBy && UUID_RE.test(str(rec.startedBy.uuid))
         ? [h("a", { class: "mh-plink", href: toPlayer(rec.startedBy.uuid), "data-go": true }, nameOf(rec.startedBy)), rec.source === "referee" || rec.source === "menu" ? " (referee)" : ""]
@@ -1780,7 +1808,7 @@
       items.length ? h("ol", { class: "mh-pg-list" }, items.map(gameRow))
         : num(games.total) > 0
           ? h("p", { class: "mh-dim" }, "That page is past the end. ",
-            h("a", { href: href({ view: "player", uuid: r.uuid, mode: r.mode, page: num(games.pages) || 1 }), "data-go": true }, "Go to the last page"))
+            h("a", { href: href({ view: "player", uuid: r.uuid, mode: r.mode, page: num(games.pages) || 1 }), "data-go": true, "data-focus": "pg:last" }, "Go to the last page"))
           : h("p", { class: "mh-dim" }, "No matches on this page."),
       pager(num(games.page), num(games.pages), (p) => href({ view: "player", uuid: r.uuid, mode: r.mode, page: p }), "Match pages")));
     return out;
@@ -1797,7 +1825,7 @@
     ];
     return h("ul", { class: "mh-pl-head" },
       tiles.map(([k, v]) => h("li", null, h("b", null, v), h("span", { class: "mh-pl-k" }, k))),
-      h("li", { class: "is-rating" }, ratingBadge(t.rating, true), h("span", { class: "mh-pl-k" }, "Avg rating")));
+      h("li", { class: "is-rating" }, ratingBadge(t.rating, true, true), h("span", { class: "mh-pl-k" }, "Avg rating")));
   }
 
   function totalsGrid(t) {
@@ -1839,13 +1867,14 @@
     const sc = arr(g.score), so = arr(g.shootout);
     const a = toMatch(g.id, g.number);
     a.className = "mh-grow" + (done ? "" : " is-void");
+    a.dataset.focus = "g:" + g.id;
     append(a, [
       h("span", { class: "mh-grow-when" }, h("b", null, dayLabel(num(g.startedAt))), h("span", null, modeName(g.mode))),
       done && g.result ? resultBadge(g.result) : h("span", { class: "mh-tag is-void" }, OUTCOME[g.outcome] || "Unfinished"),
       h("span", { class: "mh-grow-teams" },
-        h("span", { class: "mh-dotname", style: sideVars(us) }, h("i"), us.name),
+        h("span", { class: "mh-dotname", style: sideVars(us) }, h("i"), h("span", { class: "mh-dotname-t" }, us.name)),
         h("b", { class: "mh-grow-score" }, num(sc[0]) + "–" + num(sc[1]), so.length === 2 && num(so[0]) + num(so[1]) > 0 ? h("small", null, ` (${num(so[0])}–${num(so[1])} pens)`) : null),
-        h("span", { class: "mh-dotname", style: sideVars(them) }, h("i"), them.name)),
+        h("span", { class: "mh-dotname", style: sideVars(them) }, h("i"), h("span", { class: "mh-dotname-t" }, them.name))),
       h("span", { class: "mh-grow-me" },
         g.position ? h("span", { class: "mh-pos", title: POSITIONS[g.position] || g.position }, g.position) : null,
         num(g.goals) ? countBadge("is-goal", "ball", num(g.goals), "goal", "goals") : null,
@@ -1863,7 +1892,8 @@
     v = num(v);
     if (stat === "winrate") return (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, "") + "%";
     if (stat === "rating") return v.toFixed(1);
-    if (stat === "possession") return clockOf(v);
+    // "10h 21m", not "10:21:40": fits the phone table
+    if (stat === "possession") return v >= 3600 ? Math.floor(v / 3600) + "h " + pad2(Math.floor((v % 3600) / 60)) + "m" : clockOf(v);
     return Math.round(v).toLocaleString();
   }
 
@@ -1914,14 +1944,14 @@
     const unit = " " + def[1].toLowerCase();
     // after "Show more", focus goes to the first row it brought in
     const firstNew = r.limit > 25 ? (r.limit === 50 ? 25 : 50) : -1;
-    const whoLink = (x, i) => h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true, "data-focus": i === firstNew && !more ? "lb-more" : null },
+    const whoLink = (x, i) => h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true, "data-focus": i === firstNew ? "lb-more" : null },
       avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)));
 
     out.push(h("section", { class: "mh-board", "aria-labelledby": "mh-lb" },
       h("h2", { class: "mh-sec-title", id: "mh-lb" }, def[1], r.mode ? h("span", { class: "mh-dim" }, " · " + modeName(r.mode)) : null),
       h("p", { class: "mh-sec-sub" }, sub),
       h("ol", { class: "mh-podium" + (tied ? " is-tied" : ""), style: { "--n": podium.length } }, podium.map((x, i) =>
-        h("li", { class: "is-" + (i + 1) + (num(x.rank) === 1 ? " is-top" : "") },
+        h("li", { class: "is-" + (i + 1) + (num(x.rank) === 1 ? " is-top" : "") + (i === 2 && num(x.rank) !== 1 && num(x.rank) === num(podium[1].rank) ? " is-tie2" : "") },
           h("a", { href: toPlayer(x.uuid), "data-go": true },
             h("span", { class: "mh-podium-rank" }, vh("Rank "), num(x.rank)),
             avatar(x.uuid, nameOf(x), 64),
