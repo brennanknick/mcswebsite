@@ -1084,7 +1084,7 @@ p { margin: 0 0 1rem; }
 }
 .chip svg { width: 14px; height: 14px; fill: currentColor; opacity: .7; }
 /* the notched-corner clip-path would cut off a normal outline entirely */
-.chip:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-soft); }
+.chip:focus-visible { outline: 2px solid transparent; outline-offset: -2px; box-shadow: inset 0 0 0 2px var(--accent-soft); }
 .chip:hover svg { opacity: 1; }
 
 .modal-note { font-size: 14px; color: var(--text-faint); margin: -1.5rem 0 2rem; }
@@ -1417,6 +1417,11 @@ code, kbd {
   .pos { width: 46px; height: 46px; font-size: 13px; }
   .acc summary { padding: 1rem 3rem 1rem 1.1rem; font-size: 16px; }
   .acc-body { padding: 1rem 1.1rem; }
+}
+
+/* six footer links: a tidy 3 x 2 on phones instead of 5 + an orphan */
+@media (max-width: 479px) {
+  .footer-links { display: grid; grid-template-columns: repeat(3, max-content); justify-content: center; justify-items: center; gap: .5rem 1.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

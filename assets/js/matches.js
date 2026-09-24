@@ -68,7 +68,8 @@
     ["games", "Matches", "count", "Matches played to a result."],
     ["possession", "On the ball", "time", "Total time holding the ball."],
   ];
-  const STAT = Object.fromEntries(STATS.map((s) => [s[0], s]));
+  // no prototype, so ?stat=constructor can't find Object's own keys
+  const STAT = Object.assign(Object.create(null), Object.fromEntries(STATS.map((s) => [s[0], s])));
 
   /* ── small helpers ─────────────────────────────────────────────── */
 
@@ -164,9 +165,26 @@
     return "#" + [16, 8, 0].map((sh) => pad2(m(sh).toString(16))).join("");
   }
   const onColor = (c) => (lum(c) > 0.18 ? "#0b1210" : "#ffffff");
-  const vivid = (c) => (lum(c) < 0.045 ? mix(c, "#ffffff", 0.42) : c);
+  // lift a colour towards white until it reaches 3:1 against the cards, so
+  // team bars and markers stay visible (black, dark blue, dark red, grey...)
+  const CARD_L = lum("#0b1310");
+  const vividMemo = new Map();
+  function vivid(c) {
+    if (vividMemo.has(c)) return vividMemo.get(c);
+    let t = lum(c) < 0.045 ? 0.42 : 0, o = mix(c, "#ffffff", t);
+    while ((lum(o) + 0.05) / (CARD_L + 0.05) < 3 && t < 1) o = mix(c, "#ffffff", (t += 0.05));
+    vividMemo.set(c, o);
+    return o;
+  }
   function sideVars(s) {
-    return { "--c": s.color, "--cv": vivid(s.color), "--on": onColor(s.color) };
+    return {
+      "--c": s.color,
+      "--cv": vivid(s.color),
+      // the shield's rim: darker than the fill, except on colours already
+      // too dark to show, which get the lifted colour instead
+      "--ce": lum(s.color) < 0.045 ? vivid(s.color) : mix(s.color, "#000000", 0.55),
+      "--on": onColor(s.color),
+    };
   }
 
   // one side of a record, a list row or a live board, however it came
@@ -185,18 +203,20 @@
     };
   }
   const crestHex = (v) => (typeof v === "string" && CREST_RE.test(v) ? v : "");
+  // a blank name and "?" both mean the server didn't know it (doc 3)
   const nameOf = (who) => {
     const n = str(obj(who).name).trim();
-    return n || str(obj(who).uuid).slice(0, 8) || "Unknown player";
+    return (n && n !== "?" ? n : "") || str(obj(who).uuid).slice(0, 8) || "Unknown player";
   };
 
   /* ── time ──────────────────────────────────────────────────────── */
 
   const F = {
-    time: new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }),
+    // timeStyle follows each locale's own habit: 7:25 PM here, 19:25 there
+    time: new Intl.DateTimeFormat(undefined, { timeStyle: "short" }),
     day: new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }),
     dayYear: new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" }),
-    full: new Intl.DateTimeFormat(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+    full: new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" }),
     date: new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year: "numeric" }),
   };
   let skew = 0; // server clock minus ours, from /live's `now`
@@ -265,10 +285,13 @@
 
   const memo = new Map(); // url -> { t, data }
   let staleSeen = false;
+  // what the proxy said about each answer (HIT, MISS, STALE...), by body
+  const cacheLabel = new WeakMap();
 
   function noteCache(res) {
     const c = (res.headers.get("X-MCS-Cache") || "").toUpperCase();
     if (c === "STALE") staleSeen = true;
+    return c;
   }
 
   // GET a JSON route. `ttl` is how long a copy stays good in memory
@@ -301,7 +324,8 @@
         throw new ApiError("offline");
       }
       clearTimeout(timer);
-      noteCache(res);
+      const label = noteCache(res);
+      if (body && typeof body === "object") cacheLabel.set(body, label);
 
       if (res.status === 503 && attempt < 3) { await sleep(2000); continue; }
       if (res.status === 404) throw new ApiError("notfound", 404);
@@ -359,6 +383,12 @@
     return img;
   }
 
+  // Crests that failed to load, hex -> when. The live strip is rebuilt every
+  // 5 s, so without this a missing crest would be asked for every 5 s by
+  // every visitor. Try again after 10 minutes (a crest can come back).
+  const deadCrests = new Map();
+  const CREST_RETRY_MS = 10 * 60 * 1000;
+
   // A club crest from the game's resource pack, or a pixel shield in the
   // side's colour with its initial. Crests can vanish from the pack at
   // any time, so the shield is always the fallback.
@@ -369,10 +399,11 @@
       '<svg class="px" viewBox="0 0 12 14"><path class="mh-shield-edge" d="M0 0h12v8h-1v2h-1v1H9v1H8v1H7v1H5v-1H4v-1H3v-1H2v-1H1V8H0z"/>' +
       '<path class="mh-shield-fill" d="M1 1h10v7h-1v2H9v1H8v1H7v1H5v-1H4v-1H3v-1H2V8H1z"/><path class="mh-shield-shine" d="M1 1h10v2H1z"/></svg>';
     wrap.appendChild(h("b", null, letter));
-    if (side.crest && API) {
+    const dead = side.crest && deadCrests.get(side.crest);
+    if (side.crest && API && !(dead && Date.now() - dead < CREST_RETRY_MS)) {
       const img = h("img", { class: "mh-crest-img", alt: "", loading: "lazy", decoding: "async", src: `${API}/crest/${side.crest}.png` });
-      img.addEventListener("load", () => wrap.classList.add("has-img"));
-      img.addEventListener("error", () => img.remove());
+      img.addEventListener("load", () => { deadCrests.delete(side.crest); wrap.classList.add("has-img"); });
+      img.addEventListener("error", () => { deadCrests.set(side.crest, Date.now()); img.remove(); });
       wrap.appendChild(img);
     }
     return wrap;
@@ -388,7 +419,14 @@
   function ratingBadge(r, big) {
     r = num(r);
     const tier = r >= 8 ? "top" : r >= 7 ? "good" : r >= 6 ? "ok" : "low";
-    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: "Match rating" }, r.toFixed(1));
+    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: "Match rating" }, vh("Rating "), r.toFixed(1));
+  }
+
+  // goals, assists: an icon, the count when it's more than one, and words
+  // for screen readers either way
+  function countBadge(cls, ic, n, one, many) {
+    return h("span", { class: "mh-b " + cls, title: n + " " + (n === 1 ? one : many) },
+      icon(ic), n > 1 ? n : null, vh(n === 1 ? " 1 " + one : " " + many));
   }
 
   function resultBadge(res) {
@@ -463,7 +501,7 @@
     if (tab === "leaders") {
       const stat = str(q.get("stat")).toLowerCase();
       const lim = parseInt(q.get("limit"), 10);
-      return { view: "leaders", stat: STAT[stat] ? stat : "goals", mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25 };
+      return { view: "leaders", stat: Object.hasOwn(STAT, stat) ? stat : "goals", mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25 };
     }
     if (tab === "players") return { view: "players", q: str(q.get("q")).trim().slice(0, 16) };
     const field = str(q.get("field")).trim();
@@ -533,13 +571,17 @@
 
   /* ── the page frame ────────────────────────────────────────────── */
 
-  const S = { route: null, token: 0, lastList: "./", firstRender: true };
+  // finished: matches seen ending on the live strip (their Summary rows),
+  // shown at the top of page 1 even if a cached list doesn't have them yet
+  const S = { route: null, token: 0, lastList: "./", firstRender: true, finished: [], staleRetryAt: 0 };
 
   function setChrome(r) {
     const index = r.view === "list" || r.view === "leaders" || r.view === "players";
     head.hidden = !index;
     tabs.hidden = !index || !API;
     counters.hidden = !index || !API || !counters.children.length;
+    // the Players tab has its own search box: don't show two
+    searchSlot.parentElement.hidden = r.view === "players";
     $$("a", tabs).forEach((a) => {
       if (a.dataset.tab === r.view) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
@@ -561,6 +603,9 @@
       });
     }
     staleNote.hidden = !staleSeen;
+    // a report or player page showing saved data has no live poll to notice
+    // the server coming back, so look again in a while
+    if (staleSeen && S.route && (S.route.view === "match" || S.route.view === "player")) retryLater(30000);
   }
 
   function skeleton(kind) {
@@ -581,6 +626,7 @@
     const prev = S.route;
     S.route = r;
     const token = ++S.token;
+    const prevTitle = document.title;
     staleSeen = false;
 
     // /?p=ABC-... is accepted, and quietly put into its lower-case form
@@ -592,7 +638,10 @@
     setChrome(r);
 
     const same = prev && prev.view === r.view && prev.id === r.id && prev.uuid === r.uuid;
-    const focusKey = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.focus;
+    const active = document.activeElement;
+    const focusKey = active && active.dataset && active.dataset.focus;
+    const focusInMain = !!active && active !== document.body && main.contains(active);
+    const pagerUsed = !!focusKey && focusKey.startsWith("pg:") && same;
 
     if (!API) {
       setTitle("Match History");
@@ -606,7 +655,12 @@
 
     if (opts.nav && !same) window.scrollTo(0, 0);
     else if (opts.nav && same && !opts.keep) {
-      const top = (tabs.hidden ? view : tabs).getBoundingClientRect().top;
+      // bring what's changing into view: a player's match list when only
+      // its page changed, the tabs and filters everywhere else
+      const anchor = r.view === "player"
+        ? (prev.mode === r.mode && $(".mh-pl-games", view)) || view
+        : tabs.hidden ? view : tabs;
+      const top = anchor.getBoundingClientRect().top;
       if (top < 0) window.scrollTo({ top: window.scrollY + top - 110, behavior: reduceMotion ? "auto" : "smooth" });
     }
 
@@ -614,6 +668,8 @@
       const nodes = await VIEWS[r.view](r, token);
       if (token !== S.token || !nodes) return;
       swap(nodes, same);
+      // the list is back: don't leave the live strip waiting out its backoff
+      if (r.view === "list" && Live.on && Live.fails) livePoll();
     } catch (e) {
       if (token !== S.token) return;
       console.warn("[matches]", e);
@@ -621,25 +677,37 @@
     }
 
     if (token !== S.token) return;
-    // keyboard users keep their place: refocus the control they used, or
-    // land on the new view's heading after a real page change
-    const again = focusKey && $(`[data-focus="${CSS.escape(focusKey)}"]`, main);
-    if (again) again.focus({ preventScroll: true });
-    else if (opts.nav && !same) {
-      const hd = $("h1, h2", view);
-      if (hd) { hd.setAttribute("tabindex", "-1"); hd.focus({ preventScroll: true }); }
+    // keyboard users keep their place: a new page of rows takes focus (the
+    // arrow they pressed may be gone); otherwise refocus the control they
+    // used, or land on the view's heading after a page change, or when the
+    // control they were on has disappeared
+    if (pagerUsed) {
+      const rows = $(".mh-pg-list, .mh-list", view);
+      if (rows) { rows.setAttribute("tabindex", "-1"); rows.focus({ preventScroll: true }); }
+      const c = $(".mh-pg-count", view);
+      if (c) announce(c.textContent);
+    } else {
+      const again = focusKey && $(`[data-focus="${CSS.escape(focusKey)}"]`, main);
+      if (again) again.focus({ preventScroll: true });
+      else if ((opts.nav && !same) || (focusInMain && (!document.activeElement || document.activeElement === document.body))) {
+        const hd = $("h1, h2", view) || (!head.hidden && $("h1", head));
+        if (hd) { hd.setAttribute("tabindex", "-1"); hd.focus({ preventScroll: true }); }
+      }
+      // say where we are, unless nothing a listener would care about changed
+      if (opts.nav && !S.firstRender && !(same && document.title === prevTitle)) announce(document.title.replace(/ — MCS$/, ""));
     }
-    if (opts.nav && !S.firstRender) announce(document.title.replace(/ — MCS$/, ""));
     S.firstRender = false;
   }
 
   /* ── states: not set up, offline, empty ────────────────────────── */
 
+  // on a match or player route the page head (and its h1) is hidden, so a
+  // note standing in for the report is the page's h1
   function note(kind, title, text, actions) {
     return h("div", { class: "mh-note is-" + kind },
       h("div", { class: "mh-note-board", "aria-hidden": "true" },
         h("span", null, kind === "off" ? "–" : "0"), h("i", null, ":"), h("span", null, kind === "off" ? "–" : "0")),
-      h("h2", null, title),
+      h(head.hidden ? "h1" : "h2", null, title),
       h("p", null, text),
       actions && actions.length ? h("div", { class: "mh-note-actions" }, actions) : null);
   }
@@ -653,8 +721,32 @@
         h("a", { class: "btn btn-dark", href: "../rules/" }, "Read the rules")])];
   }
 
+  // Try again later, but never while the tab is hidden: wait for it to be
+  // shown again instead (a timer that just skipped would never retry).
+  function retryLater(ms) {
+    const tok = S.token;
+    const go_ = () => { if (tok === S.token) render(); };
+    setTimeout(() => {
+      if (tok !== S.token) return;
+      if (!document.hidden) return go_();
+      document.addEventListener("visibilitychange", function vis() {
+        if (document.hidden) return;
+        document.removeEventListener("visibilitychange", vis);
+        go_();
+      });
+    }, ms);
+    window.addEventListener("online", go_, { once: true });
+  }
+
   function problem(e, r) {
     const kind = e && e.kind;
+    // the list, leaderboards and search only 404 when match history isn't
+    // switched on (yet) on the game server
+    if (kind === "notfound" && r.view !== "match" && r.view !== "player") {
+      setTitle("Match History");
+      retryLater(60000);
+      return unconfigured();
+    }
     if (kind === "notfound") {
       if (r.view === "match") {
         setTitle("Match not found");
@@ -668,10 +760,9 @@
         [arrowBtn("Find a player", { href: href({ view: "players" }), "data-go": true })])];
     }
     setTitle("Match History");
-    const retry = h("button", { class: "btn", type: "button", on: { click: () => render() } }, "Try again", icon("tri", "arrow"));
-    const tok = S.token;
+    const retry = h("button", { class: "btn", type: "button", "data-focus": "retry", on: { click: () => render() } }, "Try again", icon("tri", "arrow"));
     // it's usually a restart: try again on our own while they wait
-    setTimeout(() => { if (tok === S.token && !document.hidden) render(); }, kind === "loading" ? 4000 : 20000);
+    retryLater(kind === "loading" ? 4000 : 20000);
     if (kind === "loading") {
       return [note("wait", "The match server is warming up",
         "It's reading its match history after a restart. This page will load by itself in a moment.", [retry])];
@@ -729,7 +820,18 @@
 
     const filtered = !!(r.mode || r.field || r.results);
     const out = [filters(r, meta)];
-    const items = arr(list.items);
+    let items = arr(list.items);
+    // A match that just ended can be missing from a list the browser or the
+    // proxy cached a moment before the whistle: add it (doc 2.3 order)
+    if (r.page === 1 && S.finished.length) {
+      const extra = S.finished.filter((m) => !items.some((x) => x.id === m.id) &&
+        (!r.mode || m.mode === r.mode) && (!r.field || m.fieldId === r.field) && (!r.results || m.outcome === "COMPLETED"));
+      if (extra.length) {
+        items = extra.concat(items)
+          .sort((a, b) => num(b.startedAt) - num(a.startedAt) || (a.id < b.id ? 1 : -1))
+          .slice(0, num(list.size) || 20);
+      }
+    }
 
     if (!items.length) {
       if (num(list.total) === 0 && !filtered) {
@@ -740,8 +842,9 @@
         out.push(note("off", "Nothing matches those filters", "Try a different mode or pitch.",
           [arrowBtn("Show every match", { href: href({ view: "list" }), "data-go": true })]));
       } else {
-        out.push(note("off", "That page is past the end", `There are ${list.pages} pages of matches.`,
-          [arrowBtn("Go to the last page", { href: href(Object.assign({}, r, { page: list.pages })), "data-go": true })]));
+        out.push(note("off", "That page is past the end",
+          list.pages === 1 ? "There is only 1 page of matches." : `There are ${list.pages} pages of matches.`,
+          [arrowBtn(list.pages === 1 ? "Go to page 1" : "Go to the last page", { href: href(Object.assign({}, r, { page: list.pages })), "data-go": true })]));
       }
       return out;
     }
@@ -758,7 +861,12 @@
       h("option", { value: "" }, "All pitches"),
       fields.map((f) => h("option", { value: str(f.id), selected: f.id === r.field }, str(f.name) || str(f.id))),
       r.field && !fields.some((f) => f.id === r.field) ? h("option", { value: r.field, selected: true }, r.field) : null);
-    sel.addEventListener("change", () => go(set({ field: sel.value })));
+    // arrowing through a closed <select> fires change on every key press:
+    // keep a run of picks to one history entry
+    sel.addEventListener("change", () => {
+      const again = !!(history.state && history.state.pitchPick);
+      go(set({ field: sel.value }), { replace: again, state: { pitchPick: true } });
+    });
 
     const box = h("input", { type: "checkbox", id: "mh-results", "data-focus": "results", checked: r.results });
     box.addEventListener("change", () => go(set({ results: box.checked })));
@@ -769,15 +877,17 @@
       h("div", { class: "mh-filter-more" },
         fields.length > 1 || r.field ? h("label", { class: "mh-select-wrap" }, vh("Pitch"), sel) : null,
         h("label", { class: "mh-toggle", for: "mh-results" }, box, h("span", { class: "mh-toggle-box", "aria-hidden": "true" }), "Results only"),
-        r.mode || r.field || r.results ? h("a", { class: "mh-clear", href: href({ view: "list" }), "data-go": true }, "Clear") : null));
+        r.mode || r.field || r.results ? h("a", { class: "mh-clear", href: href({ view: "list" }), "data-go": true, "data-focus": "mode:all" }, "Clear") : null));
   }
 
   const justFinished = new Set();
 
-  function sideCell(side, where, winner, loser) {
+  // `mark`: a trophy for a winner the score can't show (coin flip, referee)
+  function sideCell(side, where, winner, loser, mark) {
     return h("div", { class: "mh-side is-" + where + (winner ? " is-winner" : "") + (loser ? " is-loser" : ""), style: sideVars(side) },
       shield(side, "md"),
-      h("span", { class: "mh-side-name" }, side.name));
+      h("span", { class: "mh-side-name" }, side.name),
+      mark ? icon("trophy", "mh-side-win") : null);
   }
 
   function matchRow(m, i) {
@@ -788,24 +898,31 @@
     const sc = obj(m.score);
     const so = m.shootout;
 
+    const hiddenWin = !!win && (res.decidedBy === "COIN_FLIP" || res.decidedBy === "REFEREE");
     const a = toMatch(m.id, m.number);
-    a.className = "mh-row" + (justFinished.has(m.id) ? " is-new" : "") + (done ? "" : " is-void");
+    // a just-finished match flashes once, on the render that first shows it
+    const fresh = justFinished.delete(m.id);
+    a.className = "mh-row" + (fresh ? " is-new" : "") + (done ? "" : " is-void");
     a.style.setProperty("--i", Math.min(i, 12));
+    a.dataset.focus = "row:" + m.id; // a background refresh keeps keyboard focus here
 
     append(a, [
       h("div", { class: "mh-row-when" },
         h("b", null, dayLabel(num(m.startedAt))), " ",
         h("span", null, F.time.format(new Date(num(m.startedAt))))),
       h("div", { class: "mh-row-board" },
-        sideCell(red, "home", win === "RED", win === "BLUE"),
+        sideCell(red, "home", win === "RED", win === "BLUE", hiddenWin && win === "RED"),
         h("div", { class: "mh-score" },
           h("span", { class: "mh-score-n is-a" + (win === "RED" ? " is-win" : "") }, num(sc.RED)),
           h("span", { class: "mh-score-dash", "aria-hidden": "true" }, "–"),
           vh(" to "),
           h("span", { class: "mh-score-n is-b" + (win === "BLUE" ? " is-win" : "") }, num(sc.BLUE)),
           h("small", { class: "mh-score-note" }, statusShort(m),
-            pensShown(so) ? " " + num(so.RED) + "–" + num(so.BLUE) : "")),
-        sideCell(blue, "away", win === "BLUE", win === "RED")),
+            pensShown(so) ? " " + num(so.RED) + "–" + num(so.BLUE) : ""),
+          // say who won in words: a coin flip or a referee's call can't be
+          // read off the score, and brightness alone isn't enough
+          done ? vh(res.draw ? ", a draw" : win ? ", " + (win === "RED" ? red : blue).name + " won" : "") : null),
+        sideCell(blue, "away", win === "BLUE", win === "RED", hiddenWin && win === "BLUE")),
       h("div", { class: "mh-row-meta" },
         modeTag(m.mode, m.knockout),
         h("span", { class: "mh-row-pitch" }, str(m.fieldName) || str(m.fieldId) || "Unknown pitch")),
@@ -848,7 +965,7 @@
 
   /* ── live now: polls /live every 5 s while you can see it ──────── */
 
-  const Live = { on: false, timer: 0, fails: 0, prev: new Map(), tick: 0, busy: false };
+  const Live = { on: false, timer: 0, fails: 0, prev: new Map(), tick: 0, busy: false, okAt: 0 };
   const safeField = (id) => str(id).trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 40);
 
   function liveStart() {
@@ -873,11 +990,29 @@
     Live.busy = true;
     try {
       const d = await get("/live", null, 0);
+      // the proxy's saved copy of the live board lists matches that may be
+      // over by now: count it as a failed poll
+      if (cacheLabel.get(d) === "STALE") throw new Error("stale live board");
       Live.fails = 0;
+      Live.okAt = Date.now();
       if (typeof d.now === "number") skew = d.now - Date.now();
       showLive(arr(d.live));
+      // the game server is answering again: refresh a list still showing
+      // saved results (at most every 30 s)
+      if (!staleNote.hidden && S.route && S.route.view === "list" && Date.now() - S.staleRetryAt > 30000) {
+        S.staleRetryAt = Date.now();
+        forgetLists();
+        render({ keep: true });
+      }
     } catch {
       Live.fails++;
+      // nothing fresh for 20 s: stop showing (and ticking) matches that
+      // may well have ended
+      if (Date.now() - Live.okAt > 20000) {
+        clearInterval(Live.tick);
+        liveBox.hidden = true;
+        liveList.replaceChildren();
+      }
     } finally {
       Live.busy = false;
       if (Live.on) Live.timer = setTimeout(livePoll, Live.fails ? Math.min(60000, 5000 * Math.pow(2, Live.fails)) : 5000);
@@ -938,11 +1073,21 @@
       const m = arr(d.items).find((x) => x.startedAt === L.startedAt);
       if (!m) { if (attempt < 3) followToRecord(L, attempt + 1); return; }
       justFinished.add(m.id);
+      S.finished = S.finished.filter((x) => x.id !== m.id).concat(m).slice(-5);
       forgetLists();
       getMeta(true).then(renderCounters).catch(() => {});
       const red = sideOf(m, "RED"), blue = sideOf(m, "BLUE");
-      announce(`Full time on ${str(m.fieldName) || "a pitch"}: ${red.name} ${num(m.score.RED)}, ${blue.name} ${num(m.score.BLUE)}`);
-      if (S.route && S.route.view === "list" && S.route.page === 1) render({ keep: true });
+      announce(`Full time on ${str(m.fieldName) || "a pitch"}: ${red.name} ${num(obj(m.score).RED)}, ${blue.name} ${num(obj(m.score).BLUE)}`);
+      const onPage1 = () => S.route && S.route.view === "list" && S.route.page === 1;
+      if (onPage1()) render({ keep: true });
+      // the browser (15 s) and the proxy (20 s) may both still hold a list
+      // and counts from before the whistle: look again once they've expired
+      setTimeout(() => {
+        if (!onPage1()) return;
+        forgetLists();
+        getMeta(true).then(renderCounters).catch(() => {});
+        render({ keep: true });
+      }, 25000);
     } catch {}
   }
 
@@ -973,13 +1118,17 @@
 
     setTitle(`${red.name} ${num(sc.RED)}–${num(sc.BLUE)} ${blue.name}`);
 
-    // goal scorers under each side, as on a broadcast
+    // goal scorers under each side, as on a broadcast: only the goals that
+    // still stand at the end (a referee's edit or reset takes goals off
+    // without touching their GOAL events, doc 4.1 and 4.6)
+    const st = standingGoals(events);
+    const standing = new Set([...st.RED, ...st.BLUE].filter((x) => !x.edit));
     const scorers = { RED: [], BLUE: [] };
-    events.forEach((e) => {
-      if ((e.type !== "GOAL" && e.type !== "AWARDED_GOAL") || e.disallowed || !scorers[e.team]) return;
-      const label = e.type === "AWARDED_GOAL" ? "Awarded" : e.ownGoal ? who(e.player) + " (OG)" : who(e.player) || "Goal";
-      scorers[e.team].push([label, evClock(e, rec)]);
-    });
+    SIDES.forEach((k) => st[k].forEach((x) => {
+      if (x.edit) return scorers[k].push(["Added by the referee", evClock(x.edit, rec)]);
+      const label = x.type === "AWARDED_GOAL" ? "Awarded" : x.ownGoal ? who(x.player) + " (OG)" : who(x.player) || "Goal";
+      scorers[k].push([label, evClock(x, rec)]);
+    }));
     const scorerList = (key) => {
       const grouped = new Map();
       scorers[key].forEach(([n, c]) => grouped.set(n, (grouped.get(n) || []).concat(c)));
@@ -1006,6 +1155,8 @@
         heroSide(blue, win === "BLUE", win && win !== "BLUE", scorerList("BLUE"))),
       h("ul", { class: "mh-hero-chips" },
         h("li", null, modeTag(rec.mode, rec.knockout)),
+        // side names alone can't prove a fixture (doc 4.15); the source can
+        rec.source === "fixture" ? h("li", null, "Club fixture") : null,
         h("li", null, str(obj(rec.field).name) || "Unknown pitch"),
         h("li", null, rulesLine(rec)),
         number ? h("li", null, "Match #" + number) : null));
@@ -1019,12 +1170,12 @@
     out.push(h("div", { class: "mh-report-grid" },
       timelineCard(rec, events, sides, who),
       h("div", { class: "mh-report-side" }, statsCard(rec, red, blue))));
-    const flow = flowCard(rec, events, red, blue);
+    const flow = flowCard(rec, events, red, blue, standing);
     if (flow) out.push(flow);
 
     if (so) out.push(shootoutCard(so, sides, who));
     out.push(lineupsCard(rec, red, blue, events));
-    const shots = shotMapCard(rec, events, sides, who);
+    const shots = shotMapCard(rec, events, sides, who, standing);
     out.push(shots ? h("div", { class: "mh-report-grid is-even" }, shots, infoCard(rec, sides)) : infoCard(rec, sides));
     return out;
   }
@@ -1071,7 +1222,7 @@
     if (test) say.push("This was a practice shootout, not a real match. It isn't listed and doesn't count.");
     if (rec.outcome === "STOPPED") say.push("A referee stopped this match before the end, so it has no result and doesn't count toward anyone's stats.");
     if (rec.outcome === "ABANDONED") say.push("Everyone left the pitch, so this match was abandoned. It doesn't count toward stats.");
-    if (rec.outcome === "INTERRUPTED") say.push("The server restarted during this match. This report was saved from its last checkpoint, so the final minute may be missing, and it doesn't count toward stats.");
+    if (rec.outcome === "INTERRUPTED") say.push("This match was cut off before the end, usually by a server restart or reload, so it has no result and doesn't count toward stats. If the server crashed, the last minute or so may be missing.");
     const FLAGS = {
       SCORE_EDITED: "A referee changed the score by hand during this match.",
       REFEREE_WIN: "The referee declared the winner" + (res.winner ? ", which can differ from who scored more." : "."),
@@ -1088,11 +1239,55 @@
 
   /* the timeline */
 
+  // Which goals still stand at the end, per side. Replays the timeline:
+  // goals go on, and whenever an event's score shows a side with fewer
+  // goals than we're holding, its newest ones come off (a disallow always
+  // takes the latest standing goal, doc 4.5; edits and resets do the same
+  // to the score). Points a referee added by hand stand in as {edit}.
+  function standingGoals(events) {
+    const st = { RED: [], BLUE: [] };
+    events.forEach((e) => {
+      const k = SIDES.includes(e.team) ? e.team : null;
+      if ((e.type === "GOAL" || e.type === "AWARDED_GOAL") && k) st[k].push(e);
+      if (e.type === "SCORE_EDIT" && k && e.score) while (st[k].length < num(e.score[k])) st[k].push({ edit: e });
+      if (e.score && typeof e.score === "object") {
+        SIDES.forEach((s) => { const n = num(e.score[s]); while (st[s].length > n) st[s].pop(); });
+      }
+    });
+    SIDES.forEach((s) => (st[s] = st[s].filter((x) => !x.disallowed)));
+    return st;
+  }
+
+  // Where each half was due to end on the match clock: the clock its
+  // HALF_END shows, minus the stoppage a referee added. Only halves that
+  // ran their full time have a HALF_END, so the rest are left alone.
+  const clockSec = (c) => { const m = /^(\d+):(\d\d)$/.exec(str(c)); return m ? +m[1] * 60 + +m[2] : NaN; };
+  const endsMemo = new WeakMap();
+  function halfEnds(rec) {
+    if (endsMemo.has(rec)) return endsMemo.get(rec);
+    const added = new Map(arr(rec.halves).map((x) => [(x.extraTime ? "et" : "") + num(x.half), num(x.addedSeconds)]));
+    const ends = new Map();
+    arr(rec.events).forEach((e) => {
+      const k = (e.et ? "et" : "") + num(e.half), a = added.get(k);
+      if (e.type === "HALF_END" && a > 0 && !isNaN(clockSec(e.clock))) ends.set(k, clockSec(e.clock) - a);
+    });
+    endsMemo.set(rec, ends);
+    return ends;
+  }
+
   function evClock(e, rec) {
-    // a referee can act during the countdown: negative t, half 0
-    if (num(e.t) < 0 || num(e.half) === 0) return "Pre";
+    // a referee can act during the countdown: negative t and a "-m:ss"
+    // clock. (A match sent to penalties before kick-off has half 0 but
+    // happens after it, so half alone doesn't tell.)
+    if (num(e.t) < 0 || str(e.clock).startsWith("-")) return "Pre";
     const c = str(e.clock) || clockOf(e.t);
-    return (e.et ? "ET " : "") + c.replace(/^-/, "");
+    const pre = e.et ? "ET " : "";
+    // stoppage time reads as base+added, like football's 45+2
+    if (rec.mode === "MATCH") {
+      const end = halfEnds(rec).get((e.et ? "et" : "") + num(e.half)), s = clockSec(c);
+      if (end != null && s > end) return pre + clockOf(end) + "+" + clockOf(s - end);
+    }
+    return pre + c;
   }
 
   function ordinal(n) { return ["", "first", "second", "third", "fourth"][n] || n + "th"; }
@@ -1228,17 +1423,22 @@
       const clock = e.type === "PENALTY" ? "P" + ++kickNo : evClock(e, rec);
       rows.push({ key, el: h("li", { class: "mh-ev is-" + (side ? side.toLowerCase() : "mid") + " kind-" + kind, style: side ? sideVars(sides[side]) : null },
         h("span", { class: "mh-ev-clock", title: e.type === "PENALTY" ? "Shootout kick " + kickNo : null }, clock),
-        h("div", { class: "mh-ev-body" }, ic ? h("span", { class: "mh-ev-ic" }, icon(ic)) : null, h("div", { class: "mh-ev-text" }, text))) });
+        h("div", { class: "mh-ev-body" }, ic ? h("span", { class: "mh-ev-ic" }, icon(ic)) : null,
+          // the side in words: on desktop only the column says it, on
+          // phones only the colour rail would
+          h("div", { class: "mh-ev-text" }, side ? h("span", { class: "mh-ev-team" }, tname(side), vh(": ")) : null, text))) });
     });
 
     const hidden = rows.filter((r) => !r.key).length;
-    const list = h("ol", { class: "mh-timeline" + (hidden ? " is-key" : "") }, rows.map((r) => { if (!r.key) r.el.classList.add("is-minor"); return r.el; }));
+    const listId = "mh-tl-list" + ++uid;
+    const list = h("ol", { class: "mh-timeline" + (hidden ? " is-key" : ""), id: listId }, rows.map((r) => { if (!r.key) r.el.classList.add("is-minor"); return r.el; }));
     let toggle = null;
     if (hidden && rows.length > 10) {
-      toggle = h("button", { class: "mh-link-btn", type: "button", "aria-pressed": "false" }, `Show everything (${hidden} more)`);
+      // an action button whose label says what it will do (no aria-pressed:
+      // with a changing label that would announce the opposite state)
+      toggle = h("button", { class: "mh-link-btn", type: "button", "aria-controls": listId }, `Show everything (${hidden} more)`);
       toggle.addEventListener("click", () => {
         const all = list.classList.toggle("is-key") === false;
-        toggle.setAttribute("aria-pressed", String(all));
         toggle.textContent = all ? "Key moments only" : `Show everything (${hidden} more)`;
       });
     } else list.classList.remove("is-key");
@@ -1289,7 +1489,7 @@
 
   /* possession flow: who had the ball, 30 seconds at a time */
 
-  function flowCard(rec, events, red, blue) {
+  function flowCard(rec, events, red, blue, standing) {
     const f = obj(rec.flow), t = obj(f.teams);
     const A = arr(t.RED).map(num), B = arr(t.BLUE).map(num);
     const n = Math.max(A.length, B.length);
@@ -1304,14 +1504,14 @@
         h("i", { class: "is-red", style: { "--v": Math.min(1, a / bucket) } }),
         h("i", { class: "is-blue", style: { "--v": Math.min(1, b / bucket) } })));
     }
-    const goals = events.filter((e) => (e.type === "GOAL" || e.type === "AWARDED_GOAL") && !e.disallowed && (e.team === "RED" || e.team === "BLUE"))
+    const goals = events.filter((e) => standing.has(e))
       .map((e) => h("span", { class: "mh-flow-goal is-" + e.team.toLowerCase(), style: { "--x": Math.min(1, Math.max(0, num(e.t) / bucket / n)) }, title: "Goal, " + evClock(e, rec) }, icon("ball")));
     const mins = (n * bucket) / 60;
     const step = mins > 40 ? 10 : mins > 16 ? 5 : mins > 6 ? 2 : 1;
     const ticks = [];
     for (let m = 0; m <= mins; m += step) ticks.push(h("span", { style: { "--x": m / mins } }, m + "'"));
 
-    return h("section", { class: "mh-card mh-flow-card", "aria-labelledby": "mh-fl", style: { "--red": vivid(red.color), "--blue": vivid(blue.color), "--n": n } },
+    return h("section", { class: "mh-card mh-flow-card" + (red.color === blue.color ? " is-same" : ""), "aria-labelledby": "mh-fl", style: { "--red": vivid(red.color), "--blue": vivid(blue.color), "--n": n } },
       sectionHead(h("span", { id: "mh-fl" }, "Momentum"), "Who had the ball, 30 seconds at a time. Breaks show as gaps."),
       h("div", { class: "mh-flow-legend" },
         h("span", { class: "is-red" }, h("i"), red.name), h("span", { class: "is-blue" }, h("i"), blue.name)),
@@ -1346,8 +1546,16 @@
 
   function lineupsCard(rec, red, blue, events) {
     const players = arr(rec.players);
-    const leaveReason = new Map();
-    events.forEach((e) => { if (e.type === "LEAVE" && e.player) leaveReason.set(e.player, e.reason); });
+    // each player's first JOIN and last LEAVE, so the line-up can quote the
+    // same clock as the timeline (joinedAt/leftAt are real seconds, which
+    // drift from the match clock), and when the shootout began
+    const moves = { join: new Map(), leave: new Map(), shootoutAt: Infinity };
+    events.forEach((e, i) => {
+      if (e.type === "SHOOTOUT" && moves.shootoutAt === Infinity) moves.shootoutAt = i;
+      if (!e.player) return;
+      if (e.type === "JOIN" && !moves.join.has(e.player)) moves.join.set(e.player, e);
+      if (e.type === "LEAVE") moves.leave.set(e.player, { e, i });
+    });
     const parties = new Map();
     players.forEach((p) => { if (p.party) parties.set(p.party, (parties.get(p.party) || []).concat(p)); });
 
@@ -1355,7 +1563,7 @@
       const mine = players.filter((p) => p.team === side.key);
       return h("div", { class: "mh-lu-col", style: sideVars(side) },
         h("h3", { class: "mh-lu-head" }, shield(side, "sm"), h("span", null, side.name), h("small", null, mine.length + (mine.length === 1 ? " player" : " players"))),
-        mine.length ? h("ul", { class: "mh-lu-list" }, mine.map((p) => lineupRow(rec, p, side, leaveReason, parties)))
+        mine.length ? h("ul", { class: "mh-lu-list" }, mine.map((p) => lineupRow(rec, p, side, moves, parties)))
           : h("p", { class: "mh-dim" }, "Nobody finished on this side."));
     };
     return h("section", { class: "mh-card mh-lineups", "aria-labelledby": "mh-lu" },
@@ -1363,20 +1571,30 @@
       h("div", { class: "mh-lu-cols" }, col(red), col(blue)));
   }
 
-  function lineupRow(rec, p, side, leaveReason, parties) {
+  const LEFT = { quit: "Disconnected", left: "Left", spectate: "Went to spectate", removed: "Taken off by the referee" };
+
+  function lineupRow(rec, p, side, moves, parties) {
     const s = obj(p.stats);
     const pid = "mh-lu-" + ++uid;
     const pos = str(p.position) || arr(p.positions).slice(-1)[0] || "";
     const badges = [];
-    if (num(s.goals)) badges.push(h("span", { class: "mh-b is-goal", title: s.goals + (s.goals === 1 ? " goal" : " goals") }, icon("ball"), s.goals > 1 ? s.goals : null, vh(" goals")));
-    if (num(s.assists)) badges.push(h("span", { class: "mh-b is-assist", title: s.assists + (s.assists === 1 ? " assist" : " assists") }, icon("boot"), s.assists > 1 ? s.assists : null, vh(" assists")));
+    if (num(s.goals)) badges.push(countBadge("is-goal", "ball", num(s.goals), "goal", "goals"));
+    if (num(s.assists)) badges.push(countBadge("is-assist", "boot", num(s.assists), "assist", "assists"));
     if (num(s.ownGoals)) badges.push(h("span", { class: "mh-b is-og", title: "Own goal" }, "OG", s.ownGoals > 1 ? "×" + s.ownGoals : null));
     if (p.cleanSheet) badges.push(h("span", { class: "mh-b is-cs", title: "Clean sheet" }, icon("glove"), vh(" clean sheet")));
     if (p.mvp) badges.push(h("span", { class: "mh-b is-mvp", title: "Player of the match" }, icon("star"), "MVP"));
 
     const notes = [];
-    if (num(p.joinedAt) > 0) notes.push("On at " + clockOf(p.joinedAt));
-    if (!p.present && p.leftAt != null) notes.push((leaveReason.get(p.uuid) === "quit" ? "Disconnected at " : "Left at ") + clockOf(p.leftAt));
+    // (clockOf of the raw seconds is only a fallback: exact for scrims and
+    // quick games, whose clock is real time)
+    if (num(p.joinedAt) > 0) {
+      const j = moves.join.get(p.uuid);
+      notes.push("On at " + (j ? evClock(j, rec) : clockOf(p.joinedAt)));
+    }
+    if (!p.present && p.leftAt != null) {
+      const l = moves.leave.get(p.uuid), verb = LEFT[l && l.e.reason] || "Left";
+      notes.push(l && l.i > moves.shootoutAt ? verb + " during the shootout" : verb + " at " + (l ? evClock(l.e, rec) : clockOf(p.leftAt)));
+    }
     const others = [...new Set(arr(p.teams))].filter((t) => t !== p.team);
     if (others.length) notes.push("Also played for " + others.map((t) => sideOf(rec, t).name).join(", "));
     const mates = p.party ? (parties.get(p.party) || []).filter((q) => q.uuid !== p.uuid) : [];
@@ -1405,8 +1623,9 @@
         h("div", { class: "mh-lu-who" },
           UUID_RE.test(str(p.uuid)) ? h("a", { class: "mh-lu-name", href: toPlayer(p.uuid), "data-go": true }, nameOf(p)) : h("span", { class: "mh-lu-name" }, nameOf(p)),
           notes.length ? h("small", null, notes.join(" · ")) : null),
-        pos ? h("span", { class: "mh-pos", title: POSITIONS[pos] || pos }, pos) : null,
+        // badges first, so the position chips form a column down the list
         h("span", { class: "mh-lu-badges" }, badges),
+        pos ? h("span", { class: "mh-pos", title: POSITIONS[pos] || pos }, pos) : null,
         ratingBadge(p.rating),
         btn),
       detail);
@@ -1414,8 +1633,8 @@
 
   /* where the goals came from */
 
-  function shotMapCard(rec, events, sides, who) {
-    const shots = events.filter((e) => e.type === "GOAL" && !e.disallowed && e.from && typeof e.from.dist === "number" && sides[e.team]);
+  function shotMapCard(rec, events, sides, who, standing) {
+    const shots = events.filter((e) => standing.has(e) && e.type === "GOAL" && e.from && typeof e.from.dist === "number" && SIDES.includes(e.team));
     if (!shots.length) return null;
     const fw = num(obj(rec.field).width), fl = num(obj(rec.field).length);
     // plot on half a pitch, goal at the top: x = across, y = out
@@ -1449,12 +1668,13 @@
       svg.appendChild(g);
     });
     const red = sides.RED, blue = sides.BLUE;
-    return h("section", { class: "mh-card mh-shots", "aria-labelledby": "mh-sm", style: { "--red": vivid(red.color), "--blue": vivid(blue.color) } },
+    return h("section", { class: "mh-card mh-shots" + (red.color === blue.color ? " is-same" : ""), "aria-labelledby": "mh-sm", style: { "--red": vivid(red.color), "--blue": vivid(blue.color) } },
       sectionHead(h("span", { id: "mh-sm" }, "Where the goals came from"), "Each goal, drawn from the net it went into."),
       h("div", { class: "mh-shotmap-wrap" }, svg),
       h("ul", { class: "mh-shot-list" }, shots.map((e) => h("li", { class: "is-" + e.team.toLowerCase() },
         h("i", { "aria-hidden": "true" }), h("b", null, e.ownGoal ? who(e.player) + " (OG)" : who(e.player) || "Goal"),
-        " " + num(e.from.dist).toFixed(0) + " blocks, " + evClock(e, rec)))));
+        " " + num(e.from.dist).toFixed(0) + " blocks, " + evClock(e, rec),
+        h("span", { class: "mh-dim" }, " · for " + sides[e.team].name)))));
   }
 
   /* the small print */
@@ -1467,14 +1687,15 @@
     const played = arr(rec.halves).reduce((t, x) => t + num(x.seconds), 0);
     const rows = [
       ["Pitch", [str(f.name) || str(f.id), num(f.length) && num(f.width) ? h("small", null, ` ${Math.round(f.length)} × ${Math.round(f.width)} blocks`) : null]],
-      ["Mode", modeName(rec.mode) + (rec.knockout ? " (knockout)" : "")],
+      ["Mode", modeName(rec.mode) + (rec.knockout ? " (knockout)" : "") + (rec.source === "fixture" ? " · club fixture" : "")],
       ["Rules", [rulesLine(rec), num(r.scorePerGoal) > 1 ? ` · goals worth ${r.scorePerGoal} points` : ""]],
       ["Started by", rec.startedBy && UUID_RE.test(str(rec.startedBy.uuid))
         ? [h("a", { class: "mh-plink", href: toPlayer(rec.startedBy.uuid), "data-go": true }, nameOf(rec.startedBy)), rec.source === "referee" || rec.source === "menu" ? " (referee)" : ""]
         : src],
       ["Kick-off", num(rec.kickoffAt) ? F.time.format(new Date(rec.kickoffAt)) : "–"],
       ["Final whistle", num(rec.endedAt) ? F.time.format(new Date(rec.endedAt)) : "–"],
-      ["Length", minutesText(rec.durationSeconds) + (played ? ` (${clockOf(played)} of play)` : "")],
+      // both to the second, so breaks and shootouts show in the difference
+      ["Length", clockOf(rec.durationSeconds) + (played ? ` (${clockOf(played)} of play)` : "")],
     ];
     const link = new URL(href({ view: "match", id: rec.id }), location.href).href;
     const btn = h("button", { class: "chip mh-copy", type: "button" }, icon("copy"), h("span", null, "Copy link"));
@@ -1505,8 +1726,10 @@
     const games = obj(d.games);
     setTitle(name);
 
+    // club is the same in every mode (doc 3); form and last played are per mode
     const club = (all && all.club) || null;
-    const form = arr(all && all.form);
+    const src = r.mode ? t : all;
+    const form = arr(src && src.form);
     const modes = [["", "All"]].concat(["MATCH", "SCRIM", "QUICK"].filter((m) => byMode[m]).map((m) => [m, modeName(m)]));
 
     const body = h("img", {
@@ -1525,9 +1748,9 @@
           h("h1", { class: "mh-pl-name", id: "mh-pl-name" }, name),
           h("div", { class: "mh-pl-tags" },
             clubChip(club),
-            all ? h("span", { class: "mh-dim" }, "Last played " + ago(num(all.lastPlayed))) : null),
-          form.length ? h("div", { class: "mh-form", "aria-label": "Form, most recent first" },
-            h("span", { class: "mh-form-label", "aria-hidden": "true" }, "Form"),
+            src ? h("span", { class: "mh-dim" }, "Last played " + ago(num(src.lastPlayed))) : null),
+          form.length ? h("div", { class: "mh-form" },
+            h("span", { class: "mh-form-label" }, "Form", vh(", most recent first:")),
             form.map((x) => resultBadge(x))) : null,
           t ? headline(t) : null)));
 
@@ -1540,10 +1763,18 @@
     else if (all || r.mode) out.push(h("p", { class: "mh-card mh-dim" }, `No finished ${r.mode ? modeName(r.mode).toLowerCase() + " " : ""}matches yet.`));
     else out.push(h("p", { class: "callout mh-callout" }, "None of their matches reached a result yet (stopped, abandoned or interrupted matches don't count), so there are no totals to show."));
 
+    // the API can't filter this list by mode (doc 1.8), so under a mode tab
+    // say plainly that it still covers every mode
     const items = arr(games.items);
+    const count = num(games.total) + (num(games.total) === 1 ? " match" : " matches");
     out.push(h("section", { class: "mh-card mh-pl-games", "aria-labelledby": "mh-pg" },
-      sectionHead(h("span", { id: "mh-pg" }, "Matches"), num(games.total) + (num(games.total) === 1 ? " match, newest first" : " matches, newest first")),
-      items.length ? h("ol", { class: "mh-pg-list" }, items.map(gameRow)) : h("p", { class: "mh-dim" }, "Nothing on this page."),
+      sectionHead(h("span", { id: "mh-pg" }, r.mode ? "All their matches" : "Matches"),
+        (r.mode ? "Every mode · " : "") + count + ", newest first"),
+      items.length ? h("ol", { class: "mh-pg-list" }, items.map(gameRow))
+        : num(games.total) > 0
+          ? h("p", { class: "mh-dim" }, "That page is past the end. ",
+            h("a", { href: href({ view: "player", uuid: r.uuid, mode: r.mode, page: num(games.pages) || 1 }), "data-go": true }, "Go to the last page"))
+          : h("p", { class: "mh-dim" }, "No matches on this page."),
       pager(num(games.page), num(games.pages), (p) => href({ view: "player", uuid: r.uuid, mode: r.mode, page: p }), "Match pages")));
     return out;
   }
@@ -1610,8 +1841,8 @@
         h("span", { class: "mh-dotname", style: sideVars(them) }, h("i"), them.name)),
       h("span", { class: "mh-grow-me" },
         g.position ? h("span", { class: "mh-pos", title: POSITIONS[g.position] || g.position }, g.position) : null,
-        num(g.goals) ? h("span", { class: "mh-b is-goal", title: g.goals + " goals" }, icon("ball"), g.goals > 1 ? g.goals : null, vh(" goals")) : null,
-        num(g.assists) ? h("span", { class: "mh-b is-assist", title: g.assists + " assists" }, icon("boot"), g.assists > 1 ? g.assists : null, vh(" assists")) : null,
+        num(g.goals) ? countBadge("is-goal", "ball", num(g.goals), "goal", "goals") : null,
+        num(g.assists) ? countBadge("is-assist", "boot", num(g.assists), "assist", "assists") : null,
         g.cleanSheet ? h("span", { class: "mh-b is-cs", title: "Clean sheet" }, icon("glove"), vh(" clean sheet")) : null,
         g.mvp ? h("span", { class: "mh-b is-mvp", title: "Player of the match" }, icon("star"), vh(" MVP")) : null,
         ratingBadge(g.rating)),
@@ -1630,9 +1861,11 @@
   }
 
   async function viewLeaders(r, token) {
+    // ask for one more row than we show: that's how we know whether
+    // "Show more" would actually bring anything
     const [meta, d] = await Promise.all([
       getMeta().catch(() => null),
-      get("/leaders", { stat: r.stat, mode: r.mode, limit: r.limit }, 30000),
+      get("/leaders", { stat: r.stat, mode: r.mode, limit: Math.min(100, r.limit + 1) }, 30000),
     ]);
     if (token !== S.token) return null;
     if (meta) renderCounters(meta);
@@ -1640,8 +1873,12 @@
     setTitle(def[1] + " leaderboard");
     // the server echoes the stat it actually used; anything else is a
     // board it doesn't know, which we'd rather show as empty than wrong
-    const items = str(d.stat) === r.stat ? arr(d.items) : [];
+    const got = str(d.stat) === r.stat ? arr(d.items) : [];
+    const more = got.length > r.limit && r.limit < 100;
+    const items = got.slice(0, r.limit);
     const min = num(d.min) || 1;
+    // on the Matches board the value IS the match count: don't print it twice
+    const showGames = r.stat !== "games";
 
     const picker = h("div", { class: "mh-statpick", role: "group", "aria-label": "Stat" },
       STATS.map(([k, label]) => h("a", {
@@ -1656,35 +1893,46 @@
       picker,
     ];
 
-    const sub = def[3] + (min > 1 ? ` At least ${min} matches to qualify.` : "") + " Only matches that reached a result count.";
+    const sub = def[3] + (min > 1 ? ` At least ${min} matches to qualify.` : "") + (showGames ? " Only matches that reached a result count." : "");
     if (!items.length) {
       out.push(note("wait", "No one on this board yet", sub, []));
       return out;
     }
 
+    // Gold goes to everyone on rank 1, not just whoever sorts first by name
+    // (tied rows share a rank, doc 2.7). A tied podium lays out in rank order.
     const podium = items.slice(0, 3);
     const rest = items.slice(3);
+    const tied = podium.filter((x) => num(x.rank) === 1).length > 1;
+    const unit = " " + def[1].toLowerCase();
+    // after "Show more", focus goes to the first row it brought in
+    const firstNew = r.limit > 25 ? (r.limit === 50 ? 25 : 50) : -1;
+    const whoLink = (x, i) => h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true, "data-focus": i === firstNew && !more ? "lb-more" : null },
+      avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)));
+
     out.push(h("section", { class: "mh-board", "aria-labelledby": "mh-lb" },
       h("h2", { class: "mh-sec-title", id: "mh-lb" }, def[1], r.mode ? h("span", { class: "mh-dim" }, " · " + modeName(r.mode)) : null),
       h("p", { class: "mh-sec-sub" }, sub),
-      h("ol", { class: "mh-podium", style: { "--n": podium.length } }, podium.map((x, i) => h("li", { class: "is-" + (i + 1) },
-        h("a", { href: toPlayer(x.uuid), "data-go": true },
-          h("span", { class: "mh-podium-rank" }, num(x.rank)),
-          avatar(x.uuid, nameOf(x), 64),
-          h("b", { class: "mh-podium-name" }, nameOf(x)),
-          x.club ? clubChip(x.club) : null,
-          h("span", { class: "mh-podium-val" }, fmtStat(r.stat, x.value)),
-          h("small", null, num(x.games) + (num(x.games) === 1 ? " match" : " matches")))))),
+      h("ol", { class: "mh-podium" + (tied ? " is-tied" : ""), style: { "--n": podium.length } }, podium.map((x, i) =>
+        h("li", { class: "is-" + (i + 1) + (num(x.rank) === 1 ? " is-top" : "") },
+          h("a", { href: toPlayer(x.uuid), "data-go": true },
+            h("span", { class: "mh-podium-rank" }, vh("Rank "), num(x.rank)),
+            avatar(x.uuid, nameOf(x), 64),
+            h("b", { class: "mh-podium-name" }, nameOf(x)),
+            x.club ? clubChip(x.club) : null,
+            h("span", { class: "mh-podium-val" }, fmtStat(r.stat, x.value), vh(unit)),
+            showGames ? h("small", null, num(x.games) + (num(x.games) === 1 ? " match" : " matches")) : null)))),
       rest.length ? h("table", { class: "mh-lb-table" },
         h("caption", { class: "visually-hidden" }, def[1] + " leaderboard, from 4th place"),
-        h("thead", null, h("tr", null, h("th", { scope: "col" }, "#"), h("th", { scope: "col" }, "Player"), h("th", { scope: "col" }, def[1]), h("th", { scope: "col" }, "Matches"))),
-        h("tbody", null, rest.map((x) => h("tr", null,
+        h("thead", null, h("tr", null,
+          h("th", { scope: "col" }, "#"), h("th", { scope: "col" }, "Player"), h("th", { scope: "col", class: "mh-lb-val" }, def[1]),
+          showGames ? h("th", { scope: "col", class: "mh-lb-games" }, "Matches") : null)),
+        h("tbody", null, rest.map((x, j) => h("tr", null,
           h("td", { class: "mh-lb-rank" }, num(x.rank)),
-          h("td", null, h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true }, avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x))),
-            x.club ? clubChip(x.club) : null),
+          h("td", { class: "mh-lb-player" }, whoLink(x, j + 3), x.club ? clubChip(x.club) : null),
           h("td", { class: "mh-lb-val" }, fmtStat(r.stat, x.value)),
-          h("td", { class: "mh-lb-games" }, num(x.games)))))) : null,
-      items.length >= r.limit && r.limit < 100
+          showGames ? h("td", { class: "mh-lb-games" }, num(x.games)) : null)))) : null,
+      more
         ? h("div", { class: "mh-more" }, h("a", { class: "btn btn-dark", href: href(Object.assign({}, r, { limit: r.limit === 25 ? 50 : 100 })), "data-go": true, "data-keep": true, "data-focus": "lb-more" }, "Show more"))
         : null));
     return out;
@@ -1711,7 +1959,7 @@
         h("h2", { class: "mh-sec-title", id: "mh-rg" }, "Regulars"),
         h("p", { class: "mh-sec-sub" }, "The most matches played to a result."),
         h("ul", { class: "mh-reg-grid" }, regulars.map((x, i) => h("li", { style: { "--i": Math.min(i, 16) } },
-          h("a", { href: toPlayer(x.uuid), "data-go": true },
+          h("a", { href: toPlayer(x.uuid), "data-go": true, title: nameOf(x) },
             avatar(x.uuid, nameOf(x), 40),
             h("b", null, nameOf(x)),
             h("small", null, num(x.games) + (num(x.games) === 1 ? " match" : " matches"))))))) : null,
@@ -1750,10 +1998,21 @@
       input.setAttribute("aria-expanded", String(on));
       if (!on) { active = -1; input.removeAttribute("aria-activedescendant"); }
     };
+    // the header box hands off and empties, so it never shows an old query
+    const reset = () => {
+      clearTimeout(timer);
+      seq++;
+      input.value = "";
+      results = [];
+      list.replaceChildren();
+      msg.textContent = "";
+      open(false);
+    };
     const pick = (i) => {
       const it = results[i];
       if (!it) return;
       open(false);
+      if (!inline) reset();
       go(toPlayer(it.uuid));
     };
     const highlight = (i) => {
@@ -1767,6 +2026,7 @@
       const q = input.value.trim();
       const my = ++seq;
       msg.textContent = "";
+      msg.classList.remove("visually-hidden");
       if (!q) { results = []; list.replaceChildren(); open(false); return; }
       if (!NAME_RE.test(q)) {
         results = []; list.replaceChildren(); open(false);
@@ -1783,7 +2043,10 @@
             on: { pointerdown: (e) => { e.preventDefault(); pick(i); } } }, avatar(x.uuid, nameOf(x), 24), h("span", null, nameOf(x)))));
         highlight(-1);
         open(results.length > 0);
-        msg.textContent = results.length ? (inline ? "" : results.length + (results.length === 1 ? " player found" : " players found")) : `Nobody called "${q}" has played yet.`;
+        const n = results.length;
+        msg.textContent = n ? n + (n === 1 ? " player found" : " players found") : `Nobody called "${q}" has played yet.`;
+        // the inline list is already on screen: announce the count, don't show it
+        msg.classList.toggle("visually-hidden", inline && n > 0);
       } catch {
         if (my === seq) msg.textContent = "Search isn't working right now.";
       }
@@ -1805,8 +2068,16 @@
         e.preventDefault();
         if (active >= 0) pick(active);
         else if (results.length === 1) pick(0);
-        else if (input.value.trim()) go(href({ view: "players", q: input.value.trim() }));
-      } else if (e.key === "Escape") { if (!list.hidden) { e.stopPropagation(); open(false); } }
+        else if (input.value.trim()) {
+          const q = input.value.trim();
+          reset();
+          go(href({ view: "players", q }));
+        }
+      } else if (e.key === "Escape") {
+        // the first Escape only closes the list; without preventDefault the
+        // search field would also clear itself
+        if (!list.hidden) { e.preventDefault(); e.stopPropagation(); open(false); }
+      }
     });
     input.addEventListener("blur", () => setTimeout(() => open(false), 120));
     input.addEventListener("focus", () => { if (results.length) open(true); });
