@@ -509,12 +509,18 @@
       return { view: "leaders", stat: stat in STAT ? stat : "goals", mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25 };
     }
     if (tab === "players") return { view: "players", q: str(q.get("q")).trim().slice(0, 16) };
+    if (tab === "ranked") {
+      const lim = parseInt(q.get("limit"), 10);
+      return { view: "ranked", queue: str(q.get("queue")).toLowerCase() === "4v4" ? "4v4" : "3v3", limit: [250, 500, 1000].includes(lim) ? lim : 100 };
+    }
     const field = str(q.get("field")).trim();
+    const rk = q.get("ranked");
     return {
       view: "list",
       mode: modeParam(q.get("mode")),
       field: /^[a-z0-9_]{1,40}$/.test(field) ? field : "",
       results: q.get("results") === "1",
+      ranked: rk === "1" || rk === "0" ? rk : "",
       page: pageParam(q.get("page")),
     };
   }
@@ -538,7 +544,13 @@
         q.set("tab", "players");
         if (r.q) q.set("q", r.q);
         break;
+      case "ranked":
+        q.set("tab", "ranked");
+        if (r.queue && r.queue !== "3v3") q.set("queue", r.queue);
+        if (r.limit && r.limit !== 100) q.set("limit", r.limit);
+        break;
       default:
+        if (r.ranked) q.set("ranked", r.ranked);
         if (r.mode) q.set("mode", r.mode);
         if (r.field) q.set("field", r.field);
         if (r.results) q.set("results", "1");
@@ -580,8 +592,10 @@
   // shown at the top of page 1 even if a cached list doesn't have them yet
   const S = { route: null, token: 0, lastList: "./", firstRender: true, finished: [], staleRetryAt: 0, noted: false };
 
+  const isIndex = (v) => v === "list" || v === "ranked" || v === "leaders" || v === "players";
+
   function setChrome(r) {
-    const index = r.view === "list" || r.view === "leaders" || r.view === "players";
+    const index = isIndex(r.view);
     head.hidden = !index;
     bar.hidden = !index || !API;
     tabs.hidden = !index || !API;
@@ -836,20 +850,21 @@
   /* ── view: the match list ──────────────────────────────────────── */
 
   async function viewList(r, token) {
-    const params = { page: r.page, size: 20, mode: r.mode, field: r.field, results: r.results ? 1 : "" };
-    const [meta, list] = await Promise.all([getMeta().catch(() => null), get("/matches", params, 15000)]);
+    const params = { page: r.page, size: 20, mode: r.mode, field: r.field, results: r.results ? 1 : "", ranked: r.ranked };
+    const [meta, list, rankedOn] = await Promise.all([getMeta().catch(() => null), get("/matches", params, 15000), rankedRunning()]);
     if (token !== S.token) return null;
     if (meta) renderCounters(meta);
     setTitle(r.page > 1 ? `Matches, page ${r.page}` : "Match History");
 
-    const filtered = !!(r.mode || r.field || r.results);
-    const out = [filters(r, meta)];
+    const filtered = !!(r.mode || r.field || r.results || r.ranked);
+    const out = [filters(r, meta, rankedOn)];
     let items = arr(list.items);
     // A match that just ended can be missing from a list the browser or the
     // proxy cached a moment before the whistle: add it (doc 2.3 order)
     if (r.page === 1 && S.finished.length) {
       const extra = S.finished.filter((m) => !items.some((x) => x.id === m.id) &&
-        (!r.mode || m.mode === r.mode) && (!r.field || m.fieldId === r.field) && (!r.results || m.outcome === "COMPLETED"));
+        (!r.mode || m.mode === r.mode) && (!r.field || m.fieldId === r.field) && (!r.results || m.outcome === "COMPLETED") &&
+        (!r.ranked || (r.ranked === "1") === (m.ranked === true)));
       if (extra.length) {
         items = extra.concat(items)
           .sort((a, b) => num(b.startedAt) - num(a.startedAt) || (a.id < b.id ? 1 : -1))
@@ -857,7 +872,19 @@
       }
     }
 
+    // a server without ranked ignores ?ranked=, which would list casual
+    // matches under "Ranked": say it isn't running instead
+    if (r.ranked === "1" && (!rankedOn || items.some((m) => m.ranked !== true))) {
+      out.push(note("off", "Ranked isn't running yet", "Ranked matches will show up here once the ranked queue opens.",
+        [arrowBtn("Show every match", { href: href({ view: "list" }), "data-go": true })]));
+      return out;
+    }
     if (!items.length) {
+      if (r.ranked === "1" && num(list.total) === 0 && !r.mode && !r.field) {
+        out.push(note("wait", "No ranked matches yet", "Queue for ranked from the lobby hotbar and yours could be the first.",
+          [arrowBtn("Join the server", { on: { click: openConnect } })]));
+        return out;
+      }
       if (num(list.total) === 0 && !filtered) {
         out.push(note("wait", "No matches yet",
           "The first whistle hasn't gone. Get on a pitch and yours could be the first match in the history books.",
@@ -878,7 +905,7 @@
     return out;
   }
 
-  function filters(r, meta) {
+  function filters(r, meta, rankedOn) {
     const set = (patch) => href(Object.assign({}, r, patch, { page: 1 }));
     const fields = arr(meta && meta.fields);
     const sel = h("select", { class: "mh-select", id: "mh-field", "data-focus": "field" },
@@ -896,12 +923,16 @@
     box.addEventListener("change", () => go(set({ results: box.checked })));
 
     return h("div", { class: "mh-filters" },
-      segmented("Mode", [["", "All"], ["MATCH", "Match"], ["SCRIM", "Scrim"], ["QUICK", "Quick"]], r.mode,
-        (v) => set({ mode: v }), "mode"),
+      // "Ranked" sits with the modes (players think of it as one), though
+      // it's its own filter: ranked matches are MATCHes
+      segmented("Mode", [["", "All"]].concat(rankedOn || r.ranked === "1" ? [["RANKED", "Ranked"]] : [],
+        [["MATCH", "Match"], ["SCRIM", "Scrim"], ["QUICK", "Quick"]]),
+        r.ranked === "1" ? "RANKED" : r.mode,
+        (v) => v === "RANKED" ? set({ mode: "", ranked: "1" }) : set({ mode: v, ranked: "" }), "mode"),
       h("div", { class: "mh-filter-more" },
         fields.length > 1 || r.field ? h("label", { class: "mh-select-wrap" }, vh("Pitch"), sel) : null,
         h("label", { class: "mh-toggle", for: "mh-results" }, box, h("span", { class: "mh-toggle-box", "aria-hidden": "true" }), "Results only"),
-        r.mode || r.field || r.results ? h("a", { class: "mh-clear", href: href({ view: "list" }), "data-go": true, "data-focus": "mode:all" }, "Clear") : null));
+        r.mode || r.field || r.results || r.ranked ? h("a", { class: "mh-clear", href: href({ view: "list" }), "data-go": true, "data-focus": "mode:all" }, "Clear") : null));
   }
 
   const justFinished = new Set();
@@ -976,7 +1007,7 @@
       return h("li", null, b, h("span", null, label));
     }));
     if (meta.first) counters.appendChild(h("li", { class: "is-since" }, h("span", null, "Recording since"), h("b", null, F.date.format(new Date(meta.first)))));
-    counters.hidden = !(S.route && (S.route.view === "list" || S.route.view === "leaders" || S.route.view === "players"));
+    counters.hidden = !(S.route && isIndex(S.route.view));
   }
   function countUp(el, to, delay) {
     const t0 = performance.now() + delay, dur = 900;
@@ -1190,6 +1221,7 @@
         h("li", null, modeTag(rec.mode, rec.knockout, rec.queue)),
         // side names alone can't prove a fixture (doc 4.15); the source can
         rec.source === "fixture" ? h("li", null, "Club fixture") : null,
+        eloAverages(rec) ? h("li", { class: "mh-elo-avg" }, "Avg Elo " + eloAverages(rec).RED + " v " + eloAverages(rec).BLUE) : null,
         h("li", null, str(obj(rec.field).name) || "Unknown pitch"),
         h("li", null, rulesLine(rec)),
         number ? h("li", null, "Match #" + number) : null));
@@ -1264,6 +1296,11 @@
       RULES_CHANGED: "The rules were changed partway through this match.",
       SHOOTOUT_FORCED: "A referee sent this match straight to penalties.",
     };
+    if (QUEUE_RE.test(str(rec.queue)) && rec.outcome !== "COMPLETED") {
+      say.push(rec.outcome === "INTERRUPTED"
+        ? "A restart voids a ranked match: nobody's Elo moved."
+        : "This ranked match didn't count. Only players who left and didn't come back lost Elo.");
+    }
     if (res.decidedBy === "FORFEIT") say.push("Every player on one side left and stayed away, so the other side won by forfeit. The score is what it was when they went.");
     arr(rec.flags).forEach((f) => {
       if (f === "TEST") return;
@@ -1597,7 +1634,9 @@
     const col = (side) => {
       const mine = players.filter((p) => p.team === side.key);
       return h("div", { class: "mh-lu-col", style: sideVars(side) },
-        h("h3", { class: "mh-lu-head" }, shield(side, "sm"), h("span", null, side.name), h("small", null, mine.length + (mine.length === 1 ? " player" : " players"))),
+        h("h3", { class: "mh-lu-head" }, shield(side, "sm"), h("span", null, side.name),
+          h("small", null, mine.length + (mine.length === 1 ? " player" : " players"),
+            eloAverages(rec) ? " · avg Elo " + eloAverages(rec)[side.key] : "")),
         mine.length ? h("ul", { class: "mh-lu-list" }, mine.map((p) => lineupRow(rec, p, side, moves, parties)))
           : h("p", { class: "mh-dim" }, "Nobody finished on this side."));
     };
@@ -1657,7 +1696,8 @@
         avatar(p.uuid, nameOf(p), 32),
         h("div", { class: "mh-lu-who" },
           UUID_RE.test(str(p.uuid)) ? h("a", { class: "mh-lu-name", href: toPlayer(p.uuid), "data-go": true }, nameOf(p)) : h("span", { class: "mh-lu-name" }, nameOf(p)),
-          notes.length ? h("small", null, notes.join(" · ")) : null),
+          notes.length ? h("small", null, notes.join(" · ")) : null,
+          eloOf(p) ? eloLine(eloOf(p)) : null),
         // badges first, so the position chips form a column down the list
         h("span", { class: "mh-lu-badges" }, badges),
         pos ? h("span", { class: "mh-pos", title: POSITIONS[pos] || pos }, pos) : null,
@@ -1753,6 +1793,14 @@
     if (!UUID_RE.test(r.uuid)) throw new ApiError("notfound");
     const d = await get("/players/" + r.uuid, { page: r.page, size: 20 }, 30000);
     if (token !== S.token) return null;
+    const rankedLines = rankedOf(d);
+    // their place on each ladder they play in (the profile has only the Elo)
+    const places = await Promise.all(rankedLines.map(([q]) =>
+      get("/ranked", { queue: q, limit: 1000 }, 60000).then((l) => {
+        const row = arr(l.items).find((x) => x.uuid === r.uuid);
+        return row ? { rank: num(row.rank), of: arr(l.items).length } : null;
+      }).catch(() => null)));
+    if (token !== S.token) return null;
     const me = obj(d.player);
     const byMode = obj(d.byMode);
     const all = d.totals && typeof d.totals === "object" ? d.totals : null;
@@ -1790,18 +1838,26 @@
           t ? headline(t) : null)));
 
     const out = [hero];
+    if (rankedLines.length) out.push(rankedCard(rankedLines, places, arr(games.items)));
 
     if (modes.length > 2 || r.mode) {
       out.push(segmented("Mode", modes, r.mode, (v) => href({ view: "player", uuid: r.uuid, mode: v }), "pmode"));
     }
     if (t) out.push(totalsGrid(t));
     else if (all || r.mode) out.push(h("p", { class: "mh-card mh-dim" }, `No finished ${r.mode ? modeName(r.mode).toLowerCase() + " " : ""}matches yet.`));
-    else out.push(h("p", { class: "callout mh-callout" }, "None of their matches reached a result yet (stopped, abandoned or interrupted matches don't count), so there are no totals to show."));
+    else if (num(games.total) > 0) out.push(h("p", { class: "callout mh-callout" }, "None of their matches reached a result yet (stopped, abandoned or interrupted matches don't count), so there are no totals to show."));
 
     // the API can't filter this list by mode (doc 1.8), so under a mode tab
     // say plainly that it still covers every mode
     const items = arr(games.items);
     const count = num(games.total) + (num(games.total) === 1 ? " match" : " matches");
+    // someone known only to the ranked ratings (doc 2.6) has no records
+    if (num(games.total) === 0 && !items.length) {
+      out.push(h("p", { class: "callout mh-callout" }, rankedLines.length
+        ? "None of their matches has been recorded yet: they're on the ladder from a ranked game that ended before kick-off."
+        : "None of their matches has been recorded yet."));
+      return out;
+    }
     out.push(h("section", { class: "mh-card mh-pl-games", "aria-labelledby": "mh-pg" },
       sectionHead(h("span", { id: "mh-pg" }, r.mode ? "All their matches" : "Matches"),
         (r.mode ? "Every mode · " : "") + count + ", newest first"),
@@ -1869,7 +1925,8 @@
     a.className = "mh-grow" + (done ? "" : " is-void");
     a.dataset.focus = "g:" + g.id;
     append(a, [
-      h("span", { class: "mh-grow-when" }, h("b", null, dayLabel(num(g.startedAt))), h("span", null, modeName(g.mode))),
+      h("span", { class: "mh-grow-when" }, h("b", null, dayLabel(num(g.startedAt))),
+        h("span", null, QUEUE_RE.test(str(g.queue)) ? "Ranked " + g.queue : modeName(g.mode))),
       done && g.result ? resultBadge(g.result) : h("span", { class: "mh-tag is-void" }, OUTCOME[g.outcome] || "Unfinished"),
       h("span", { class: "mh-grow-teams" },
         h("span", { class: "mh-dotname", style: sideVars(us) }, h("i"), h("span", { class: "mh-dotname-t" }, us.name)),
@@ -1881,9 +1938,177 @@
         num(g.assists) ? countBadge("is-assist", "boot", num(g.assists), "assist", "assists") : null,
         g.cleanSheet ? h("span", { class: "mh-b is-cs", title: "Clean sheet" }, icon("glove"), vh(" clean sheet")) : null,
         g.mvp ? h("span", { class: "mh-b is-mvp", title: "Player of the match" }, icon("star"), vh(" MVP")) : null,
+        eloOf(g) ? eloDelta(eloOf(g)) : null,
         ratingBadge(g.rating)),
     ]);
     return h("li", { style: { "--i": Math.min(i, 12) } }, a);
+  }
+
+  /* ── ranked: Elo, the ladder ──────────────────────────────────────
+     The game server works out every Elo number (doc 5): the page only
+     shows them. Player lines and a player's rows carry {before, after,
+     delta, left?}; the ladder and a profile's `ranked` are the ratings now. */
+
+  const eloOf = (o) => {
+    const e = obj(o).elo;
+    return e && typeof e === "object" && isFinite(e.before) && isFinite(e.after) ? e : null;
+  };
+  // "+11" / "−13" / "±0", coloured; a leaver's loss is marked as one
+  function eloDelta(e) {
+    const d = num(e.delta);
+    return h("span", {
+      class: "mh-elo-d " + (d > 0 ? "is-up" : d < 0 ? "is-down" : "is-flat") + (e.left ? " is-left" : ""),
+      title: `Elo ${num(e.before)} → ${num(e.after)}` + (e.left ? " (left the match: counted as a loss)" : ""),
+    }, (d > 0 ? "+" : d < 0 ? "−" : "±") + Math.abs(d), vh(" Elo" + (e.left ? ", counted as a loss for leaving" : "")));
+  }
+  function eloLine(e) {
+    return h("span", { class: "mh-lu-elo" }, eloDelta(e), " ",
+      h("span", null, num(e.before) + " → " + num(e.after)), e.left ? h("em", null, " · left, counted as a loss") : null);
+  }
+  // each side's average Elo before the match: how even the teams were
+  const avgMemo = new WeakMap();
+  function eloAverages(rec) {
+    if (!QUEUE_RE.test(str(rec.queue))) return null;
+    if (avgMemo.has(rec)) return avgMemo.get(rec);
+    const out = {};
+    for (const k of SIDES) {
+      const es = arr(rec.players).filter((p) => p.team === k).map(eloOf).filter(Boolean);
+      if (!es.length) { avgMemo.set(rec, null); return null; }
+      out[k] = Math.round(es.reduce((t, e) => t + num(e.before), 0) / es.length);
+    }
+    avgMemo.set(rec, out);
+    return out;
+  }
+  // a profile's current ratings, in queue order, for queues they've played
+  const rankedOf = (d) => ["3v3", "4v4"]
+    .map((q) => [q, obj(obj(d.ranked)[q])])
+    .filter(([, l]) => isFinite(l.elo) && num(l.games) > 0);
+
+  // Is ranked running on the server? (a ladder with updatedAt). Cached.
+  function rankedRunning() {
+    return get("/ranked", { queue: "3v3", limit: 1 }, 60000).then((d) => !!d.updatedAt).catch(() => false);
+  }
+
+  function placementTag(games) {
+    return num(games) < 10 ? h("span", { class: "mh-tag is-placement", title: "Fewer than 10 ranked games: the rating still moves fast" }, "Placement") : null;
+  }
+
+  // Elo over their ranked games on this page, oldest to newest
+  function sparkline(rows, q) {
+    const pts = rows.filter((g) => g.queue === q && eloOf(g)).map((g) => [num(g.startedAt), num(eloOf(g).after)]).sort((a, b) => a[0] - b[0]);
+    if (pts.length < 2) return null;
+    const vals = pts.map((p) => p[1]);
+    const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+    const W = 120, H = 32;
+    const xy = pts.map((p, i) => [Math.round((i / (pts.length - 1)) * (W - 4)) + 2, Math.round(H - 3 - ((p[1] - lo) / span) * (H - 6))]);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("class", "mh-spark");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", `Elo over their last ${pts.length} ranked ${q} games: from ${vals[0]} to ${vals[vals.length - 1]}`);
+    // a stepped line, pixel style
+    let d = `M${xy[0][0]} ${xy[0][1]}`;
+    for (let i = 1; i < xy.length; i++) d += ` H${xy[i][0]} V${xy[i][1]}`;
+    svg.innerHTML = `<path class="mh-spark-line" d="${d}"/>` + xy.map(([x, y]) => `<rect class="mh-spark-dot" x="${x - 1.5}" y="${y - 1.5}" width="3" height="3"/>`).join("");
+    return svg;
+  }
+
+  function rankedCard(lines, places, rows) {
+    const leaves = Math.max(0, ...lines.map(([, l]) => num(l.leaves)));
+    return h("section", { class: "mh-card mh-rk", "aria-labelledby": "mh-rk" },
+      sectionHead(h("span", { id: "mh-rk" }, "Ranked"), "Their Elo now. Everyone starts at 1000 in each queue."),
+      h("div", { class: "mh-rk-grid" }, lines.map(([q, l], i) => {
+        const g = num(l.games), w = num(l.wins), lo = num(l.losses);
+        const place = places[i];
+        return h("div", { class: "mh-rk-tile" },
+          h("div", { class: "mh-rk-top" }, h("span", { class: "mh-tag is-ranked" }, "Ranked " + q), placementTag(g)),
+          h("b", { class: "mh-rk-elo" }, num(l.elo), vh(" Elo")),
+          h("p", { class: "mh-rk-line" },
+            place ? h("a", { class: "mh-plink", href: href({ view: "ranked", queue: q }), "data-go": true }, `#${place.rank} of ${place.of}`) : null,
+            place ? " · " : null,
+            `${w} W · ${lo} L` + (g ? ` · ${Math.round((w / g) * 100)}%` : "")),
+          sparkline(rows, q));
+      })),
+      leaves > 0 ? h("p", { class: "mh-dim mh-rk-leaves" },
+        `${leaves} recent ${leaves === 1 ? "leave" : "leaves"}: leaving a ranked match counts as a loss and means a queue cooldown. It clears after a day without leaving.`) : null);
+  }
+
+  /* ── view: the ranked ladder ───────────────────────────────────── */
+
+  async function viewRanked(r, token) {
+    const [meta, d] = await Promise.all([
+      getMeta().catch(() => null),
+      // a server without ranked has no /ranked (404): the same as no ladder
+      get("/ranked", { queue: r.queue, limit: r.limit }, 20000).catch((e) => {
+        if (e && e.kind === "notfound") return { queue: r.queue, items: [] };
+        throw e;
+      }),
+    ]);
+    if (token !== S.token) return null;
+    if (meta) renderCounters(meta);
+    const q = str(d.queue) === "4v4" ? "4v4" : str(d.queue) === "3v3" ? "3v3" : r.queue;
+    setTitle(`Ranked ${q} ladder`);
+    const items = arr(d.items).filter((x) => UUID_RE.test(str(x.uuid)));
+
+    const out = [
+      h("div", { class: "mh-filters" },
+        segmented("Queue", [["3v3", "3v3"], ["4v4", "4v4"]], r.queue, (v) => href({ view: "ranked", queue: v }), "queue"),
+        d.updatedAt ? h("span", { class: "mh-dim mh-updated" }, "Updated " + ago(num(d.updatedAt))) : null),
+    ];
+
+    if (!d.updatedAt) {
+      out.push(note("off", "Ranked isn't running yet",
+        "When the ranked queue opens, the ladder shows up here: everyone's Elo, best first.", []));
+    } else if (!items.length) {
+      out.push(note("wait", `Nobody's on the ${q} ladder yet`,
+        "Queue for ranked from the lobby hotbar and take the top spot.", [arrowBtn("Join the server", { on: { click: openConnect } })]));
+    } else {
+      const podium = items.slice(0, 3), rest = items.slice(3);
+      const tied = podium.filter((x) => num(x.rank) === 1).length > 1;
+      const wl = (x) => `${num(x.wins)} W · ${num(x.losses)} L`;
+      const firstNew = r.limit > 100 ? { 250: 100, 500: 250, 1000: 500 }[r.limit] : -1;
+      const more = items.length >= r.limit && r.limit < 1000;
+      out.push(h("section", { class: "mh-board", "aria-labelledby": "mh-lb" },
+        h("h2", { class: "mh-sec-title", id: "mh-lb" }, "Ranked ", h("span", { class: "grad" }, q)),
+        h("p", { class: "mh-sec-sub" }, "Current Elo, best first. The server works out every rating; players in their first 10 games are still placing."),
+        h("ol", { class: "mh-podium" + (tied ? " is-tied" : ""), style: { "--n": podium.length } }, podium.map((x, i) =>
+          h("li", { class: "is-" + (i + 1) + (num(x.rank) === 1 ? " is-top" : "") + (i === 2 && num(x.rank) !== 1 && num(x.rank) === num(podium[1].rank) ? " is-tie2" : "") },
+            h("a", { href: toPlayer(x.uuid), "data-go": true },
+              h("span", { class: "mh-podium-rank" }, vh("Rank "), num(x.rank)),
+              avatar(x.uuid, nameOf(x), 64),
+              h("b", { class: "mh-podium-name" }, nameOf(x)),
+              h("span", { class: "mh-podium-val" }, num(x.elo), vh(" Elo")),
+              h("small", null, wl(x)),
+              placementTag(x.games))))),
+        rest.length ? h("table", { class: "mh-lb-table mh-rk-table" },
+          h("caption", { class: "visually-hidden" }, `Ranked ${q} ladder, from 4th place`),
+          h("thead", null, h("tr", null,
+            h("th", { scope: "col" }, "#"), h("th", { scope: "col" }, "Player"), h("th", { scope: "col", class: "mh-lb-val" }, "Elo"),
+            h("th", { scope: "col", class: "mh-lb-games" }, "Record"))),
+          h("tbody", null, rest.map((x, j) => h("tr", null,
+            h("td", { class: "mh-lb-rank" }, num(x.rank)),
+            h("td", { class: "mh-lb-player" },
+              h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true, "data-focus": j + 3 === firstNew ? "rk-more" : null },
+                avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x))),
+              placementTag(x.games)),
+            h("td", { class: "mh-lb-val" }, num(x.elo)),
+            h("td", { class: "mh-lb-games" }, wl(x)))))) : null,
+        more ? h("div", { class: "mh-more" }, h("a", { class: "btn btn-dark", href: href(Object.assign({}, r, { limit: { 100: 250, 250: 500, 500: 1000 }[r.limit] })), "data-go": true, "data-keep": true, "data-focus": "rk-more" }, "Show more")) : null));
+    }
+
+    // how it works, in plain words (doc 5.1 and 5.2)
+    out.push(h("details", { class: "acc mh-rk-how" },
+      h("summary", null, "How ranked works"),
+      h("div", { class: "acc-body" },
+        h("ul", null,
+          h("li", null, "Queue for ", h("b", null, "3v3"), " or ", h("b", null, "4v4"), " from the ranked item in your lobby hotbar, on your own or with your party. A party always plays on the same side."),
+          h("li", null, "Matchmaking looks for players close to your Elo, then splits the two sides so their average Elo is as even as possible."),
+          h("li", null, "Matches are two timed halves. A draw goes straight to penalties, so every ranked match has a winner."),
+          h("li", null, "Everyone starts at 1000 in each queue. Beat a stronger side and you gain more; lose to a weaker one and you drop more. Your first 10 games in a queue are placement games, and your rating moves faster while you settle."),
+          h("li", null, "Leaving counts as a loss, whatever your side does, and puts you on a queue cooldown that grows if you keep leaving. If you only disconnected, ", h("code", null, "/rejoin"), " in time and it's forgotten."),
+          h("li", null, "If a whole side is gone for a minute, the other side wins by forfeit. A match that's stopped, abandoned or cut off by a restart doesn't count.")))));
+    return out;
   }
 
   /* ── view: leaderboards ────────────────────────────────────────── */
@@ -1949,7 +2174,8 @@
 
     out.push(h("section", { class: "mh-board", "aria-labelledby": "mh-lb" },
       h("h2", { class: "mh-sec-title", id: "mh-lb" }, def[1], r.mode ? h("span", { class: "mh-dim" }, " · " + modeName(r.mode)) : null),
-      h("p", { class: "mh-sec-sub" }, sub),
+      h("p", { class: "mh-sec-sub" }, sub, " ",
+        h("a", { class: "mh-plink", href: href({ view: "ranked" }), "data-go": true }, "Elo ratings are on the Ranked tab.")),
       h("ol", { class: "mh-podium" + (tied ? " is-tied" : ""), style: { "--n": podium.length } }, podium.map((x, i) =>
         h("li", { class: "is-" + (i + 1) + (num(x.rank) === 1 ? " is-top" : "") + (i === 2 && num(x.rank) !== 1 && num(x.rank) === num(podium[1].rank) ? " is-tie2" : "") },
           h("a", { href: toPlayer(x.uuid), "data-go": true },
@@ -2142,7 +2368,7 @@
     return wrap;
   }
 
-  const VIEWS = { list: viewList, match: viewMatch, player: viewPlayer, leaders: viewLeaders, players: viewPlayers };
+  const VIEWS = { list: viewList, match: viewMatch, player: viewPlayer, ranked: viewRanked, leaders: viewLeaders, players: viewPlayers };
 
   /* ── start ─────────────────────────────────────────────────────── */
 

@@ -53,7 +53,8 @@
  *
  * What it serves (everything else is a 404, and only GET/HEAD/OPTIONS work):
  *   /api/v1/meta  /api/v1/live  /api/v1/matches  /api/v1/matches/{id}
- *   /api/v1/players  /api/v1/players/{uuid}  /api/v1/leaders  /crest/{hex}.png
+ *   /api/v1/players  /api/v1/players/{uuid}  /api/v1/leaders  /api/v1/ranked
+ *   /crest/{hex}.png
  *
  * Headers the site can read on every response:
  *   X-MCS-Cache  HIT    served from the proxy's saved copy (still fresh)
@@ -150,7 +151,7 @@ const ROUTES = [
     name: "matches",
     re: /^\/api\/v1\/matches\/?$/,
     path: () => "/api/v1/matches",
-    params: ["page", "size", "field", "mode", "player", "results"],
+    params: ["page", "size", "field", "mode", "player", "results", "ranked"],
     ttl: LIST_TTL, staleFor: LIST_STALE, browser: LIST_BROWSER,
   },
   {
@@ -182,6 +183,15 @@ const ROUTES = [
     re: /^\/api\/v1\/leaders\/?$/,
     path: () => "/api/v1/leaders",
     params: ["stat", "mode", "min", "limit"],
+    ttl: LIST_TTL, staleFor: LIST_STALE, browser: LIST_BROWSER,
+  },
+  {
+    // The ranked ladder (doc 2.8). It comes from the ranked ratings, not the
+    // match index, so it answers normally while the index is loading.
+    name: "ranked",
+    re: /^\/api\/v1\/ranked\/?$/,
+    path: () => "/api/v1/ranked",
+    params: ["queue", "limit"],
     ttl: LIST_TTL, staleFor: LIST_STALE, browser: LIST_BROWSER,
   },
   {
