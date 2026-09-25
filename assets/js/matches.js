@@ -1327,6 +1327,13 @@
     events.forEach((e) => {
       const k = SIDES.includes(e.team) ? e.team : null;
       if ((e.type === "GOAL" || e.type === "AWARDED_GOAL") && k) st[k].push(e);
+      // a DISALLOWED names the goal it cancels (doc 4.5): take off exactly
+      // that one. Popping the newest would drop a hand-added point instead,
+      // and the "not disallowed" filter below would then drop the goal too
+      if (e.type === "DISALLOWED" && k && Number.isInteger(e.goal) && e.goal >= 0 && e.goal < events.length) {
+        const i = st[k].lastIndexOf(events[e.goal]);
+        if (i >= 0) st[k].splice(i, 1);
+      }
       if (e.type === "SCORE_EDIT" && k && e.score) while (st[k].length < num(e.score[k])) st[k].push({ edit: e });
       if (e.score && typeof e.score === "object") {
         SIDES.forEach((s) => { const n = num(e.score[s]); while (st[s].length > n) st[s].pop(); });
