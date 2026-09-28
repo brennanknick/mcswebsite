@@ -440,6 +440,13 @@
 
   const modeName = (m) => MODES[m] || (str(m) ? str(m).charAt(0) + str(m).slice(1).toLowerCase() : "Match");
   const QUEUE_RE = /^[34]v[34]$/;
+  // A small game (2 or fewer a side when it started) is listed like any
+  // match but counts nowhere: totals, form, leaderboards (doc 4.13)
+  // boards and the ladder list linked players only (doc 2.7, 2.8)
+  const LINKED_ONLY = "Only linked players are ranked: type /link in game.";
+  const isSmall = (m) => arr(obj(m).flags).includes("SMALL") || obj(m).small === true;
+  const smallTag = () => h("span", { class: "mh-tag is-small" }, "Not counted");
+
   function modeTag(mode, knockout, queue) {
     // a ranked match is labelled by its queue, not its mode (doc 2.3)
     if (QUEUE_RE.test(str(queue))) return h("span", { class: "mh-tag is-ranked" }, "Ranked " + queue);
@@ -985,6 +992,7 @@
         sideCell(blue, "away", win === "BLUE", win === "RED", hiddenWin && win === "BLUE")),
       h("div", { class: "mh-row-meta" },
         modeTag(m.mode, m.knockout, m.queue),
+        isSmall(m) ? smallTag() : null,
         h("span", { class: "mh-row-pitch" }, str(m.fieldName) || str(m.fieldId) || "Unknown pitch")),
       h("div", { class: "mh-row-mvp" },
         m.mvp && UUID_RE.test(str(m.mvp.uuid))
@@ -1225,6 +1233,7 @@
         heroSide(blue, win === "BLUE", win && win !== "BLUE", scorerList("BLUE"))),
       h("ul", { class: "mh-hero-chips" },
         h("li", null, modeTag(rec.mode, rec.knockout, rec.queue)),
+        isSmall(rec) ? h("li", null, smallTag()) : null,
         // side names alone can't prove a fixture (doc 4.15); the source can
         rec.source === "fixture" ? h("li", null, "Club fixture") : null,
         eloAverages(rec) ? h("li", { class: "mh-elo-avg" }, "Avg Elo " + eloAverages(rec).RED + " v " + eloAverages(rec).BLUE) : null,
@@ -1301,6 +1310,7 @@
       COIN_FLIP: "Level after everything, so a coin flip decided it.",
       RULES_CHANGED: "The rules were changed partway through this match.",
       SHOOTOUT_FORCED: "A referee sent this match straight to penalties.",
+      SMALL: "A side had 2 or fewer players when it started, so this match doesn't count toward stats or leaderboards.",
     };
     if (QUEUE_RE.test(str(rec.queue)) && rec.outcome !== "COMPLETED") {
       say.push(rec.outcome === "INTERRUPTED"
@@ -1949,6 +1959,7 @@
         h("b", { class: "mh-grow-score" }, num(sc[0]) + "–" + num(sc[1]), so.length === 2 && num(so[0]) + num(so[1]) > 0 ? h("small", null, ` (${num(so[0])}–${num(so[1])} pens)`) : null),
         h("span", { class: "mh-dotname", style: sideVars(them) }, h("i"), h("span", { class: "mh-dotname-t" }, them.name))),
       h("span", { class: "mh-grow-me" },
+        isSmall(g) ? smallTag() : null,
         g.position ? h("span", { class: "mh-pos", title: POSITIONS[g.position] || g.position }, g.position) : null,
         num(g.goals) ? countBadge("is-goal", "ball", num(g.goals), "goal", "goals") : null,
         num(g.assists) ? countBadge("is-assist", "boot", num(g.assists), "assist", "assists") : null,
@@ -2096,7 +2107,8 @@
         "When the ranked queue opens, the ladder shows up here: everyone's Elo, best first.", []));
     } else if (!items.length) {
       out.push(note("wait", `Nobody's on the ${q} ladder yet`,
-        "Queue for ranked from the lobby hotbar and take the top spot.", [arrowBtn("Join the server", { on: { click: openConnect } })]));
+        (d.linkedOnly ? "Link your account with /link in game, then queue" : "Queue") + " for ranked from the lobby hotbar and take the top spot.",
+        [arrowBtn("Join the server", { on: { click: openConnect } })]));
     } else {
       const podium = items.slice(0, 3), rest = items.slice(3);
       const tied = podium.filter((x) => num(x.rank) === 1).length > 1;
@@ -2105,7 +2117,8 @@
       const more = all.length > r.limit && r.limit < 1000;
       out.push(h("section", { class: "mh-board", "aria-labelledby": "mh-lb" },
         h("h2", { class: "mh-sec-title", id: "mh-lb" }, "Ranked ", h("span", { class: "grad" }, q)),
-        h("p", { class: "mh-sec-sub" }, "Current Elo, best first. The server works out every rating; players in their first 10 games are still placing."),
+        h("p", { class: "mh-sec-sub" }, "Current Elo, best first. The server works out every rating; players in their first 10 games are still placing."
+          + (d.linkedOnly ? " " + LINKED_ONLY : "")),
         h("ol", { class: "mh-podium" + (tied ? " is-tied" : ""), style: { "--n": podium.length } }, podium.map((x, i) =>
           h("li", { class: "is-" + (i + 1) + (num(x.rank) === 1 ? " is-top" : "") + (i === 2 && num(x.rank) !== 1 && num(x.rank) === num(podium[1].rank) ? " is-tie2" : "") },
             h("a", { href: toPlayer(x.uuid), "data-go": true },
@@ -2190,7 +2203,8 @@
       picker,
     ];
 
-    const sub = def[3] + (min > 1 ? ` At least ${min} matches to qualify.` : "") + (showGames ? " Only matches that reached a result count." : "");
+    const sub = def[3] + (min > 1 ? ` At least ${min} matches to qualify.` : "") + (showGames ? " Only matches that reached a result count." : "")
+      + (d.linkedOnly ? " " + LINKED_ONLY : "");
     if (!items.length) {
       out.push(note("wait", "No one on this board yet", sub, []));
       return out;

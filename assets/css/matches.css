@@ -391,6 +391,8 @@
 .mh-tag.is-scrim { color: var(--scrim); background: rgba(255, 200, 90, .13); }
 .mh-tag.is-quick { color: var(--quick); background: rgba(90, 200, 255, .13); }
 .mh-tag.is-void  { color: var(--text-strong); background: rgba(255, 255, 255, .08); }
+/* a small game: listed, never counted */
+.mh-tag.is-small { color: var(--text-strong); background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22); }
 .mh-tag.is-ranked { color: #ffcf6e; background: rgba(255, 190, 70, .12); box-shadow: inset 0 0 0 1px rgba(255, 207, 110, .45); }
 
 .mh-rating {
@@ -1576,7 +1578,9 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
     padding: .9rem 1rem;
   }
   .mh-row-when { grid-area: when; flex-direction: row; gap: .5rem; }
-  .mh-row-meta { grid-area: meta; flex-direction: row; align-items: center; }
+  .mh-row-meta { grid-area: meta; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+  /* the date and time never break mid-phrase; a second tag wraps instead */
+  .mh-row-when > * { white-space: nowrap; }
   .mh-row-pitch { display: none; }
   .mh-row-board { grid-area: board; grid-template-columns: minmax(0, 1fr) 5.5rem minmax(0, 1fr); gap: .6rem; }
   .mh-row-go { display: none; }
