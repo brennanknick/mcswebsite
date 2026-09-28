@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Match History — MCS</title>
-<meta name="description" content="Every match played on MCS: results, full match reports, player pages and leaderboards." />
+<title>Cup — MCS</title>
+<meta name="description" content="The MCS Cup: the live bracket, scores and results of every knockout cup on MCS." />
 <meta name="theme-color" content="#070c0a" />
 
 <link rel="icon" href="../favicon.ico?v=e4392b99" sizes="32x32" />
@@ -13,9 +13,9 @@
 
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="MCS" />
-<meta property="og:title" content="Match History — MCS" />
-<meta property="og:description" content="Every match played on MCS, with full reports, player pages and leaderboards." />
-<meta property="og:url" content="https://mcsoccer.net/matches/" />
+<meta property="og:title" content="Cup — MCS" />
+<meta property="og:description" content="The MCS Cup: live bracket, scores and results." />
+<meta property="og:url" content="https://mcsoccer.net/cup/" />
 <meta property="og:image" content="https://mcsoccer.net/assets/img/og.png" />
 <meta name="twitter:card" content="summary_large_image" />
 
@@ -24,6 +24,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=4773e96f" />
 <link rel="stylesheet" href="../assets/css/matches.css?v=0a1c38af" />
+<link rel="stylesheet" href="../assets/css/cup.css?v=b3870d7f" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -43,8 +44,8 @@
     <ul class="nav-links">
       <li><a href="../">Home</a></li>
       <li><a href="../rules/">Rules</a></li>
-      <li><a href="./" aria-current="page">Matches</a></li>
-      <li class="nav-cup" data-cup-nav hidden><a href="../cup/">Cup</a></li>
+      <li><a href="../matches/">Matches</a></li>
+      <li class="nav-cup" data-cup-nav><a href="./" aria-current="page">Cup</a></li>
       <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
       <li><a data-discord-link href="../#discord">Discord</a></li>
     </ul>
@@ -74,59 +75,37 @@
   <ul>
     <li><a href="../">Home</a></li>
     <li><a href="../rules/">Rules</a></li>
-    <li><a href="./" aria-current="page">Matches</a></li>
-    <li class="nav-cup" data-cup-nav hidden><a href="../cup/">Cup</a></li>
+    <li><a href="../matches/">Matches</a></li>
+    <li class="nav-cup" data-cup-nav><a href="./" aria-current="page">Cup</a></li>
     <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
     <li><a data-discord-link href="../#discord">Discord</a></li>
   </ul>
   <button class="btn" type="button" data-open-connect>Join Now</button>
 </aside>
 
-<main class="page mh" data-mh>
+<main class="page mh cup" data-cup>
   <div class="mh-glow" aria-hidden="true"></div>
-  <div class="container">
 
-    <!-- the index views (matches, leaderboards, players): the live strip
-         first, then the tabs with the player search; the page's h1 is for
-         screen readers only. A match report or player page has its own. -->
-    <header class="mh-head" data-mh-head>
-      <h1 class="visually-hidden">Match History</h1>
-    </header>
-
-    <section class="mh-live" data-mh-live hidden aria-labelledby="mh-live-title">
-      <h2 class="mh-live-title" id="mh-live-title"><span class="mh-live-dot" aria-hidden="true"></span>Live now</h2>
-      <ul class="mh-live-list" data-mh-live-list></ul>
-    </section>
-
-    <div class="mh-bar" data-mh-bar>
-      <nav class="mh-tabs" data-mh-tabs aria-label="Match history" hidden>
-        <a href="./" data-tab="list">Matches</a>
-        <a href="./?tab=ranked" data-tab="ranked">Ranked</a>
-        <a href="./?tab=leaders" data-tab="leaders">Leaderboards</a>
-        <a href="./?tab=players" data-tab="players">Players</a>
-      </nav>
-      <div class="mh-bar-search">
-        <div class="mh-search" data-mh-search hidden></div>
-      </div>
-    </div>
-
-    <p class="mh-stale" data-mh-stale hidden>
-      The game server isn't answering right now, so these are saved results
-      and the newest matches may be missing.
+  <div class="cup-wrap">
+    <p class="mh-stale" data-cup-stale hidden>
+      The game server isn't answering right now, so this may be out of date.
     </p>
+  </div>
 
-    <div class="mh-view" data-mh-view>
-      <noscript>
-        <div class="mh-note">
-          <h2>Match history needs JavaScript</h2>
-          <p>Turn it on for this site to see results, match reports and player pages.</p>
-        </div>
-      </noscript>
+  <!-- cup.js draws the cup here: its head, what's live, the bracket, the
+       teams and the list of past cups -->
+  <div class="cup-view" data-cup-view aria-busy="true">
+    <div class="cup-wrap">
+      <div class="mh-sk-hero"><i class="mh-sk" style="--w:24%"></i><i class="mh-sk" style="--w:46%"></i><i class="mh-sk" style="--w:32%"></i></div>
     </div>
-
-    <!-- the numbers, at the foot of the index views -->
-    <ul class="mh-counters" data-mh-counters hidden aria-label="Match history in numbers"></ul>
-
+    <noscript>
+      <div class="cup-wrap">
+        <div class="mh-note">
+          <h1>The cup needs JavaScript</h1>
+          <p>Turn it on for this site to see the bracket and live scores.</p>
+        </div>
+      </div>
+    </noscript>
   </div>
 </main>
 
@@ -135,7 +114,7 @@
     <ul class="footer-links">
       <li><a href="../">Home</a></li>
       <li><a href="../rules/">Rules</a></li>
-      <li><a href="./" aria-current="page">Matches</a></li>
+      <li><a href="../matches/">Matches</a></li>
       <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
       <li><a data-discord-link href="../#discord">Discord</a></li>
       <li><a href="#" data-open-connect>How to join</a></li>
@@ -188,6 +167,6 @@
 
 <script src="../site.config.js?v=5a3590c2"></script>
 <script src="../assets/js/site.js?v=d4005201"></script>
-<script src="../assets/js/matches.js?v=2589eb1a"></script>
+<script src="../assets/js/cup.js?v=7b360554"></script>
 </body>
 </html>

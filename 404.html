@@ -9,6 +9,7 @@
   // The game's chat links use /matches/<id>, /matches/player/<uuid>,
   // /matches/leaders and /matches/players. Every match view lives on
   // /matches/ itself, so send those paths there before anything shows.
+  // A cup has one page too: /cup/<id> goes to /cup/?id=<id>.
   (function () {
     var p = location.pathname, m, to = null;
     if ((m = p.match(/^\/matches\/(\d{8}-\d{6}-[a-z0-9_]{1,40})\/?$/))) to = "?m=" + m[1];
@@ -18,6 +19,11 @@
     if (to) {
       document.documentElement.style.visibility = "hidden";
       location.replace("/matches/" + to);
+    }
+    // a cup by id: /cup/cup-20260928-010000
+    else if ((m = p.match(/^\/cup\/(cup-\d{8}-\d{6})\/?$/))) {
+      document.documentElement.style.visibility = "hidden";
+      location.replace("/cup/?id=" + m[1]);
     }
   })();
 </script>
@@ -29,7 +35,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/site.css?v=e0707807" />
+<link rel="stylesheet" href="/assets/css/site.css?v=4773e96f" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -50,6 +56,7 @@
       <li><a href="/">Home</a></li>
       <li><a href="/rules/">Rules</a></li>
       <li><a href="/matches/">Matches</a></li>
+      <li class="nav-cup" data-cup-nav hidden><a href="/cup/">Cup</a></li>
       <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
       <li><a data-discord-link href="/#discord">Discord</a></li>
     </ul>
@@ -79,7 +86,8 @@
   <ul>
     <li><a href="/">Home</a></li>
     <li><a href="/rules/">Rules</a></li>
-      <li><a href="/matches/">Matches</a></li>
+    <li><a href="/matches/">Matches</a></li>
+    <li class="nav-cup" data-cup-nav hidden><a href="/cup/">Cup</a></li>
     <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
     <li><a data-discord-link href="/#discord">Discord</a></li>
   </ul>
@@ -164,6 +172,6 @@
 </footer>
 
 <script src="/site.config.js?v=5a3590c2"></script>
-<script src="/assets/js/site.js?v=731bf898"></script>
+<script src="/assets/js/site.js?v=d4005201"></script>
 </body>
 </html>

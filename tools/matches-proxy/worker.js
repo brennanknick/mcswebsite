@@ -8,9 +8,10 @@
  *   browser --HTTPS--> https://api.mcsoccer.net/api/v1/...  (this file)
  *                      --HTTP--> http://play.mcsoccer.net:25543/api/v1/...
  *
- * It only forwards the public read-only routes from docs/match-history.md,
- * adds the CORS headers the site needs, and caches answers so the game server
- * sees one polite client instead of every visitor. When the game server is
+ * It only forwards the public read-only routes from docs/match-history.md and
+ * docs/tournaments.md, adds the CORS headers the site needs, and caches
+ * answers so the game server sees one polite client instead of every
+ * visitor. When the game server is
  * down it keeps serving the last good copy, marked "X-MCS-Cache: STALE".
  *
  * DEPLOY (about 5 minutes, in the Cloudflare account that runs mcsoccer.net)
@@ -51,9 +52,15 @@
  * Cloudflare's proxy (orange cloud) port 25543 would be ignored, and
  * Minecraft would break too.
  *
+ * UPDATING: when this file changes (it did on 2026-09-28, to add the cup
+ * routes), open the Worker, press "Edit code", select all, paste this whole
+ * file over it and press "Deploy". Nothing else changes. Until then the
+ * Worker answers the new routes with 404 and the site hides the cup.
+ *
  * What it serves (everything else is a 404, and only GET/HEAD/OPTIONS work):
  *   /api/v1/meta  /api/v1/live  /api/v1/matches  /api/v1/matches/{id}
  *   /api/v1/players  /api/v1/players/{uuid}  /api/v1/leaders  /api/v1/ranked
+ *   /api/v1/tournaments  /api/v1/tournaments/current  /api/v1/tournaments/{id}
  *   /crest/{hex}.png
  *
  * Headers the site can read on every response:
@@ -113,7 +120,7 @@ const HOUR = 3600;
 const DAY = 86400;
 
 // ---------------------------------------------------------------------------
-// Routes (docs/match-history.md, section 2). Paths are matched after
+// Routes (docs/match-history.md section 2, docs/tournaments.md). Paths are matched after
 // percent-decoding, case-sensitively, with one optional trailing slash on API
 // routes and none on crests, exactly like the game server. The forwarded path
 // is rebuilt from the match, so nothing else from the visitor's path is sent.
@@ -193,6 +200,34 @@ const ROUTES = [
     path: () => "/api/v1/ranked",
     params: ["queue", "limit"],
     ttl: LIST_TTL, staleFor: LIST_STALE, browser: LIST_BROWSER,
+  },
+  {
+    // The open cup, or the last one for 48 h (docs/tournaments.md). The cup
+    // page polls it every 5 s while a match is live, so a copy is fresh for
+    // only 2 s, and it is served stale for only 30 s: an old copy would show
+    // a finished match as still live. `since` only trims the events list.
+    name: "cup-current",
+    re: /^\/api\/v1\/tournaments\/current\/?$/,
+    path: () => "/api/v1/tournaments/current",
+    params: ["since"],
+    ttl: 2, staleFor: 30, browser: "public, max-age=2",
+  },
+  {
+    // Every cup, newest first. Changes only when a cup opens or ends.
+    name: "cups",
+    re: /^\/api\/v1\/tournaments\/?$/,
+    path: () => "/api/v1/tournaments",
+    params: [],
+    ttl: 30, staleFor: LIST_STALE, browser: "public, max-age=30",
+  },
+  {
+    // One cup by id (cup-yyyyMMdd-HHmmss). A running cup changes with every
+    // goal, so this is short too; a finished one never changes again.
+    name: "cup",
+    re: /^\/api\/v1\/tournaments\/(cup-[0-9]{8}-[0-9]{6})\/?$/,
+    path: (m) => "/api/v1/tournaments/" + m[1],
+    params: ["since"],
+    ttl: 5, staleFor: LIST_STALE, browser: "public, max-age=5",
   },
   {
     // Club crest PNG: 4 or 5 lower-case hex digits, no trailing slash.

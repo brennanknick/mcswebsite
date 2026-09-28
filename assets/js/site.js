@@ -438,6 +438,115 @@
     }
   }
 
+  /* ── the cup: the nav link and the home banner ─────────────────────
+     One look at /api/v1/tournaments/current per page load (soccer/docs/
+     tournaments.md), through the same HTTPS proxy as match history. Until
+     a clear answer names a cup, everything here stays hidden: a 404 (no
+     cups on the game server yet), an error or a slow answer shows nothing
+     to visitors. The cup page reuses this answer for its first draw. */
+
+  // matchesApi, or on localhost a ?api=http://localhost:PORT override that
+  // lasts for the tab (the same key matches.js uses)
+  function apiBase() {
+    let base = String(CFG.matchesApi || "").trim();
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+      const q = new URLSearchParams(location.search).get("api");
+      try {
+        if (q) sessionStorage.setItem("mh-api", q);
+        base = sessionStorage.getItem("mh-api") || base;
+      } catch { if (q) base = q; }
+    }
+    if (!base) return "";
+    try {
+      const u = new URL(base, location.href);
+      if (!/^https?:$/.test(u.protocol)) return "";
+      if (location.protocol === "https:" && u.protocol === "http:") return "";
+      return u.href.replace(/\/+$/, "");
+    } catch { return ""; }
+  }
+
+  const cupItems = $$("[data-cup-nav]");
+  const cupBanner = $("[data-cup-banner]");
+  const cupLinks = $$("[data-cup-link]");
+  const cupBase = cupItems.length || cupBanner || cupLinks.length ? apiBase() : "";
+
+  if (cupBase) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 5000);
+    const answer = fetch(cupBase + "/api/v1/tournaments/current", { headers: { Accept: "application/json" }, signal: ctl.signal })
+      .then((res) => res.json().catch(() => null).then((body) => ({
+        status: res.status, body, cache: (res.headers.get("X-MCS-Cache") || "").toUpperCase(),
+      })))
+      .catch(() => null)
+      .finally(() => clearTimeout(timer));
+    window.__mcsCup = { base: cupBase, answer };
+    answer.then((res) => { try { showCup(res); } catch {} });
+  }
+
+  // the latest round among some matches ("Semifinals live now"), or the
+  // earliest ("Quarterfinals up next")
+  function roundOf(list, latest) {
+    const pick = list.slice().sort((a, b) => (latest ? b.round - a.round : a.round - b.round))[0];
+    return pick ? pick.name : "";
+  }
+
+  function showCup(res) {
+    const d = res && res.status === 200 && res.body && typeof res.body === "object" ? res.body : null;
+    const T = d && d.tournament && typeof d.tournament === "object" && !Array.isArray(d.tournament) ? d.tournament : null;
+    if (!T) return;
+
+    const live = d.live === true;
+    const all = [];
+    (Array.isArray(T.rounds) ? T.rounds : []).forEach((r) => {
+      if (!r || !Array.isArray(r.matches)) return;
+      const name = String(r.name || "").trim() || "Round " + (Number(r.round) || 1);
+      r.matches.forEach((m) => { if (m && typeof m === "object") all.push({ state: m.state, round: Number(r.round) || 0, name }); });
+    });
+    const playing = live ? all.filter((m) => m.state === "LIVE") : [];
+
+    cupItems.forEach((li) => {
+      li.hidden = false;
+      li.classList.toggle("is-live", live);
+      li.classList.toggle("is-on", playing.length > 0);
+      const a = $("a", li);
+      if (!a) return;
+      let note = $(".visually-hidden", a);
+      if (!note) { note = document.createElement("span"); note.className = "visually-hidden"; a.appendChild(note); }
+      note.textContent = playing.length ? " (live now)" : live ? " (on now)" : "";
+    });
+    cupLinks.forEach((el) => (el.hidden = false));
+    $$("[data-cup-demote]").forEach((el) => el.classList.add("btn-dark"));
+
+    // the home banner: only while the cup is open
+    if (!cupBanner || !live) return;
+    const name = String(T.name || "").trim() || "MCS Cup";
+    const n = Number(T.teamCount) || 0, max = Number(T.maxTeams) || 0;
+    let line = "";
+    if (T.state === "SIGNUP") line = (max && n >= max ? "Sign-ups full " : "Sign-ups open ") + n + (max ? "/" + max : "");
+    else if (T.state === "RUNNING") {
+      if (playing.length) line = roundOf(playing, true) + " live now";
+      else {
+        const next = roundOf(all.filter((m) => m.state === "READY"), false) || roundOf(all.filter((m) => m.state === "WAITING"), false);
+        line = next ? next + " up next" : "Bracket drawn";
+      }
+    } else return;
+
+    const tag = $("[data-cup-banner-tag]", cupBanner);
+    if (tag) {
+      tag.classList.toggle("is-live", playing.length > 0);
+      tag.innerHTML = playing.length
+        ? '<i aria-hidden="true"></i>Live'
+        : '<svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path fill="#1f5a2e" d="M1 2h2v1H1zM1 3h1v2H1zM2 5h1v1H2zM13 2h2v1h-2zM14 3h1v2h-1zM13 5h1v1h-1zM11 2h2v4h-2zM10 6h2v1h-2zM9 7h2v1H9zM6 8h4v1H6zM7 9h2v1H7zM4 12h8v2H4zM3 14h10v1H3z"/><path fill="#0b1210" d="M3 2h8v4H3zM4 6h6v1H4zM5 7h4v1H5zM7 10h2v1H7zM5 11h6v1H5z"/><path fill="#3a6b2a" d="M3 1h10v1H3zM4 2h1v5H4z"/></svg>Cup';
+    }
+    const nm = $("[data-cup-banner-name]", cupBanner);
+    const ln = $("[data-cup-banner-line]", cupBanner);
+    if (nm) nm.textContent = name;
+    if (ln) ln.textContent = line;
+    cupBanner.hidden = false;
+    // open the slot smoothly rather than shoving the headline down
+    requestAnimationFrame(() => requestAnimationFrame(() => cupBanner.classList.add("is-on")));
+  }
+
   /* ── scroll reveals ────────────────────────────────────────────────
      <head> added .reveal-on before first paint and armed a failsafe that
      removes it unless this flag is set. So if anything above threw, the

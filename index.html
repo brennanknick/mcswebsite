@@ -25,7 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=e0707807" />
+<link rel="stylesheet" href="assets/css/site.css?v=4773e96f" />
 <script>
   /* Hide reveal targets before first paint, but only if site.js then
      arms the observers. If it never does, show everything anyway. */
@@ -49,6 +49,7 @@
       <li><a href="./" aria-current="page">Home</a></li>
       <li><a href="rules/">Rules</a></li>
       <li><a href="matches/">Matches</a></li>
+      <li class="nav-cup" data-cup-nav hidden><a href="cup/">Cup</a></li>
       <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
       <li><a data-discord-link href="#discord">Discord</a></li>
     </ul>
@@ -78,7 +79,8 @@
   <ul>
     <li><a href="./" aria-current="page">Home</a></li>
     <li><a href="rules/">Rules</a></li>
-      <li><a href="matches/">Matches</a></li>
+    <li><a href="matches/">Matches</a></li>
+    <li class="nav-cup" data-cup-nav hidden><a href="cup/">Cup</a></li>
     <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
     <li><a data-discord-link href="#discord">Discord</a></li>
   </ul>
@@ -148,6 +150,18 @@
   </div>
 
   <div class="container hero-stack">
+    <!-- shown by site.js while a cup is open: sign-ups, or the bracket being played -->
+    <div class="cup-banner-slot" data-cup-banner hidden>
+      <div>
+        <a class="cup-banner" href="cup/">
+          <span class="cup-banner-tag" data-cup-banner-tag></span>
+          <b data-cup-banner-name>MCS Cup</b>
+          <i class="cup-banner-sep" aria-hidden="true"></i>
+          <span data-cup-banner-line></span>
+          <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+        </a>
+      </div>
+    </div>
     <p class="hero-sub" data-reveal="up" data-version>Java Edition | Open Alpha</p>
     <h1 class="hero-title" data-reveal="up" style="--delay:.18s">
       The home of<br><span class="grad">Minecraft soccer.</span>
@@ -209,8 +223,12 @@
           <p class="feature-para" data-reveal="from-r" style="--delay:.1s">
             No draws. A tie goes to extra time, then penalties.
           </p>
-          <div data-reveal="from-r" style="--delay:.2s">
-            <a class="btn" href="rules/#modes">
+          <div class="feature-btns" data-reveal="from-r" style="--delay:.2s">
+            <a class="btn" href="cup/" data-cup-link hidden>
+              See the cup
+              <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+            </a>
+            <a class="btn" href="rules/#modes" data-cup-demote>
               Knockout rules
               <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
             </a>
@@ -337,6 +355,6 @@
 </div>
 
 <script src="site.config.js?v=5a3590c2"></script>
-<script src="assets/js/site.js?v=731bf898"></script>
+<script src="assets/js/site.js?v=d4005201"></script>
 </body>
 </html>
