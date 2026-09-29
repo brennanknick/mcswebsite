@@ -53,14 +53,16 @@
  * Minecraft would break too.
  *
  * UPDATING: when this file changes (it did on 2026-09-28, to add the cup
- * routes), open the Worker, press "Edit code", select all, paste this whole
- * file over it and press "Deploy". Nothing else changes. Until then the
- * Worker answers the new routes with 404 and the site hides the cup.
+ * routes and /api/v1/crates), open the Worker, press "Edit code", select all,
+ * paste this whole file over it and press "Deploy". Nothing else changes.
+ * Until then the Worker answers the new routes with 404 and the site hides
+ * the cup and the crate odds.
  *
  * What it serves (everything else is a 404, and only GET/HEAD/OPTIONS work):
  *   /api/v1/meta  /api/v1/live  /api/v1/matches  /api/v1/matches/{id}
  *   /api/v1/players  /api/v1/players/{uuid}  /api/v1/leaders  /api/v1/ranked
  *   /api/v1/tournaments  /api/v1/tournaments/current  /api/v1/tournaments/{id}
+ *   /api/v1/crates
  *   /crest/{hex}.png
  *
  * Headers the site can read on every response:
@@ -228,6 +230,16 @@ const ROUTES = [
     path: (m) => "/api/v1/tournaments/" + m[1],
     params: ["since"],
     ttl: 5, staleFor: LIST_STALE, browser: "public, max-age=5",
+  },
+  {
+    // Crate contents and exact odds (docs/wallet.md): public by rule, and the
+    // site's /crates/ page shows them. They change only when staff edit a
+    // loot table, so a minute is plenty.
+    name: "crates",
+    re: /^\/api\/v1\/crates\/?$/,
+    path: () => "/api/v1/crates",
+    params: [],
+    ttl: 60, staleFor: LIST_STALE, browser: "public, max-age=60",
   },
   {
     // Club crest PNG: 4 or 5 lower-case hex digits, no trailing slash.

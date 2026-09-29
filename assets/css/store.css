@@ -1,0 +1,1113 @@
+/* ==================================================================
+   MCS — the Sapphire store (/store/, /store/thanks/)
+   Loaded after site.css and built from it: the floodlit pitch, bevelled
+   buttons, notched chips and Minecraft panels. It adds one colour, the
+   Sapphire's own blue, taken straight from its 16x16 menu icon. Every
+   gem on the page is that icon, or a heap of it, at a whole-number
+   scale with image-rendering: pixelated, so no pixel is ever smeared.
+   The hero's idea: the currency sitting on the centre spot, under a
+   floodlight, with the pitch markings lit only where the light lands.
+   ================================================================== */
+
+:root {
+  /* the gem's own ramp (sapphire.py, "sapph") */
+  --sa-hi:    #e2f6ff;
+  --sa-light: #72c6ff;
+  --sa-mid:   #2f7ceb;
+  --sa-dark:  #2a3ca6;
+  --sa-deep:  #1b2a8f;
+  --sa-glow:  #4aa8ff;
+  --sa-text:  #a8dbff;   /* sapphire that reads as text on this page: 11:1 */
+  --st-amber: #ffe6ad;
+
+  --notch: polygon(
+    3px 0, calc(100% - 3px) 0, calc(100% - 3px) 3px, 100% 3px,
+    100% calc(100% - 3px), calc(100% - 3px) calc(100% - 3px), calc(100% - 3px) 100%,
+    3px 100%, 3px calc(100% - 3px), 0 calc(100% - 3px), 0 3px, 3px 3px);
+  --notch-lg: polygon(
+    6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px),
+    0 6px, 3px 6px, 3px 3px, 6px 3px);
+  --px-star: polygon(33% 0, 67% 0, 67% 33%, 100% 33%, 100% 67%, 67% 67%, 67% 100%, 33% 100%, 33% 67%, 0 67%, 0 33%, 33% 33%);
+}
+
+/* the page opens straight into its state: html[data-store] is set by
+   store.js in <head>, before first paint */
+html[data-store="off"] [data-show="on"],
+html:not([data-store="off"]) [data-show="off"] { display: none !important; }
+[data-show="closed"], [data-show="demo"] { display: none; }
+html[data-store="on"][data-store-open="0"]:not([data-store-demo]) [data-show="closed"],
+html[data-store-demo] [data-show="demo"] { display: flex; }
+
+html.st-locked { overflow: hidden; }
+
+.px-img, .st img, .st-dlg-art img, .st-sum img { image-rendering: pixelated; }
+
+/* ── page frame ──────────────────────────────────────────────────── */
+
+.st {
+  padding-top: calc(var(--nav-h) + 1.5rem);
+  padding-bottom: 5rem;
+  overflow: clip;
+}
+.st-wrap { position: relative; width: 100%; max-width: 1180px; margin-inline: auto; padding-inline: var(--gutter); }
+
+/* floodlights at the corners, as on every page, and one blue light where
+   the gem sits */
+.st-glow {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1200px;
+  pointer-events: none;
+  background:
+    radial-gradient(36% 46% at 8% 0%, rgba(255, 244, 214, .07), transparent 70%),
+    radial-gradient(30% 40% at 96% 0%, rgba(255, 244, 214, .05), transparent 70%),
+    radial-gradient(34% 40% at 74% 32%, color-mix(in srgb, var(--sa-glow) 15%, transparent), transparent 72%),
+    radial-gradient(60% 50% at 40% 0%, color-mix(in srgb, var(--grad-3) 7%, transparent), transparent 70%);
+}
+
+/* sapphire gradient text: the site's .grad, cut from the gem */
+.st-grad {
+  background: radial-gradient(ellipse 70% 95% at 42% 40%, #f6fcff 0%, #b9e3ff 30%, var(--sa-light) 58%, #4f8ff5 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.st-kicker {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin: 0 0 .6rem;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+.st-kicker::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: var(--sa-light);
+  clip-path: var(--px-star);
+}
+
+.st-h2 { margin: 0; font-size: 40px; font-weight: 750; line-height: 1.12; text-wrap: balance; }
+/* focused by script only (after "Try again"), never tabbed to */
+.st-h2[tabindex="-1"]:focus { outline: none; }
+
+/* pixel icons: two inks */
+.st-ico { display: block; shape-rendering: crispEdges; }
+.st-ico .ia { fill: var(--accent-soft); }
+.st-ico .ib { fill: var(--grad-3); }
+
+/* the load: everything in the first screen rises in, in order */
+.st-in { animation: st-rise .6s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 70ms + 60ms); }
+.st-rise { animation: st-rise .55s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes st-rise { from { opacity: 0; transform: translateY(18px); } }
+
+/* ── hero ────────────────────────────────────────────────────────── */
+
+.st-hero { position: relative; }
+.st-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+  align-items: center;
+  gap: 1.5rem 3rem;
+  min-height: 540px;
+}
+.st-hero-text { position: relative; z-index: 2; min-width: 0; padding: 1rem 0 2rem; }
+
+.st-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  margin: 0 0 .4rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+}
+.st-eyebrow img { width: 18px; height: 18px; }
+
+.st-title {
+  margin: 0 0 1.1rem;
+  font-size: 118px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.025em;
+  color: #fff;
+}
+.st-title .st-grad { display: inline-block; padding: 0 .04em .08em 0; }
+.st-title.is-off { font-size: 76px; line-height: 1.05; letter-spacing: -.015em; text-wrap: balance; }
+
+.st-lead {
+  max-width: 31rem;
+  margin: 0 0 1.75rem;
+  font-size: 1.3rem;
+  line-height: 1.55;
+  color: var(--text-strong);
+}
+
+/* the real-money reference, stated once */
+.st-rate {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 1rem;
+  row-gap: .05rem;
+  margin: 0 0 1.9rem;
+  padding: .85rem 1.4rem .9rem 1rem;
+  background:
+    radial-gradient(70% 140% at 0% 50%, color-mix(in srgb, var(--sa-glow) 16%, transparent), transparent 70%),
+    rgba(3, 8, 6, .62);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sa-light) 26%, transparent), inset 0 3px 0 rgba(255, 255, 255, .05);
+  clip-path: var(--notch);
+}
+.st-rate img { grid-row: span 2; width: 32px; height: 32px; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sa-glow) 50%, transparent)); }
+.st-rate b { font-size: 1.4rem; font-weight: 800; line-height: 1.2; color: #fff; font-variant-numeric: tabular-nums; }
+.st-rate span { font-size: 14px; line-height: 1.4; color: var(--text); }
+
+.st-hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 2rem; }
+
+/* notices above the headline */
+.st-notice {
+  align-items: flex-start;
+  gap: .9rem;
+  max-width: 33rem;
+  margin: 0 0 1.6rem;
+  padding: .85rem 1.15rem .85rem .9rem;
+  color: var(--st-amber);
+  background: rgba(255, 190, 70, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 207, 110, .32), inset 3px 0 0 #f5b544;
+  clip-path: var(--notch);
+  animation: st-rise .5s var(--ease-spring) both;
+}
+.st-notice p { margin: 0; font-size: 15px; line-height: 1.5; }
+.st-notice b { color: #fff; font-weight: 700; }
+.st-notice-ico { flex: 0 0 24px; padding-top: 1px; }
+.st-notice-ico .st-ico { width: 24px; height: 24px; }
+.st-notice-ico .ia { fill: #ffcf6e; }
+.st-notice.is-demo { color: var(--sa-text); background: rgba(74, 168, 255, .08); box-shadow: inset 0 0 0 1px rgba(114, 198, 255, .3), inset 3px 0 0 var(--sa-light); }
+
+/* ── the stage: the gem on the centre spot ── */
+
+.st-stage {
+  position: relative;
+  aspect-ratio: 540 / 500;
+  width: 100%;
+  max-width: 540px;
+  justify-self: center;
+  isolation: isolate;
+}
+
+/* a floodlight from above, falling on the spot */
+.st-beam {
+  position: absolute;
+  left: 50%;
+  top: -20%;
+  width: 74%;
+  height: 101%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(210, 236, 255, 0) 0%, rgba(170, 214, 255, .07) 45%, rgba(130, 196, 255, .15) 100%);
+  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 35%, #000 80%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 35%, #000 80%, transparent 100%);
+  animation: st-flood 5.5s ease-in-out infinite alternate;
+}
+@keyframes st-flood { from { opacity: .75; } to { opacity: 1; } }
+
+/* the floor: an SVG pitch (see the markup), already in perspective, so
+   nothing here is skewed or blurred */
+.st-floor { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* the pool of blue light on the grass */
+.st-pool {
+  position: absolute;
+  left: 50%;
+  bottom: 7%;
+  width: 80%;
+  height: 24%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--sa-glow) 42%, transparent), color-mix(in srgb, var(--sa-glow) 10%, transparent) 62%, transparent);
+  mix-blend-mode: screen;
+}
+.st-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 16%;
+  width: 24%;
+  height: 6%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(2, 8, 24, .75), rgba(2, 8, 24, .3) 60%, transparent);
+  animation: st-shade 3.6s ease-in-out infinite;
+}
+@keyframes st-shade { 50% { transform: translateX(-50%) scale(.8); opacity: .7; } }
+
+/* the gem: 16px art at 14x. It drops onto the spot, then floats */
+.st-gem-drop {
+  position: absolute;
+  left: 50%;
+  bottom: 20%;
+  width: 224px;
+  height: 224px;
+  margin-left: -112px;
+  animation: st-drop .9s var(--ease-spring) .25s both;
+}
+.st-gem {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 30px color-mix(in srgb, var(--sa-glow) 55%, transparent)) drop-shadow(0 0 70px color-mix(in srgb, var(--sa-glow) 25%, transparent));
+  animation: st-bob 3.6s ease-in-out 1.15s infinite;
+}
+@keyframes st-drop { from { opacity: 0; transform: translateY(-140px); } 60% { opacity: 1; } }
+@keyframes st-bob { 50% { transform: translateY(-14px); } }
+
+/* The float, in whole pixels. A transform eased through fractions of a
+   pixel is resampled smoothly, so every row of the pixel art would blur
+   while the gem moves. Where the browser can round, the bob animates a
+   length instead, and the gem is moved by it rounded to the pixel: the
+   same ease, but the art only ever sits on whole pixels. It moves by
+   `translate`, not `transform`, so the satellites' rise-in (a transform
+   animation) can't hold it still. Elsewhere it's the plain bob above. */
+@property --st-lift { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@supports (translate: 0 round(nearest, 1.5px, 1px)) {
+  @keyframes st-bob { 50% { --st-lift: -14px; } }
+  .st-gem, .st-sat, .st-ty-gem img { translate: 0 round(nearest, var(--st-lift), 1px); }
+}
+
+/* three smaller gems in the light, further off */
+.st-sat {
+  position: absolute;
+  animation: st-bob var(--bob, 4.2s) ease-in-out var(--o, 0s) infinite, st-rise .8s var(--ease-spring) var(--in, .6s) both;
+  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--sa-glow) 40%, transparent));
+}
+.st-sat.is-a { width: 64px; height: 64px; left: 9%; bottom: 36%; opacity: .78; --bob: 4.6s; --o: -1.2s; --in: .75s; }
+.st-sat.is-b { width: 48px; height: 48px; right: 8%; bottom: 52%; opacity: .62; --bob: 3.9s; --o: -2.4s; --in: .9s; }
+.st-sat.is-c { width: 32px; height: 32px; right: 20%; bottom: 20%; opacity: .7; --bob: 4.9s; --o: -.5s; --in: 1.05s; }
+
+/* the glint, four points of pixel light, blinking out of step */
+.st-sparks { position: absolute; inset: 0; pointer-events: none; }
+.st-sparks i {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 12px;
+  height: 12px;
+  background: var(--sa-hi);
+  clip-path: var(--px-star);
+  opacity: 0;
+  animation: st-glint 2.8s steps(1, end) var(--d, 0s) infinite;
+}
+.st-sparks .k1 { width: 9px; height: 9px; background: var(--sa-light); }
+.st-sparks .k2 { width: 15px; height: 15px; }
+@keyframes st-glint { 0%, 12% { opacity: 1; } 12.01%, 24% { opacity: .45; } 24.01%, 100% { opacity: 0; } }
+
+/* no store yet: the floodlight is off */
+html[data-store="off"] .st-stage .st-beam,
+html[data-store="off"] .st-stage .st-sparks { display: none; }
+html[data-store="off"] .st-stage .st-gem,
+html[data-store="off"] .st-stage .st-sat { filter: saturate(.75) brightness(.42); }
+html[data-store="off"] .st-stage .st-pool { opacity: .25; }
+
+/* ── what Sapphires are ──────────────────────────────────────────── */
+
+.st-facts { margin-top: .5rem; }
+.st-fact-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+  margin: .5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.st-fact {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: 1rem;
+  row-gap: .2rem;
+  padding: 1.15rem 1.2rem 1.2rem;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 3px 0 rgba(255, 255, 255, .035);
+  clip-path: var(--notch);
+}
+/* each icon sits in an inventory slot: dark edge top-left, light edge
+   bottom-right, the inverse of a button's bevel */
+.st-slot {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  background: #0a110d;
+  box-shadow: inset 3px 3px 0 #030605, inset -3px -3px 0 #26352d;
+}
+.st-slot .st-ico { width: 36px; height: 36px; }
+.st-fact b { align-self: end; font-size: 1.05rem; font-weight: 700; line-height: 1.3; color: #fff; }
+.st-fact > span:last-child { font-size: 14px; line-height: 1.5; color: var(--text); }
+
+/* ── bundles ─────────────────────────────────────────────────────── */
+
+.st-bundles { margin-top: 5.5rem; scroll-margin-top: 1.5rem; }
+.st-sec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  margin: 0 0 1.75rem;
+}
+.st-sec-note { max-width: 33rem; margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-faint); text-align: right; }
+
+.st-catalog { position: relative; min-height: 20rem; }
+
+.st-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* a bundle: a Minecraft panel lit from the top, the heap in a pool of its
+   own light. Every card gets the same light: the heap's size is the only
+   thing that grows up the ladder, and the Popular card's lime edge the only
+   highlight. */
+.st-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1.1rem 1.2rem 1.15rem;
+  background:
+    radial-gradient(80% 42% at 50% 24%, color-mix(in srgb, var(--sa-glow) 12%, transparent), transparent 72%),
+    linear-gradient(180deg, #17241e, #0f1814 70%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .085),
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px rgba(255, 255, 255, .07);
+  clip-path: var(--notch-lg);
+  transition: transform .3s var(--ease-spring), box-shadow .25s var(--ease-ui);
+}
+.st-card:hover, .st-card:focus-within {
+  transform: translateY(-4px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .1),
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px color-mix(in srgb, var(--sa-light) 42%, transparent);
+}
+.st-card.is-pop {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .1),
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px color-mix(in srgb, var(--grad-2) 55%, transparent);
+}
+.st-card.is-pop:hover, .st-card.is-pop:focus-within {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .12),
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 2px color-mix(in srgb, var(--grad-2) 70%, transparent);
+}
+
+.st-art {
+  position: relative;
+  display: grid;
+  place-items: end center;
+  height: 132px;
+  margin: .2rem 0 .9rem;
+}
+.st-art img { position: relative; width: 192px; height: 120px; transition: transform .35s var(--ease-spring); }
+/* site.css caps every img at its box's width, which would squash the heap
+   on one axis only (it keeps its height) where a card is narrower than it,
+   as at 320-334px. It overhangs the card's padding a little instead. */
+.st .st-art img, .st-dlg-art img, .st-shot img { max-width: none; }
+/* a product we can't size: the single gem, at 4x */
+.st-art img.is-gem { width: 64px; height: 64px; }
+/* the pool the heap sits in */
+.st-art::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 78%;
+  height: 26px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--sa-glow) 38%, transparent), transparent);
+  transition: opacity .3s;
+}
+.st-card:hover .st-art img, .st-card:focus-within .st-art img { transform: translateY(-6px); }
+
+.st-card-body { flex: 1 1 auto; }
+.st-name {
+  margin: 0 0 .15rem;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.st-amt {
+  margin: 0;
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.st-amt .st-grad { padding-right: .03em; }
+.st-unit { margin-left: .1em; font-size: 15px; font-weight: 700; letter-spacing: .01em; color: var(--sa-text); }
+.st-amt.is-named { font-size: 26px; line-height: 1.2; letter-spacing: 0; overflow-wrap: anywhere; }
+
+.st-bonus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem .5rem;
+  min-height: 25px;
+  margin: .45rem 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.st-bonus.is-none { color: var(--text-faint); font-weight: 500; }
+.st-pct {
+  padding: .1rem .42rem;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  color: #0b1210;
+  background: var(--grad-2);
+  clip-path: var(--notch);
+}
+
+.st-tags {
+  position: absolute;
+  z-index: 1;
+  top: 13px;
+  left: 13px;
+  right: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  pointer-events: none;
+}
+.st-tag {
+  padding: .22rem .6rem;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  clip-path: var(--notch);
+}
+.st-tag.is-pop { color: #0b1210; background: var(--grad-2); }
+.st-tag.is-sale { color: #06122e; background: var(--sa-light); }
+.st-tag.is-once { color: #0b1210; background: var(--accent-soft); }
+
+.st-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: .6rem;
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+.st-price { display: flex; flex-direction: column; min-width: 0; }
+.st-price-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .5rem; }
+.st-price b { font-size: 1.4rem; font-weight: 800; line-height: 1.2; color: #fff; font-variant-numeric: tabular-nums; }
+.st-price s { font-size: 14px; font-weight: 600; color: var(--text-faint); text-decoration-thickness: 2px; }
+.st-vat { margin-top: .1rem; font-size: 12px; line-height: 1.3; color: var(--text-faint); }
+
+.st-buy { flex: 0 0 auto; padding: .45rem 1.05rem; gap: .65rem; font-size: 15px; }
+.st-buy .arrow { width: 7px; height: 12px; flex-basis: 7px; }
+.st-buy.is-off, .st-buy:disabled {
+  --b: var(--btn-dark);
+  --b-hover: var(--btn-dark);
+  --b-hi: var(--btn-dark-hi);
+  --b-lo: var(--btn-dark-lo);
+  --b-shadow: #000;
+  color: var(--text);
+  cursor: not-allowed;
+}
+.st-card.is-off .st-art img { filter: grayscale(.8) brightness(.6); }
+
+/* ── the Starter Pack: its own lime-lit ticket ── */
+
+.st-starter {
+  position: relative;
+  display: grid;
+  grid-template-columns: 256px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem 2.5rem;
+  margin: 0 0 1rem;
+  padding: 1.25rem 2.25rem 1.25rem 1.5rem;
+  background:
+    radial-gradient(30% 130% at 10% 60%, color-mix(in srgb, var(--grad-2) 13%, transparent), transparent 70%),
+    radial-gradient(40% 100% at 12% 80%, color-mix(in srgb, var(--sa-glow) 12%, transparent), transparent 70%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .018) 0 8px, transparent 8px 16px),
+    linear-gradient(180deg, #18261e, #0f1814);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px color-mix(in srgb, var(--grad-2) 38%, transparent);
+  clip-path: var(--notch-lg);
+}
+/* a lime kit stripe along the top */
+.st-starter::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--grad-3), var(--grad-2) 50%, var(--grad-1));
+}
+.st-starter .st-art { height: 150px; margin: 0; }
+.st-starter .st-art img { width: 256px; height: 160px; }
+.st-starter .st-art::before { width: 70%; height: 34px; bottom: -8px; }
+.st-starter .st-tags { position: static; margin-bottom: .55rem; }
+.st-starter-name { margin: 0 0 .25rem; font-size: 1.6rem; font-weight: 800; line-height: 1.15; }
+.st-starter .st-amt { font-size: 40px; }
+.st-starter-buy { display: flex; align-items: center; gap: 1.5rem; }
+.st-starter-buy .st-price { align-items: flex-end; text-align: right; }
+.st-starter .st-buy { padding: .6rem 1.6rem; font-size: 16px; }
+
+/* ── loading, empty, error ── */
+
+.st-sk-wide, .st-sk-card {
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  clip-path: var(--notch-lg);
+}
+.st-sk-wide { display: flex; align-items: center; gap: 2rem; height: 172px; margin-bottom: 1rem; padding: 0 2rem; }
+.st-sk-wide span { flex: 1; }
+.st-sk-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.st-sk-card { display: flex; flex-direction: column; height: 360px; padding: 1.2rem; }
+/* the placeholder is the gem itself, unlit, at 4x */
+.st-sk i {
+  display: block;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  margin: 2.2rem auto 2.4rem;
+  background: url("../img/store/gem.png") center / 64px 64px no-repeat;
+  image-rendering: pixelated;
+  filter: grayscale(1) brightness(.5);
+  opacity: .35;
+}
+.st-sk-wide i { margin: 0 3rem 0 4rem; }
+.st-sk b {
+  display: block;
+  width: var(--w, 50%);
+  height: 12px;
+  margin: .6rem 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .05) 0 40%, rgba(255, 255, 255, .11) 50%, rgba(255, 255, 255, .05) 60% 100%) 0 0 / 300% 100%;
+  animation: st-shimmer 1.4s linear infinite;
+}
+@keyframes st-shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+.st-sk-wait { margin: 1rem 0 0; font-size: 14px; text-align: center; color: var(--text-faint); }
+
+.st-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 3.5rem 1.5rem;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  clip-path: var(--notch-lg);
+  animation: st-rise .5s var(--ease-spring) both;
+}
+.st-state-gem { width: 64px; height: 64px; margin-bottom: 1.25rem; filter: drop-shadow(0 0 22px color-mix(in srgb, var(--sa-glow) 40%, transparent)); }
+.st-state.is-error .st-state-gem { filter: saturate(.25) brightness(.6); }
+.st-state h3 { margin: 0 0 .4rem; font-size: 1.6rem; }
+.st-state p { max-width: 30rem; margin: 0 auto; }
+.st-state .btn { margin-top: 1.6rem; }
+
+/* ── in game ─────────────────────────────────────────────────────── */
+
+.st-ingame { margin-top: 5.5rem; }
+.st-ig-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2rem 3.5rem;
+  padding: 2.5rem 2.75rem;
+  background:
+    radial-gradient(40% 90% at 92% 50%, color-mix(in srgb, var(--sa-glow) 10%, transparent), transparent 70%),
+    var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  clip-path: var(--notch-lg);
+}
+.st-ig-text p:last-child { max-width: 30rem; margin: .9rem 0 0; }
+.st-shots { display: grid; gap: 1.25rem; justify-items: start; }
+.st-shot { margin: 0; }
+/* captures from the game at GUI scale 2, shown at exactly 2x, or at 1x
+   where the card has no room for 2x. The switch keys off the card's own
+   width (a container query), so a padding change can never leave a capture
+   at an in-between size. Both switch together, so the two read at one
+   scale. */
+.st-ig-card { container-type: inline-size; }
+.st-shot img {
+  display: block;
+  width: calc(var(--w) * 2px);
+  height: calc(var(--h) * 2px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .08), 0 18px 40px rgba(0, 0, 0, .45);
+}
+.st-shot:not(.is-menu) img { --w: 200; --h: 20; }
+.st-shot.is-menu img { --w: 252; --h: 28; }
+.st-shot figcaption { margin-top: .55rem; font-size: 13px; font-weight: 600; color: var(--text-faint); }
+/* the menu capture is the wider, 504px at 2x */
+@container (max-width: 503px) {
+  .st-shot img { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); }
+}
+/* narrower than a capture even at 1x (no phone is, today): keep 1x and show
+   its start, rather than scale it */
+@container (max-width: 251px) {
+  .st-shot img { width: 100%; object-fit: none; object-position: left center; }
+}
+/* no container queries (Safari before 16): the same switch by screen width */
+@supports not (container-type: inline-size) {
+  @media (max-width: 583px) {
+    .st-shot img { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); }
+  }
+}
+
+/* ── how it works ───────────────────────────────────────────────── */
+
+.st-faq {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr);
+  align-items: start;
+  gap: 1.5rem 4rem;
+  margin-top: 5.5rem;
+  scroll-margin-top: 1.5rem;
+}
+.st-faq-head { position: sticky; top: 2rem; }
+.st-faq-lead { margin: .9rem 0 0; color: var(--text); }
+.st-faq .acc:last-child { margin-bottom: 0; }
+.st-faq .acc-body a { color: var(--accent-soft); }
+
+/* ── payments and privacy ───────────────────────────────────────── */
+
+.st-legal { margin-top: 4.5rem; }
+.st-legal-card {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.25fr;
+  background: rgba(0, 0, 0, .28);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  clip-path: var(--notch-lg);
+}
+.st-legal-col { padding: 1.6rem 1.75rem 1.7rem; font-size: 14px; line-height: 1.6; }
+.st-legal-col + .st-legal-col { box-shadow: inset 1px 0 0 rgba(255, 255, 255, .06); }
+.st-legal-col h3 {
+  margin: 0 0 .7rem;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.st-legal-col p { margin: 0 0 .7rem; }
+.st-legal-col p:last-child { margin-bottom: 0; }
+.st-legal-col b { color: #fff; }
+.st-legal-col a { color: var(--accent-soft); }
+
+.st-pn {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  margin: 0 0 .85rem;
+  padding: .4rem .8rem .4rem .6rem;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong) !important;
+  text-decoration: none;
+  background: rgba(255, 255, 255, .05);
+  clip-path: var(--notch);
+  transition: background-color .2s var(--ease-ui);
+}
+.st-pn:hover { background: rgba(255, 255, 255, .09); }
+.st-pn .st-ico { width: 16px; height: 16px; }
+.st-pn b { color: #fff; }
+.st-pn:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent-soft); }
+
+.st-legal-links { display: flex; flex-wrap: wrap; gap: .3rem 1.1rem; margin: .2rem 0 0; padding: 0; list-style: none; }
+.st-legal-links a { font-weight: 600; }
+
+/* ── the buy dialog ─────────────────────────────────────────────── */
+
+.st-dlg {
+  width: min(540px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  overflow: visible;
+}
+.st-dlg::backdrop {
+  background: rgba(2, 6, 4, .74);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.st-dlg[open] { animation: st-pop .42s var(--ease-spring) both; }
+.st-dlg[open]::backdrop { animation: st-fade .25s ease both; }
+@keyframes st-pop { from { opacity: 0; transform: translateY(24px) scale(.97); } }
+@keyframes st-fade { from { opacity: 0; } }
+
+.st-dlg-box {
+  position: relative;
+  display: block;
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 1.75rem 2rem 1.5rem;
+  background:
+    radial-gradient(60% 45% at 18% 0%, color-mix(in srgb, var(--sa-glow) 17%, transparent), transparent 72%),
+    linear-gradient(160deg, #0f1b16, #12211a 60%, #0d1612);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07), inset 0 3px 0 rgba(255, 255, 255, .05);
+  clip-path: var(--notch-lg);
+  scrollbar-width: thin;
+}
+
+.st-dlg-x {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #fff;
+  background: none;
+  border: 0;
+  opacity: .65;
+  cursor: pointer;
+}
+.st-dlg-x:hover { opacity: 1; }
+.st-dlg-x svg { width: 16px; height: 16px; fill: currentColor; }
+
+.st-dlg-head { display: flex; align-items: center; gap: 1.25rem; margin: 0 2.5rem 1.5rem 0; }
+.st-dlg-art {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 96px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--sa-glow) 22%, transparent), transparent);
+}
+.st-dlg-art img { width: 128px; height: 80px; }
+.st-dlg-art img.is-gem { width: 64px; height: 64px; }
+.st-dlg-what { min-width: 0; }
+.st-dlg-kicker { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--text-faint); }
+.st-dlg-what h2 { margin: .1rem 0 .2rem; font-size: 2.1rem; font-weight: 800; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.st-dlg-unit { font-size: 1rem; font-weight: 700; letter-spacing: 0; color: var(--sa-text); }
+.st-dlg-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .55rem; margin: 0; }
+.st-dlg-price b { font-size: 1.15rem; color: #fff; }
+.st-dlg-price s { font-size: 14px; color: var(--text-faint); }
+.st-dlg-price small { flex-basis: 100%; font-size: 12px; color: var(--text-faint); }
+
+/* fields: black like a sign or a text box in game, grey-rimmed */
+.st-field { margin: 0 0 1.1rem; }
+.st-field label { display: block; margin: 0 0 .45rem; font-size: 14px; font-weight: 700; color: #fff; }
+.st-input { position: relative; }
+.st-input input {
+  display: block;
+  width: 100%;
+  height: 54px;
+  padding: 0 .9rem 0 3.9rem;
+  font: 600 1.1rem/1 var(--font);
+  letter-spacing: .01em;
+  color: #fff;
+  background: #040806;
+  /* 3.8:1 on the dialog, 4.6:1 on the field: the box's edge is visible at rest */
+  border: 2px solid #6b7c72;
+  border-radius: 0;
+  outline: none;
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, .6);
+  transition: border-color .15s;
+}
+.st-input input:hover { border-color: #8fa197; }
+.st-input input:focus { border-color: var(--sa-light); box-shadow: inset 0 3px 0 rgba(0, 0, 0, .6), 0 0 0 3px color-mix(in srgb, var(--sa-light) 25%, transparent); }
+.st-input input[readonly] { color: var(--text-strong); }
+.st-field.has-err .st-input input { border-color: #ff6b5b; }
+.st-field.has-err .st-input input:focus { box-shadow: inset 0 3px 0 rgba(0, 0, 0, .6), 0 0 0 3px rgba(255, 107, 91, .25); }
+
+/* the head preview, or a blank pixel head until a name is typed */
+.st-head {
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  width: 40px;
+  height: 40px;
+  background:
+    linear-gradient(#2a3a31, #2a3a31) 10px 15px / 5px 5px no-repeat,
+    linear-gradient(#2a3a31, #2a3a31) 25px 15px / 5px 5px no-repeat,
+    #17221c;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06);
+}
+.st-head img { width: 40px; height: 40px; }
+
+.st-hint { margin: .4rem 0 0; font-size: 13px; color: var(--text-faint); }
+.st-err {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: .45rem 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff9d8f;
+}
+.st-err::before { content: ""; flex: 0 0 8px; height: 8px; background: currentColor; clip-path: var(--px-star); }
+.st-err:empty { margin: 0; }
+.st-err:empty::before { content: none; }
+.st-field.has-err .st-hint { display: none; }
+
+/* the gift switch: a pixel toggle */
+.st-gift { margin: 0 0 1.1rem; }
+.st-switch { display: inline-flex; align-items: center; gap: .75rem; font-weight: 700; color: #fff; cursor: pointer; user-select: none; }
+.st-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.st-switch-ui {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+  background: #0a110d;
+  box-shadow: inset 2px 2px 0 #030605, inset -2px -2px 0 #26352d;
+  transition: background-color .2s;
+}
+.st-switch-ui i {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 16px;
+  height: 16px;
+  background: #6b7c72;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, .25), inset 0 -3px 0 rgba(0, 0, 0, .3);
+  transition: transform .25s var(--ease-spring), background-color .2s;
+}
+.st-switch input:checked + .st-switch-ui { background: color-mix(in srgb, var(--btn) 70%, #0a110d); }
+.st-switch input:checked + .st-switch-ui i { transform: translateX(20px); background: var(--grad-2); }
+.st-switch input:focus-visible + .st-switch-ui { outline: 2px solid var(--accent-soft); outline-offset: 3px; }
+.st-switch input:disabled ~ * { opacity: .6; cursor: default; }
+.st-gift .st-field.is-gift { margin: 1rem 0 0; padding-left: 1rem; box-shadow: inset 3px 0 0 color-mix(in srgb, var(--grad-2) 55%, transparent); animation: st-rise .35s var(--ease-spring) both; }
+
+.st-sum {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  margin: 0 0 1.1rem;
+  padding: .8rem 1rem;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-strong);
+  background: rgba(74, 168, 255, .07);
+  box-shadow: inset 0 0 0 1px rgba(114, 198, 255, .16);
+  clip-path: var(--notch);
+}
+.st-sum img { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 1px; }
+.st-sum b { color: #fff; }
+
+.st-alert {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  margin: 0 0 1.1rem;
+  padding: .8rem 1rem;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #ffd4cc;
+  background: rgba(255, 90, 70, .1);
+  box-shadow: inset 0 0 0 1px rgba(255, 120, 100, .35), inset 3px 0 0 #ff6b5b;
+  clip-path: var(--notch);
+  animation: st-rise .3s var(--ease-spring) both;
+}
+.st-alert:empty { margin: 0; padding: 0; background: none; box-shadow: none; animation: none; }
+.st-alert small { font-size: 12px; font-weight: 500; color: rgba(255, 212, 204, .7); font-variant-numeric: tabular-nums; }
+
+.st-go { width: 100%; padding-block: .8rem; font-size: 1.1rem; }
+.st-go .arrow { transition: transform .2s var(--ease-ui); }
+.st-go:hover .arrow { transform: translateX(3px); }
+.st-go[aria-disabled="true"] { cursor: progress; }
+.st-go.is-busy { background: var(--btn-lo); }
+.st-go.is-busy .arrow { animation: st-nudge .7s steps(2, jump-none) infinite; }
+@keyframes st-nudge { 50% { transform: translateX(4px); } }
+
+.st-wait { min-height: 1.3em; margin: .55rem 0 0; font-size: 13px; text-align: center; color: var(--sa-text); }
+.st-wait:empty { margin: 0; min-height: 0; }
+.st-fine { margin: .9rem 0 0; font-size: 12.5px; line-height: 1.55; color: var(--text-faint); }
+.st-fine a { color: var(--text-strong); }
+
+/* ── thanks ─────────────────────────────────────────────────────── */
+
+.st-thanks { padding-bottom: 5rem; }
+.st-ty {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  /* top and bottom only: the sides keep .st-wrap's gutter */
+  padding-block: 3rem 1rem;
+}
+.st-ty-stage { position: relative; width: 280px; height: 210px; margin-bottom: .5rem; }
+.st-ty-stage .st-pool { bottom: 4%; width: 100%; height: 34%; }
+.st-ty-stage .st-shadow { bottom: 14%; width: 40%; height: 9%; }
+.st-ty-gem { position: absolute; left: 50%; bottom: 22%; width: 144px; height: 144px; margin-left: -72px; animation: st-drop .9s var(--ease-spring) .2s both; }
+.st-ty-gem img { width: 100%; height: 100%; filter: drop-shadow(0 0 26px color-mix(in srgb, var(--sa-glow) 55%, transparent)); animation: st-bob 3.6s ease-in-out 1.1s infinite; }
+.st-ty-stage .st-sparks i { animation-duration: 2.2s; }
+.st-ty h1 { margin: 0 0 .75rem; font-size: 84px; font-weight: 800; line-height: 1.02; letter-spacing: -.02em; }
+.st-ty-lead { max-width: 34rem; margin: 0 auto; font-size: 1.3rem; line-height: 1.55; color: var(--text-strong); }
+
+.st-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+  margin: 3rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.st-steps .st-fact { grid-template-rows: auto 1fr; }
+.st-ty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: 2.5rem; }
+
+/* ── responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .st-title { font-size: 104px; }
+  .st-fact-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* four across still: eight bundles make two even rows */
+  .st-grid { gap: .75rem; }
+  .st-card { padding-inline: 1rem; }
+  .st-amt { font-size: 38px; }
+  .st-buy { padding-inline: .85rem; }
+  .st-legal-card { grid-template-columns: 1fr 1fr; }
+  .st-legal-col:first-child { grid-column: 1 / -1; }
+  .st-legal-col:nth-child(2) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
+  .st-legal-col:nth-child(3) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), inset 1px 0 0 rgba(255, 255, 255, .06); }
+  .st-ig-card { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 980px) {
+  .st { padding-top: calc(var(--nav-h) + 1rem); }
+  .st-hero-grid { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 0; }
+  .st-hero-text { order: 2; padding: 0 0 1.5rem; text-align: center; }
+  .st-stage { order: 1; max-width: 420px; margin: -1rem auto -2.5rem; }
+  .st-gem-drop { width: 192px; height: 192px; margin-left: -96px; }
+  .st-notice { margin-inline: auto; text-align: left; }
+  .st-rate { text-align: left; }
+  .st-lead { margin-inline: auto; }
+  .st-hero-cta { justify-content: center; }
+  .st-title { font-size: 88px; }
+  .st-title.is-off { font-size: 56px; }
+  .st-h2 { font-size: calc(1.375rem + 1.5vw); }
+  .st-grid, .st-sk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-sk-card:nth-child(n + 3) { display: none; }
+  .st-starter { grid-template-columns: 192px minmax(0, 1fr); padding: 1.35rem 1.5rem; }
+  .st-starter .st-art { height: 128px; }
+  .st-starter .st-art img { width: 192px; height: 120px; }
+  .st-starter-buy { grid-column: 1 / -1; justify-content: space-between; padding-top: 1rem; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07); }
+  .st-starter-buy .st-price { align-items: flex-start; text-align: left; }
+  .st-sec-note { text-align: left; }
+  .st-faq { grid-template-columns: minmax(0, 1fr); }
+  .st-faq-head { position: static; }
+  .st-ig-card { padding: 2rem 1.75rem; }
+  .st-ty h1 { font-size: 64px; }
+  .st-steps { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .st-fact-list { grid-template-columns: minmax(0, 1fr); }
+  .st-legal-card { grid-template-columns: minmax(0, 1fr); }
+  .st-legal-col:nth-child(3) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
+}
+
+@media (max-width: 575px) {
+  .st-stage { max-width: 340px; margin-bottom: -2rem; }
+  .st-gem-drop { width: 144px; height: 144px; margin-left: -72px; }
+  .st-sat.is-a { width: 48px; height: 48px; }
+  .st-sat.is-b { width: 32px; height: 32px; }
+  .st-sat.is-c { width: 32px; height: 32px; }
+  .st-sparks i { width: 9px; height: 9px; }
+  .st-eyebrow { font-size: 1.05rem; }
+  .st-title { font-size: min(76px, 19vw); }
+  .st-title.is-off { font-size: min(44px, 11.4vw); }
+  .st-lead { font-size: 1.1rem; }
+  .st-rate { padding: .75rem 1rem .8rem .8rem; column-gap: .8rem; text-align: left; }
+  .st-rate b { font-size: 1.2rem; }
+  .st-rate span { font-size: 13px; }
+  .st-bundles, .st-ingame, .st-faq { margin-top: 4rem; }
+  .st-grid { gap: .6rem; }
+  .st-card { padding: .9rem .85rem 1rem; }
+  .st-art { height: 92px; margin: .9rem 0 .6rem; }
+  .st-art img { width: 128px; height: 80px; }
+  .st-tags { top: 10px; left: 10px; right: 10px; }
+  .st-tag { padding: .18rem .45rem; font-size: 10px; letter-spacing: .1em; }
+  .st-name { font-size: 11px; letter-spacing: .14em; }
+  .st-amt { font-size: 32px; }
+  .st-unit { display: block; margin: .1rem 0 0; font-size: 13px; }
+  .st-bonus { flex-direction: column; align-items: flex-start; min-height: 46px; font-size: 12.5px; gap: .3rem; }
+  .st-starter .st-bonus { flex-direction: row; min-height: 0; }
+  .st-tag-name { display: none; }
+  .st-pct { font-size: 11px; }
+  .st-foot { flex-direction: column; align-items: stretch; gap: .7rem; padding-top: .8rem; }
+  .st-price b { font-size: 1.2rem; }
+  .st-buy { justify-content: center; width: 100%; }
+  .st-starter { grid-template-columns: minmax(0, 1fr); padding: 1.25rem 1.1rem 1.2rem; text-align: center; }
+  .st-starter .st-art { height: 88px; }
+  .st-starter .st-art img { width: 128px; height: 80px; }
+  .st-starter .st-tags { justify-content: center; }
+  .st-starter .st-amt { font-size: 34px; }
+  .st-starter .st-unit { display: inline; }
+  .st-starter .st-bonus { justify-content: center; }
+  .st-starter-buy { flex-direction: column; align-items: stretch; gap: .8rem; }
+  .st-starter-buy .st-price { align-items: center; text-align: center; }
+  .st-starter-buy .st-price-row { justify-content: center; }
+  .st-sk-wide { height: 150px; }
+  .st-sk-card { height: 300px; }
+  .st-sk i { margin: 1.4rem auto 1.6rem; }
+  .st-sk-wide i { margin: 0 1rem 0 .5rem; }
+  .st-ig-card { padding: 1.6rem 1.1rem; }
+  .st-legal-col { padding: 1.3rem 1.2rem 1.35rem; }
+  .st-dlg-box { padding: 1.35rem 1.1rem 1.2rem; }
+  .st-dlg-head { gap: .75rem; margin-right: 2rem; margin-bottom: 1.2rem; }
+  .st-dlg-art { width: 72px; height: 56px; }
+  .st-dlg-art img { width: 64px; height: 40px; }
+  .st-dlg-art img.is-gem { width: 48px; height: 48px; }
+  .st-dlg-what h2 { font-size: 1.6rem; }
+  .st-dlg-x { top: 8px; right: 6px; }
+  .st-ty h1 { font-size: min(56px, 14vw); }
+  .st-ty-lead { font-size: 1.1rem; }
+  .st-ty-stage { width: 220px; height: 170px; }
+  .st-ty-gem { width: 112px; height: 112px; margin-left: -56px; }
+}
+
+/* under 360px: tighter cards, so the in-game captures and prices fit */
+@media (max-width: 359px) {
+  .st-ig-card { padding-inline: .65rem; }
+  .st-card { padding-inline: .7rem; }
+  .st-amt { font-size: 28px; }
+  .st-price b { font-size: 1.1rem; }
+  .st-dlg-art { display: none; }
+}
+
+@media (forced-colors: active) {
+  .st-card, .st-starter, .st-fact, .st-state, .st-legal-card, .st-dlg-box, .st-rate, .st-notice { border: 1px solid CanvasText; }
+  .st-grad { -webkit-text-fill-color: currentColor; color: CanvasText; background: none; }
+}
+
+@media print {
+  .st-stage, .st-dlg, .st-buy { display: none !important; }
+}

@@ -547,6 +547,15 @@
     requestAnimationFrame(() => requestAnimationFrame(() => cupBanner.classList.add("is-on")));
   }
 
+  /* ── the store: its nav link ───────────────────────────────────────
+     Hidden in the markup, and shown only once the store is open: a PayNow
+     store id AND storeOpen: true in site.config.js. So a config that fails
+     to load, an empty id, or a store that isn't open yet all keep it out
+     of the nav. No network call: this is config only. */
+
+  const storeOpen = String(CFG.paynowStoreId || "").trim() !== "" && CFG.storeOpen === true;
+  $$("[data-store-nav]").forEach((li) => (li.hidden = !storeOpen));
+
   /* ── scroll reveals ────────────────────────────────────────────────
      <head> added .reveal-on before first paint and armed a failsafe that
      removes it unless this flag is set. So if anything above threw, the

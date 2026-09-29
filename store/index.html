@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Store — MCS</title>
+<meta name="description" content="Sapphires, the MCS currency for cosmetics. Every bundle and price, bought safely through PayNow." />
+<meta name="theme-color" content="#070c0a" />
+
+<link rel="icon" href="../favicon.ico?v=e4392b99" sizes="32x32" />
+<link rel="icon" type="image/svg+xml" href="../assets/img/icon.svg?v=5f522723" />
+<link rel="apple-touch-icon" href="../assets/img/icon-180.png" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="MCS" />
+<meta property="og:title" content="Store — MCS" />
+<meta property="og:description" content="Sapphires, the MCS currency for cosmetics." />
+<meta property="og:url" content="https://mcsoccer.net/store/" />
+<meta property="og:image" content="https://mcsoccer.net/assets/img/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css?v=b2151443" />
+<link rel="stylesheet" href="../assets/css/store.css?v=70f0fae9" />
+<script>
+  document.documentElement.classList.add("reveal-on");
+  setTimeout(function () {
+    if (!window.__mcsRevealReady) document.documentElement.classList.remove("reveal-on");
+  }, 3000);
+</script>
+<!-- Loaded up here, before anything paints, so the page opens straight
+     into the right state (on its way / not open yet / open) with no flash. -->
+<script src="../site.config.js?v=6e5d39ae"></script>
+<script src="../assets/js/store.js?v=324ccd9d" data-page="store"></script>
+</head>
+<body>
+
+<nav class="nav" aria-label="Main">
+  <div class="container">
+    <a class="nav-brand" href="../" aria-label="MCS home">
+      <img src="../assets/img/logo.png" alt="" width="64" height="64" />
+      <span class="nav-brand-text"><b>MCS</b><span>Minecraft Soccer</span></span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="../">Home</a></li>
+      <li><a href="../rules/">Rules</a></li>
+      <li><a href="../matches/">Matches</a></li>
+      <li class="nav-cup" data-cup-nav hidden><a href="../cup/">Cup</a></li>
+      <li class="nav-store" data-store-nav hidden><a href="./" aria-current="page"><svg class="nav-gem px" viewBox="0 0 9 8" aria-hidden="true"><path fill="#2a3ca6" d="M2 0h5v1H2zM1 1h1v1H1zM0 2h1v2H0zM8 2h1v1H8zM7 3h1v1H7zM6 4h1v1H6zM5 5h1v1H5z"/><path fill="#e2f6ff" d="M2 1h2v1H2zM1 2h1v1H1z"/><path fill="#72c6ff" d="M4 1h2v1H4zM2 2h4v1H2zM1 3h4v1H1zM3 4h2v2H3zM4 6h1v1H4z"/><path fill="#2f7ceb" d="M6 1h2v2H6zM5 3h2v1H5zM1 4h2v1H1zM5 4h1v1H5zM2 5h1v1H2zM3 6h1v1H3z"/><path fill="#1b2a8f" d="M8 3h1v1H8zM7 4h1v1H7zM6 5h1v1H6zM5 6h1v1H5zM4 7h1v1H4z"/></svg>Store</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
+      <li><a data-discord-link href="../#discord">Discord</a></li>
+    </ul>
+
+    <div class="nav-cta">
+      <button class="btn address-btn" type="button" data-copy-address>
+        <span class="slot">
+          <span class="slot-main" data-address>PLAY.MCSOCCER.NET</span>
+          <span class="slot-alt" aria-hidden="true">Copied to clipboard!</span>
+        </span>
+        <span class="visually-hidden"> (copy server address)</span>
+      </button>
+    </div>
+
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="drawer" aria-expanded="false" data-drawer-open>
+      <svg viewBox="0 0 30 22" fill="none" aria-hidden="true"><path d="M2 3h26M2 11h26M2 19h26"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="scrim" data-scrim></div>
+<aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true" inert>
+  <div class="drawer-head">
+    <img src="../assets/img/logo.png" alt="MCS" />
+    <button class="drawer-close" type="button" aria-label="Close menu" data-drawer-close><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+  </div>
+  <ul>
+    <li><a href="../">Home</a></li>
+    <li><a href="../rules/">Rules</a></li>
+    <li><a href="../matches/">Matches</a></li>
+    <li class="nav-cup" data-cup-nav hidden><a href="../cup/">Cup</a></li>
+    <li class="nav-store" data-store-nav hidden><a href="./" aria-current="page"><svg class="nav-gem px" viewBox="0 0 9 8" aria-hidden="true"><path fill="#2a3ca6" d="M2 0h5v1H2zM1 1h1v1H1zM0 2h1v2H0zM8 2h1v1H8zM7 3h1v1H7zM6 4h1v1H6zM5 5h1v1H5z"/><path fill="#e2f6ff" d="M2 1h2v1H2zM1 2h1v1H1z"/><path fill="#72c6ff" d="M4 1h2v1H4zM2 2h4v1H2zM1 3h4v1H1zM3 4h2v2H3zM4 6h1v1H4z"/><path fill="#2f7ceb" d="M6 1h2v2H6zM5 3h2v1H5zM1 4h2v1H1zM5 4h1v1H5zM2 5h1v1H2zM3 6h1v1H3z"/><path fill="#1b2a8f" d="M8 3h1v1H8zM7 4h1v1H7zM6 5h1v1H6zM5 6h1v1H5zM4 7h1v1H4z"/></svg>Store</a></li>
+    <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+    <li><a data-discord-link href="../#discord">Discord</a></li>
+  </ul>
+  <button class="btn" type="button" data-open-connect>Join Now</button>
+</aside>
+
+<main class="page st" data-store>
+  <div class="st-glow" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+  <header class="st-hero">
+    <div class="st-wrap st-hero-grid">
+      <div class="st-hero-text">
+        <!-- store id set, storeOpen false: it works in full, but says so -->
+        <div class="st-notice" data-show="closed" role="note">
+          <span class="st-notice-ico"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M4 0h4v1H4zM2 1h2v1H2zM8 1h2v1H8zM1 2h1v1H1zM10 2h1v1H10zM1 3h1v1H1zM5 3h1v1H5zM10 3h1v1H10zM0 4h1v1H0zM5 4h1v1H5zM11 4h1v1H11zM0 5h1v1H0zM5 5h3v1H5zM11 5h1v1H11zM0 6h1v1H0zM11 6h1v1H11zM1 7h1v1H1zM10 7h1v1H10zM1 8h1v1H1zM10 8h1v1H10zM2 9h2v1H2zM8 9h2v1H8zM4 10h4v1H4z"/></svg></span>
+          <p><b>The store isn't open yet.</b> Sapphires go on sale when the first cosmetics can be bought.</p>
+        </div>
+        <!-- testing only: PayNow's public demo store is read, never bought from -->
+        <div class="st-notice is-demo" data-show="demo" role="note">
+          <p><b>Reading PayNow's demo store.</b> Buying is switched off here, so nothing is created on it.</p>
+        </div>
+
+        <p class="st-eyebrow st-in" style="--i:0"><img src="../assets/img/store/glyph.png" width="18" height="18" alt="" />MCS Store</p>
+
+        <div data-show="on">
+          <h1 class="st-title st-in" style="--i:1"><span class="st-grad">Sapphires</span></h1>
+          <p class="st-lead st-in" style="--i:2">The MCS currency for cosmetics. New looks for your player, never an edge on the pitch.</p>
+          <div class="st-rate st-in" style="--i:3">
+            <img src="../assets/img/store/gem.png" width="32" height="32" alt="" />
+            <b>100 Sapphires &asymp; $1</b>
+            <span>The list rate. Bigger bundles add bonus Sapphires on top.</span>
+          </div>
+          <div class="st-hero-cta st-in" style="--i:4">
+            <a class="btn" href="#bundles">
+              See the bundles
+              <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+            </a>
+            <a class="more" href="#faq">How it works <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg></a>
+          </div>
+        </div>
+
+        <!-- no store id yet: no calls to PayNow at all -->
+        <div data-show="off">
+          <h1 class="st-title is-off st-in" style="--i:1">The store is <span class="st-grad">on its way</span></h1>
+          <p class="st-lead st-in" style="--i:2">Sapphires, the MCS currency for cosmetics, are coming. The Discord hears first when they land.</p>
+          <div class="st-hero-cta st-in" style="--i:3">
+            <a class="btn btn-discord" data-discord-button href="#" target="_blank" rel="noopener">
+              <span data-discord-label>Join the Discord</span>
+              <svg viewBox="0 0 24 24" width="25" height="25" fill="currentColor" aria-hidden="true"><path d="M19.3 5.3A16.6 16.6 0 0 0 15.2 4l-.2.4a15.5 15.5 0 0 1 3.6 1.2 12.6 12.6 0 0 0-10.9 0A15.5 15.5 0 0 1 11.2 4.4L11 4a16.6 16.6 0 0 0-4.1 1.3C4.3 9.2 3.6 13 4 16.7a16.7 16.7 0 0 0 5 2.6l.7-1.2a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 9.3 0l.4.3a10.8 10.8 0 0 1-1.7.8l.7 1.2a16.7 16.7 0 0 0 5-2.6c.5-4.3-.6-8.1-2.8-11.4ZM9.6 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.8 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- the gem on the centre spot, under a floodlight -->
+      <div class="st-stage" aria-hidden="true">
+        <div class="st-beam"></div>
+        <!-- the pitch, seen from behind a goal: mown bands, the halfway line
+             and the centre circle, lit only where the floodlight lands -->
+        <svg class="st-floor" viewBox="0 0 540 500" preserveAspectRatio="none">
+          <defs>
+            <radialGradient id="st-lit" cx="270" cy="405" r="280" gradientUnits="userSpaceOnUse" gradientTransform="translate(270 405) scale(1 .44) translate(-270 -405)">
+              <stop offset="0" stop-color="#fff"/>
+              <stop offset=".5" stop-color="#fff" stop-opacity=".55"/>
+              <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <mask id="st-spot"><rect width="540" height="500" fill="url(#st-lit)"/></mask>
+          </defs>
+          <g mask="url(#st-spot)">
+            <rect y="296" width="540" height="204" fill="#0d3320"/>
+            <g fill="#185233"><rect y="312" width="540" height="17"/><rect y="348" width="540" height="23"/><rect y="394" width="540" height="30"/><rect y="452" width="540" height="40"/></g>
+            <g fill="none" stroke="#e3f3ff" stroke-opacity=".55" stroke-width="3">
+              <line x1="0" y1="405" x2="540" y2="405"/>
+              <ellipse cx="270" cy="405" rx="168" ry="46"/>
+            </g>
+            <ellipse cx="270" cy="405" rx="8" ry="3" fill="#e3f3ff" fill-opacity=".75"/>
+          </g>
+        </svg>
+        <div class="st-pool"></div>
+        <div class="st-shadow"></div>
+        <img class="st-sat is-a" src="../assets/img/store/gem.png" width="16" height="16" alt="" />
+        <img class="st-sat is-b" src="../assets/img/store/gem.png" width="16" height="16" alt="" />
+        <img class="st-sat is-c" src="../assets/img/store/gem.png" width="16" height="16" alt="" />
+        <div class="st-gem-drop"><img class="st-gem" src="../assets/img/store/gem.png" width="16" height="16" alt="" /></div>
+        <div class="st-sparks"><i style="--x:22%;--y:30%;--d:0s"></i><i class="k1" style="--x:76%;--y:18%;--d:.7s"></i><i style="--x:84%;--y:56%;--d:1.4s"></i><i class="k1" style="--x:14%;--y:62%;--d:2s"></i><i class="k2" style="--x:62%;--y:8%;--d:1.1s"></i></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═════════════════════ WHAT SAPPHIRES ARE ═════════════════════ -->
+  <section class="st-wrap st-facts" aria-labelledby="facts-title">
+    <h2 class="st-kicker" id="facts-title">What Sapphires are</h2>
+    <ul class="st-fact-list">
+      <li class="st-fact st-in" style="--i:5">
+        <span class="st-slot"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M3 1h2v1H3zM7 1h2v1H7zM1 2h4v1H1zM7 2h4v1H7zM0 3h12v1H0zM0 4h12v1H0zM0 5h2v1H0zM3 5h6v1H3zM10 5h2v1H10zM3 6h6v1H3zM3 7h6v1H3zM3 8h6v1H3z"/><path class="ib" d="M3 9h6v1H3z"/></svg></span>
+        <b>Cosmetics only</b>
+        <span>New looks for your player. No gameplay advantage, ever.</span>
+      </li>
+      <li class="st-fact st-in" style="--i:6">
+        <span class="st-slot"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M2 5h8v1H2zM2 6h8v1H2zM2 7h3v1H2zM7 7h3v1H7zM2 8h3v1H2zM7 8h3v1H7zM2 9h4v1H2zM7 9h3v1H7zM2 10h8v1H2z"/><path class="ib" d="M4 1h4v1H4zM3 2h1v1H3zM8 2h1v1H8zM3 3h1v1H3zM8 3h1v1H8zM3 4h1v1H3zM8 4h1v1H8z"/></svg></span>
+        <b>Only for MCS</b>
+        <span>No cash-out, no trading, and no use on other servers.</span>
+      </li>
+      <li class="st-fact st-in" style="--i:7">
+        <span class="st-slot"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M5 0h2v1H5zM5 1h2v1H5zM5 2h2v1H5zM2 3h2v1H2zM5 3h2v1H5zM8 3h2v1H8zM3 4h6v1H3zM4 5h4v1H4zM5 6h2v1H5z"/><path class="ib" d="M0 8h1v1H0zM11 8h1v1H11zM0 9h1v1H0zM11 9h1v1H11zM0 10h12v1H0z"/></svg></span>
+        <b>Delivered in game</b>
+        <span>Automatically. Right away if you're online, or when you next join.</span>
+      </li>
+      <li class="st-fact st-in" style="--i:8">
+        <span class="st-slot"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M2 1h2v1H2zM8 1h2v1H8zM1 2h1v1H1zM4 2h1v1H4zM7 2h1v1H7zM10 2h1v1H10zM2 3h2v1H2zM5 3h2v1H5zM8 3h2v1H8zM0 4h5v1H0zM7 4h5v1H7zM0 5h5v1H0zM7 5h5v1H7zM1 6h4v1H1zM7 6h4v1H7zM1 7h4v1H1zM7 7h4v1H7zM1 8h4v1H1zM7 8h4v1H7zM1 9h4v1H1zM7 9h4v1H7zM1 10h4v1H1zM7 10h4v1H7z"/><path class="ib" d="M5 4h2v1H5zM5 5h2v1H5zM5 6h2v1H5zM5 7h2v1H5zM5 8h2v1H5zM5 9h2v1H5zM5 10h2v1H5z"/></svg></span>
+        <b>Easy to gift</b>
+        <span>Send any bundle to a friend. You just need their username.</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════ BUNDLES ══════════════════════════ -->
+  <section class="st-wrap st-bundles" id="bundles" aria-labelledby="bundles-title" data-show="on">
+    <div class="st-sec-head">
+      <div>
+        <p class="st-kicker">Bundles</p>
+        <h2 class="st-h2" id="bundles-title" tabindex="-1">Pick a <span class="st-grad">bundle</span></h2>
+      </div>
+      <p class="st-sec-note">Prices are in your currency. PayNow shows any tax before you pay.</p>
+    </div>
+
+    <!-- store.js draws the bundles here, straight from PayNow -->
+    <div class="st-catalog" data-catalog aria-busy="true">
+      <div class="st-sk" aria-hidden="true">
+        <div class="st-sk-wide"><i></i><span><b style="--w:30%"></b><b style="--w:55%"></b><b style="--w:40%"></b></span></div>
+        <div class="st-sk-grid">
+          <div class="st-sk-card"><i></i><b style="--w:40%"></b><b style="--w:70%"></b><b style="--w:55%"></b></div>
+          <div class="st-sk-card"><i></i><b style="--w:40%"></b><b style="--w:70%"></b><b style="--w:55%"></b></div>
+          <div class="st-sk-card"><i></i><b style="--w:40%"></b><b style="--w:70%"></b><b style="--w:55%"></b></div>
+          <div class="st-sk-card"><i></i><b style="--w:40%"></b><b style="--w:70%"></b><b style="--w:55%"></b></div>
+        </div>
+      </div>
+      <p class="st-sk-wait" data-catalog-wait hidden>Still waiting for PayNow&hellip;</p>
+      <noscript>
+        <div class="st-state">
+          <h3>The store needs JavaScript</h3>
+          <p>Turn it on for this site to see the bundles and prices.</p>
+        </div>
+      </noscript>
+    </div>
+    <!-- what loading the bundles came to, for screen readers (outside the
+         box above, which every render empties) -->
+    <p class="visually-hidden" role="status" data-catalog-status></p>
+  </section>
+
+  <!-- ═══════════════════════════ IN GAME ══════════════════════════ -->
+  <section class="st-wrap st-ingame" aria-labelledby="ingame-title" data-show="on">
+    <div class="st-ig-card">
+      <div class="st-ig-text">
+        <p class="st-kicker">In game</p>
+        <h2 class="st-h2" id="ingame-title">Right where <span class="st-grad">you play</span></h2>
+        <p>Your balance shows in chat and sits beside every price in the menus. Prices there also show about what they are in dollars. <code>/sapphires history</code> lists everything you've bought and spent.</p>
+      </div>
+      <div class="st-shots">
+        <figure class="st-shot">
+          <img src="../assets/img/store/ingame-chat.png" width="200" height="20" alt="A chat line in game: 1,250 Sapphires, with the gem beside it." loading="lazy" />
+          <figcaption>Your balance, in chat</figcaption>
+        </figure>
+        <figure class="st-shot is-menu">
+          <img src="../assets/img/store/ingame-menu.png" width="252" height="28" alt="A menu tooltip in game: Price 300 Sapphires (about $3)." loading="lazy" />
+          <figcaption>In the menus, beside every price</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════════ FAQ ════════════════════════════ -->
+  <section class="st-wrap st-faq" id="faq" aria-labelledby="faq-title" data-show="on">
+    <div class="st-faq-head">
+      <p class="st-kicker">Details</p>
+      <h2 class="st-h2" id="faq-title">How it <span class="st-grad">works</span></h2>
+      <p class="st-faq-lead">Delivery, gifts, refunds and receipts, in short.</p>
+    </div>
+
+    <div class="st-faq-list">
+    <details class="acc">
+      <summary>How does delivery work?</summary>
+      <div class="acc-body">
+        <p>When your payment clears, PayNow tells our server, and the Sapphires are added to the account you bought for. There's nothing to claim or redeem.</p>
+        <p>If you're online, they usually land within a minute.</p>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>What if I'm offline when I buy?</summary>
+      <div class="acc-body">
+        <p>Nothing is lost. The order waits for you, and the Sapphires land the next time you join MCS.</p>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>Can I send Sapphires to a friend?</summary>
+      <div class="acc-body">
+        <p>Yes. Pick a bundle, turn on <b>Send as a gift</b>, and type their Java Edition username. The Sapphires go to them, and the receipt comes to you.</p>
+        <p>Check the spelling first: the gift goes to exactly the name you type.</p>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>Can I get a refund?</summary>
+      <div class="acc-body">
+        <p>Refunds are handled by PayNow, under its <a href="https://paynow.gg/legal/buyer-agreement" target="_blank" rel="noopener">Buyer Agreement</a>.</p>
+        <p>If you bought from the EU, you can withdraw within 14 days of buying and get your money back for any Sapphires you haven't used. For a refund, <span data-support-line>ask us on <a href="../#discord">Discord</a></span> with your order ID.</p>
+        <p>Refunded Sapphires are taken back off your balance.</p>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>Where can I see what I've bought?</summary>
+      <div class="acc-body">
+        <p>PayNow emails you a receipt for every purchase, with its order ID.</p>
+        <p>In game, <code>/sapphires history</code> lists every Sapphire you've bought and spent.</p>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>How do I contact you?</summary>
+      <div class="acc-body">
+        <p>About a purchase, <span data-support-line>ask us on <a href="../#discord">Discord</a></span>. Put your order ID in the message and we'll get back to you.</p>
+      </div>
+    </details>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ PAYMENTS AND PRIVACY ══════════════════════
+       Required on every store page (PayNow's review, Mojang's usage
+       guidelines). Before launch: supportEmail in site.config.js must be
+       a real, monitored inbox. Mojang and PayNow both need an email, and
+       a Discord link alone doesn't count. -->
+  <section class="st-wrap st-legal" aria-labelledby="legal-title" data-show="on">
+    <h2 class="visually-hidden" id="legal-title">Payments and privacy</h2>
+    <div class="st-legal-card">
+      <div class="st-legal-col">
+        <a class="st-pn" href="https://paynow.gg" target="_blank" rel="noopener">
+          <svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M2 5h8v1H2zM2 6h8v1H2zM2 7h3v1H2zM7 7h3v1H7zM2 8h3v1H2zM7 8h3v1H7zM2 9h4v1H2zM7 9h3v1H7zM2 10h8v1H2z"/><path class="ib" d="M4 1h4v1H4zM3 2h1v1H3zM8 2h1v1H8zM3 3h1v1H3zM8 3h1v1H8zM3 4h1v1H3zM8 4h1v1H8z"/></svg>
+          Powered by <b>PayNow</b>
+        </a>
+        <p>PayNow is the merchant of record for every purchase here, and PayNow's buyer terms apply.</p>
+        <ul class="st-legal-links">
+          <li><a href="https://paynow.gg/legal/terms-of-use" target="_blank" rel="noopener">Terms of Use</a></li>
+          <li><a href="https://paynow.gg/legal/buyer-agreement" target="_blank" rel="noopener">Buyer Agreement</a></li>
+          <li><a href="https://paynow.gg/legal/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a></li>
+        </ul>
+      </div>
+      <div class="st-legal-col">
+        <h3>Seller</h3>
+        <p>Sapphires are sold by <b>MCS</b>. Questions about a purchase? <span data-support-line data-cap>Ask us on <a href="../#discord">Discord</a></span>.</p>
+        <p>Purchases are made through PayNow. By buying you confirm you are of legal age to accept PayNow's buyer terms.</p>
+      </div>
+      <div class="st-legal-col">
+        <h3>Privacy</h3>
+        <p>MCS is responsible for the player data it handles. To deliver purchases, the PayNow plugin on our server sends PayNow the IP address and UUID of each player who joins. PayNow's <a href="https://paynow.gg/legal/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a> covers how it uses them.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <ul class="footer-links">
+      <li><a href="../">Home</a></li>
+      <li><a href="../rules/">Rules</a></li>
+      <li><a href="../matches/">Matches</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+      <li><a data-discord-link href="../#discord">Discord</a></li>
+      <li><a href="#" data-open-connect>How to join</a></li>
+    </ul>
+
+    <div class="footer-row">
+      <div class="footer-brand">
+        <img src="../assets/img/logo.png" alt="MCS" loading="lazy" />
+        <p class="footer-legal">
+          &copy; <span data-year>2026</span> MCS. All rights reserved.<br>
+          Not an official Minecraft product.<br>
+          Not approved by or associated with Mojang or Microsoft.
+        </p>
+      </div>
+      <ul class="footer-social">
+        <li><a data-discord-link href="../#discord" aria-label="Discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.3 5.3A16.6 16.6 0 0 0 15.2 4l-.2.4a15.5 15.5 0 0 1 3.6 1.2 12.6 12.6 0 0 0-10.9 0A15.5 15.5 0 0 1 11.2 4.4L11 4a16.6 16.6 0 0 0-4.1 1.3C4.3 9.2 3.6 13 4 16.7a16.7 16.7 0 0 0 5 2.6l.7-1.2a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 9.3 0l.4.3a10.8 10.8 0 0 1-1.7.8l.7 1.2a16.7 16.7 0 0 0 5-2.6c.5-4.3-.6-8.1-2.8-11.4ZM9.6 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.8 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg></a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<div class="modal" id="connect" role="dialog" aria-modal="true" aria-labelledby="connect-title" aria-hidden="true" inert>
+  <div class="modal-box">
+    <button class="modal-close" type="button" aria-label="Close" data-close-connect><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+    <div class="modal-head">
+      <img src="../assets/img/logo.png" alt="" />
+      <div>
+        <h2 id="connect-title">Connect to the <span class="grad">server</span></h2>
+      </div>
+    </div>
+    <ol class="steps">
+      <li>Open <b>Minecraft: Java Edition</b> and go to <b>Multiplayer</b>.</li>
+      <li>Click <b>Add Server</b> and enter
+        <button class="chip" type="button" data-copy-address>
+          <span data-address>play.mcsoccer.net</span>
+          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg><span class="visually-hidden"> (copy)</span>
+        </button>
+      </li>
+      <li>Join, and <b>accept the resource pack</b>. It carries the kits, crests and goals, so the server needs it.</li>
+      <li>Walk into a pitch's <b>ready zone</b> and the match starts itself.</li>
+    </ol>
+    <p class="modal-note">Click the address to copy it.</p>
+    <p class="visually-hidden" role="status" data-status></p>
+    <button class="btn" type="button" data-close-connect>
+      Got it
+      <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════ BUY: username, gift, then PayNow ═══════════════════ -->
+<dialog class="st-dlg" id="buy" aria-labelledby="buy-title" aria-describedby="buy-sum">
+  <form class="st-dlg-box" data-buy-form novalidate>
+    <button class="st-dlg-x" type="button" aria-label="Close" data-buy-close><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+
+    <div class="st-dlg-head">
+      <div class="st-dlg-art"><img data-buy-pile src="../assets/img/store/pile-1.png" width="64" height="40" alt="" /></div>
+      <div class="st-dlg-what">
+        <p class="st-dlg-kicker" data-buy-name>Bundle</p>
+        <h2 id="buy-title"><span class="st-grad" data-buy-amount></span> <span class="st-dlg-unit" data-buy-unit>Sapphires</span></h2>
+        <p class="st-dlg-price"><b data-buy-price></b> <s data-buy-was hidden></s> <small data-buy-vat hidden></small></p>
+      </div>
+    </div>
+
+    <div class="st-field" data-field="user">
+      <label for="buy-user">Your Java Edition username</label>
+      <div class="st-input">
+        <span class="st-head"><img data-head alt="" width="40" height="40" hidden /></span>
+        <input id="buy-user" name="user" type="text" inputmode="text" autocomplete="nickname" autocapitalize="off" autocorrect="off" spellcheck="false" required aria-describedby="buy-user-hint buy-user-err" />
+      </div>
+      <p class="st-hint" id="buy-user-hint">The name you play MCS with.</p>
+      <p class="st-err" id="buy-user-err" data-err role="alert"></p>
+    </div>
+
+    <div class="st-gift" data-gift-wrap>
+      <label class="st-switch">
+        <input type="checkbox" data-gift-toggle aria-controls="buy-gift-field" />
+        <span class="st-switch-ui" aria-hidden="true"><i></i></span>
+        <span class="st-switch-label">Send as a gift</span>
+      </label>
+      <div class="st-field is-gift" id="buy-gift-field" data-field="gift" hidden>
+        <label for="buy-gift">Their Java Edition username</label>
+        <div class="st-input">
+          <span class="st-head"><img data-head alt="" width="40" height="40" hidden /></span>
+          <input id="buy-gift" name="gift" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-describedby="buy-gift-hint buy-gift-err" />
+        </div>
+        <p class="st-hint" id="buy-gift-hint">The Sapphires go to them. The receipt comes to you.</p>
+        <p class="st-err" id="buy-gift-err" data-err role="alert"></p>
+      </div>
+    </div>
+
+    <p class="st-sum" id="buy-sum" data-buy-sum></p>
+
+    <div class="st-alert" role="alert" data-buy-alert></div>
+
+    <button class="btn st-go" type="submit" data-buy-go>
+      <span data-buy-go-label>Continue to checkout</span>
+      <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+    </button>
+    <p class="st-wait" role="status" data-buy-status></p>
+
+    <p class="st-fine">You pay on PayNow's secure checkout. PayNow is the merchant of record, and by buying you confirm you are of legal age to accept its <a href="https://paynow.gg/legal/buyer-agreement" target="_blank" rel="noopener">buyer terms</a>.</p>
+  </form>
+</dialog>
+
+<script src="../assets/js/site.js?v=fa49b9ca"></script>
+</body>
+</html>

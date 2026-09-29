@@ -16,8 +16,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 ASSETS = ["assets/css/site.css", "assets/js/site.js", "site.config.js",
           "assets/css/matches.css", "assets/js/matches.js",
           "assets/css/cup.css", "assets/js/cup.js",
+          "assets/css/store.css", "assets/js/store.js",
           "favicon.ico", "assets/img/icon.svg"]
-PAGES = ["index.html", "rules/index.html", "matches/index.html", "cup/index.html", "404.html"]
+PAGES = ["index.html", "rules/index.html", "matches/index.html", "cup/index.html", "404.html",
+         "store/index.html", "store/thanks/index.html"]
 
 
 def digest(rel):
@@ -31,9 +33,9 @@ for page in PAGES:
     raw = io.open(path, encoding="utf-8", newline="").read()
     out = raw
     for asset, v in versions.items():
-        # matches href="assets/css/site.css", "../assets/...", "/assets/...",
-        # with or without an existing ?v=
-        pattern = re.compile(r'((?:href|src)="(?:\.\./|/)?' + re.escape(asset) + r')(\?v=[0-9a-f]+)?"')
+        # matches href="assets/css/site.css", "../assets/...", "../../assets/...",
+        # "/assets/...", with or without an existing ?v=
+        pattern = re.compile(r'((?:href|src)="(?:(?:\.\./)+|/)?' + re.escape(asset) + r')(\?v=[0-9a-f]+)?"')
         out = pattern.sub(lambda m: f'{m.group(1)}?v={v}"', out)
     if out != raw:
         io.open(path, "w", encoding="utf-8", newline="").write(out)

@@ -309,7 +309,7 @@ p { margin: 0 0 1rem; }
   transition: color .15s ease-in-out;
 }
 .nav-links a:hover { color: rgba(255, 255, 255, .78); }
-.nav-links a[aria-current="page"] { color: var(--accent-soft); }
+.nav-links a[aria-current]:not([aria-current="false"]) { color: var(--accent-soft); }
 
 .nav-links .ext svg { width: 11px; height: 11px; margin-left: .35rem; vertical-align: 1px; opacity: .6; fill: currentColor; }
 
@@ -396,7 +396,7 @@ p { margin: 0 0 1rem; }
   text-decoration: none;
   color: rgba(255, 255, 255, .7);
 }
-.drawer a[aria-current="page"] { color: var(--accent-soft); }
+.drawer a[aria-current]:not([aria-current="false"]) { color: var(--accent-soft); }
 
 .scrim {
   position: fixed;
@@ -1318,13 +1318,38 @@ code, kbd {
 .nav-cup.is-on a::before { background: #ff4d4d; }
 @keyframes cup-blink { 50% { opacity: .25; } }
 
-/* six links: a little tighter until the menu takes over at 991px */
+/* six links (the cup or the store): a little tighter until the menu takes
+   over at 991px. Seven (both): tighter again. */
 @media (min-width: 1200px) and (max-width: 1319px) {
-  .nav-links:has(> .nav-cup:not([hidden])) a { padding-inline: 1.1rem; }
+  .nav-links:has(> :is(.nav-cup, .nav-store):not([hidden])) a { padding-inline: 1.1rem; }
+}
+@media (min-width: 1200px) and (max-width: 1319px) {
+  .nav-links:has(> .nav-cup:not([hidden])):has(> .nav-store:not([hidden])) a { padding-inline: .9rem; }
 }
 @media (min-width: 992px) and (max-width: 1199px) {
-  .nav-links:has(> .nav-cup:not([hidden])) a { padding-inline: .6rem; }
-  .nav-links:has(> .nav-cup:not([hidden])) ~ .nav-cta { min-width: 0; }
+  .nav-links:has(> :is(.nav-cup, .nav-store):not([hidden])) a { padding-inline: .6rem; }
+  .nav-links:has(> :is(.nav-cup, .nav-store):not([hidden])) ~ .nav-cta { min-width: 0; }
+}
+/* the Store link is the widest: where there's no room left, the wordmark
+   beside the logo steps aside for it (the logo itself says MCS). Only
+   there: with room (a gap of about 58px or more, as at 1200) it stays.
+   Seven links (the cup and the store) need it gone up to 1109px, six
+   (the store alone) up to 1059px. */
+@media (min-width: 992px) and (max-width: 1109px) {
+  .nav .container:has(.nav-cup:not([hidden])):has(.nav-store:not([hidden])) .nav-brand-text { display: none; }
+}
+@media (min-width: 992px) and (max-width: 1059px) {
+  .nav .container:has(.nav-store:not([hidden])) .nav-brand-text { display: none; }
+}
+
+/* the store's link: the Sapphire's 9x9 text glyph, at exactly 2x */
+.nav-gem {
+  display: inline-block;
+  width: 18px;
+  height: 16px;
+  margin-right: .5rem;
+  vertical-align: -2px;
+  shape-rendering: crispEdges;
 }
 
 /* the banner above the home headline. Its slot opens smoothly from zero
