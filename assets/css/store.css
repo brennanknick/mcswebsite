@@ -352,6 +352,38 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 .st-fact b { align-self: end; font-size: 1.05rem; font-weight: 700; line-height: 1.3; color: #fff; }
 .st-fact > span:last-child { font-size: 14px; line-height: 1.5; color: var(--text); }
 
+/* ── crates: bought in game, odds on their own page ─────────────── */
+
+.st-crates { margin-top: 3rem; }
+.st-crates-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem 1.5rem;
+  padding: .95rem 1.5rem .95rem 1.1rem;
+  background:
+    radial-gradient(40% 160% at 0% 50%, rgba(255, 214, 150, .07), transparent 70%),
+    rgba(0, 0, 0, .28);
+  box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 3px 0 rgba(255, 255, 255, .03);
+  clip-path: var(--notch);
+}
+.st-crates-art { flex: 0 0 32px; line-height: 0; }
+.st-crates-art svg { width: 32px; height: 32px; }
+.st-crates-bar p { flex: 1 1 20rem; margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-strong); }
+.st-crates-bar .more { flex: 0 1 auto; min-width: 0; }
+.st-crates + .st-bundles { margin-top: 3.5rem; }
+/* phones: the link sits under the line, beside the crate */
+@media (max-width: 575px) {
+  .st-crates { margin-top: 2.25rem; }
+  .st-crates-bar { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: .6rem 1rem; padding: 1rem 1.1rem; }
+  .st-crates-bar p { font-size: 14.5px; }
+  /* a block of text, so a wrapped link keeps its arrow right after the words */
+  .st-crates-bar .more { display: block; grid-column: 2; justify-self: start; }
+  .st-crates-bar .more svg { display: inline-block; margin-left: .45rem; vertical-align: 0; }
+  .st-crates-bar .more:hover { transform: translateX(6px); }
+  .st-crates + .st-bundles { margin-top: 3rem; }
+}
+
 /* ── bundles ─────────────────────────────────────────────────────── */
 
 .st-bundles { margin-top: 5.5rem; scroll-margin-top: 1.5rem; }

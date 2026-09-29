@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=b2151443" />
-<link rel="stylesheet" href="../assets/css/store.css?v=70f0fae9" />
+<link rel="stylesheet" href="../assets/css/store.css?v=e08fbabc" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -199,6 +199,17 @@
     </ul>
   </section>
 
+  <!-- ═════════ CRATES: bought in game, and their odds are public ═════════
+       Shown whatever state the store is in: the odds page is linked from
+       here by rule (the crates contract). -->
+  <div class="st-wrap st-crates">
+    <div class="st-crates-bar st-in" style="--i:9">
+      <span class="st-crates-art" aria-hidden="true"><svg class="px" viewBox="0 0 16 16"><path fill="#140c06" d="M2 2h12v1H2zM1 3h1v11H1zM14 3h1v11h-1zM2 14h12v1H2zM2 7h12v1H2z"/><path fill="#c4843f" d="M2 3h12v1H2zM2 8h12v1H2z"/><path fill="#9a622b" d="M2 4h12v2H2zM2 9h12v4H2z"/><path fill="#4d2d11" d="M2 13h12v1H2z"/><path fill="#6e421b" d="M2 6h12v1H2zM5 4h1v2H5zM10 4h1v2h-1zM5 8h1v5H5zM10 8h1v5h-1z"/><path fill="#8e9c95" d="M2 3h2v2H2zM12 3h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z"/><path fill="#c9d4ce" d="M2 3h1v1H2zM12 3h1v1h-1zM2 12h1v1H2zM12 12h1v1h-1z"/><path fill="#56635c" d="M3 4h1v1H3zM13 4h1v1h-1zM3 13h1v1H3zM13 13h1v1h-1z"/><path fill="#2a3ca6" d="M7 5h2v1H7z"/><path fill="#e2f6ff" d="M7 6h1v1H7z"/><path fill="#72c6ff" d="M8 6h1v1H8zM7 7h1v1H7z"/><path fill="#2f7ceb" d="M8 7h1v1H8zM7 8h1v1H7z"/><path fill="#1b2a8f" d="M8 8h1v1H8zM7 9h2v1H7z"/></svg></span>
+      <p>The store sells Sapphires only. Crates and cosmetics are bought in game with them.</p>
+      <a class="more" href="../crates/">See every crate's contents and odds <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg></a>
+    </div>
+  </div>
+
   <!-- ═══════════════════════════ BUNDLES ══════════════════════════ -->
   <section class="st-wrap st-bundles" id="bundles" aria-labelledby="bundles-title" data-show="on">
     <div class="st-sec-head">
@@ -259,7 +270,7 @@
     <div class="st-faq-head">
       <p class="st-kicker">Details</p>
       <h2 class="st-h2" id="faq-title">How it <span class="st-grad">works</span></h2>
-      <p class="st-faq-lead">Delivery, gifts, refunds and receipts, in short.</p>
+      <p class="st-faq-lead">Delivery, gifts, crates, refunds and receipts, in short.</p>
     </div>
 
     <div class="st-faq-list">
@@ -283,6 +294,14 @@
       <div class="acc-body">
         <p>Yes. Pick a bundle, turn on <b>Send as a gift</b>, and type their Java Edition username. The Sapphires go to them, and the receipt comes to you.</p>
         <p>Check the spelling first: the gift goes to exactly the name you type.</p>
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>What are crates?</summary>
+      <div class="acc-body">
+        <p>A crate opens into one random cosmetic. You buy crates in game with Sapphires, and you can also earn them by playing. They hold cosmetics only.</p>
+        <p>Every crate's contents and exact odds are on the <a href="../crates/">crate odds page</a>.</p>
       </div>
     </details>
 

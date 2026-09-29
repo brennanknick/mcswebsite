@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crate odds — MCS</title>
+<meta name="description" content="Every MCS crate, every item in it and its exact chance. Crates hold cosmetics only." />
+<meta name="theme-color" content="#070c0a" />
+
+<link rel="icon" href="../favicon.ico?v=e4392b99" sizes="32x32" />
+<link rel="icon" type="image/svg+xml" href="../assets/img/icon.svg?v=5f522723" />
+<link rel="apple-touch-icon" href="../assets/img/icon-180.png" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="MCS" />
+<meta property="og:title" content="Crate odds — MCS" />
+<meta property="og:description" content="Every crate, every item and its exact chance." />
+<meta property="og:url" content="https://mcsoccer.net/crates/" />
+<meta property="og:image" content="https://mcsoccer.net/assets/img/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css?v=b2151443" />
+<link rel="stylesheet" href="../assets/css/store.css?v=e08fbabc" />
+<link rel="stylesheet" href="../assets/css/crates.css?v=75d2694e" />
+<script>
+  document.documentElement.classList.add("reveal-on");
+  setTimeout(function () {
+    if (!window.__mcsRevealReady) document.documentElement.classList.remove("reveal-on");
+  }, 3000);
+</script>
+</head>
+<body>
+
+<nav class="nav" aria-label="Main">
+  <div class="container">
+    <a class="nav-brand" href="../" aria-label="MCS home">
+      <img src="../assets/img/logo.png" alt="" width="64" height="64" />
+      <span class="nav-brand-text"><b>MCS</b><span>Minecraft Soccer</span></span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="../">Home</a></li>
+      <li><a href="../rules/">Rules</a></li>
+      <li><a href="../matches/">Matches</a></li>
+      <li class="nav-cup" data-cup-nav hidden><a href="../cup/">Cup</a></li>
+      <li class="nav-store" data-store-nav hidden><a href="../store/"><svg class="nav-gem px" viewBox="0 0 9 8" aria-hidden="true"><path fill="#2a3ca6" d="M2 0h5v1H2zM1 1h1v1H1zM0 2h1v2H0zM8 2h1v1H8zM7 3h1v1H7zM6 4h1v1H6zM5 5h1v1H5z"/><path fill="#e2f6ff" d="M2 1h2v1H2zM1 2h1v1H1z"/><path fill="#72c6ff" d="M4 1h2v1H4zM2 2h4v1H2zM1 3h4v1H1zM3 4h2v2H3zM4 6h1v1H4z"/><path fill="#2f7ceb" d="M6 1h2v2H6zM5 3h2v1H5zM1 4h2v1H1zM5 4h1v1H5zM2 5h1v1H2zM3 6h1v1H3z"/><path fill="#1b2a8f" d="M8 3h1v1H8zM7 4h1v1H7zM6 5h1v1H6zM5 6h1v1H5zM4 7h1v1H4z"/></svg>Store</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener" class="ext">Tier List<svg class="px" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 1h7v2H4zM9 3h2v5H9zM7 3h2v2H7zM5 5h2v2H5zM3 7h2v2H3zM1 9h2v2H1z"/></svg></a></li>
+      <li><a data-discord-link href="../#discord">Discord</a></li>
+    </ul>
+
+    <div class="nav-cta">
+      <button class="btn address-btn" type="button" data-copy-address>
+        <span class="slot">
+          <span class="slot-main" data-address>PLAY.MCSOCCER.NET</span>
+          <span class="slot-alt" aria-hidden="true">Copied to clipboard!</span>
+        </span>
+        <span class="visually-hidden"> (copy server address)</span>
+      </button>
+    </div>
+
+    <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="drawer" aria-expanded="false" data-drawer-open>
+      <svg viewBox="0 0 30 22" fill="none" aria-hidden="true"><path d="M2 3h26M2 11h26M2 19h26"/></svg>
+    </button>
+  </div>
+</nav>
+
+<div class="scrim" data-scrim></div>
+<aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true" inert>
+  <div class="drawer-head">
+    <img src="../assets/img/logo.png" alt="MCS" />
+    <button class="drawer-close" type="button" aria-label="Close menu" data-drawer-close><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+  </div>
+  <ul>
+    <li><a href="../">Home</a></li>
+    <li><a href="../rules/">Rules</a></li>
+    <li><a href="../matches/">Matches</a></li>
+    <li class="nav-cup" data-cup-nav hidden><a href="../cup/">Cup</a></li>
+    <li class="nav-store" data-store-nav hidden><a href="../store/"><svg class="nav-gem px" viewBox="0 0 9 8" aria-hidden="true"><path fill="#2a3ca6" d="M2 0h5v1H2zM1 1h1v1H1zM0 2h1v2H0zM8 2h1v1H8zM7 3h1v1H7zM6 4h1v1H6zM5 5h1v1H5z"/><path fill="#e2f6ff" d="M2 1h2v1H2zM1 2h1v1H1z"/><path fill="#72c6ff" d="M4 1h2v1H4zM2 2h4v1H2zM1 3h4v1H1zM3 4h2v2H3zM4 6h1v1H4z"/><path fill="#2f7ceb" d="M6 1h2v2H6zM5 3h2v1H5zM1 4h2v1H1zM5 4h1v1H5zM2 5h1v1H2zM3 6h1v1H3z"/><path fill="#1b2a8f" d="M8 3h1v1H8zM7 4h1v1H7zM6 5h1v1H6zM5 6h1v1H5zM4 7h1v1H4z"/></svg>Store</a></li>
+    <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+    <li><a data-discord-link href="../#discord">Discord</a></li>
+  </ul>
+  <button class="btn" type="button" data-open-connect>Join Now</button>
+</aside>
+
+<main class="page st cr" data-crates>
+  <div class="st-glow cr-glow" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+  <header class="st-hero cr-hero">
+    <div class="st-wrap st-hero-grid cr-hero-grid">
+      <div class="st-hero-text">
+        <p class="st-eyebrow st-in" style="--i:0"><svg class="cr-glyph px" viewBox="0 0 16 16" aria-hidden="true"><path fill="#140c06" d="M2 2h12v1H2zM1 3h1v11H1zM14 3h1v11h-1zM2 14h12v1H2zM2 7h12v1H2z"/><path fill="#c4843f" d="M2 3h12v1H2zM2 8h12v1H2z"/><path fill="#9a622b" d="M2 4h12v2H2zM2 9h12v4H2z"/><path fill="#4d2d11" d="M2 13h12v1H2z"/><path fill="#6e421b" d="M2 6h12v1H2zM5 4h1v2H5zM10 4h1v2h-1zM5 8h1v5H5zM10 8h1v5h-1z"/><path fill="#8e9c95" d="M2 3h2v2H2zM12 3h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z"/><path fill="#c9d4ce" d="M2 3h1v1H2zM12 3h1v1h-1zM2 12h1v1H2zM12 12h1v1h-1z"/><path fill="#56635c" d="M3 4h1v1H3zM13 4h1v1h-1zM3 13h1v1H3zM13 13h1v1h-1z"/><path fill="#2a3ca6" d="M7 5h2v1H7z"/><path fill="#e2f6ff" d="M7 6h1v1H7z"/><path fill="#72c6ff" d="M8 6h1v1H8zM7 7h1v1H7z"/><path fill="#2f7ceb" d="M8 7h1v1H8zM7 8h1v1H7z"/><path fill="#1b2a8f" d="M8 8h1v1H8zM7 9h2v1H7z"/></svg>MCS Crates</p>
+        <h1 class="st-title cr-title st-in" style="--i:1">Crate <span class="grad">odds</span></h1>
+        <p class="st-lead st-in" style="--i:2">Every item in every crate, and the exact chance of getting it.</p>
+        <div class="cr-hero-cta st-in" style="--i:3">
+          <!-- crates.js lists the crates here once they load -->
+          <nav class="cr-jump" aria-label="Crates on this page" data-crate-jump hidden></nav>
+          <a class="more" href="#rules" data-rules-link hidden>Duplicates and pity <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg></a>
+        </div>
+      </div>
+
+      <!-- a closed crate on the centre spot, under a floodlight -->
+      <div class="st-stage cr-stage" aria-hidden="true">
+        <div class="st-beam"></div>
+        <svg class="st-floor" viewBox="0 0 540 500" preserveAspectRatio="none">
+          <defs>
+            <radialGradient id="cr-lit" cx="270" cy="405" r="280" gradientUnits="userSpaceOnUse" gradientTransform="translate(270 405) scale(1 .44) translate(-270 -405)">
+              <stop offset="0" stop-color="#fff"/>
+              <stop offset=".5" stop-color="#fff" stop-opacity=".55"/>
+              <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+            <mask id="cr-spot"><rect width="540" height="500" fill="url(#cr-lit)"/></mask>
+          </defs>
+          <g mask="url(#cr-spot)">
+            <rect y="296" width="540" height="204" fill="#0d3320"/>
+            <g fill="#185233"><rect y="312" width="540" height="17"/><rect y="348" width="540" height="23"/><rect y="394" width="540" height="30"/><rect y="452" width="540" height="40"/></g>
+            <g fill="none" stroke="#e3f3ff" stroke-opacity=".55" stroke-width="3">
+              <line x1="0" y1="405" x2="540" y2="405"/>
+              <ellipse cx="270" cy="405" rx="168" ry="46"/>
+            </g>
+            <ellipse cx="270" cy="405" rx="8" ry="3" fill="#e3f3ff" fill-opacity=".75"/>
+          </g>
+        </svg>
+        <div class="st-pool cr-pool"></div>
+        <div class="cr-crate-shadow"></div>
+        <div class="cr-crate-drop">
+          <svg class="cr-crate-art px" viewBox="0 0 16 16"><path fill="#140c06" d="M2 2h12v1H2zM1 3h1v11H1zM14 3h1v11h-1zM2 14h12v1H2zM2 7h12v1H2z"/><path fill="#c4843f" d="M2 3h12v1H2zM2 8h12v1H2z"/><path fill="#9a622b" d="M2 4h12v2H2zM2 9h12v4H2z"/><path fill="#4d2d11" d="M2 13h12v1H2z"/><path fill="#6e421b" d="M2 6h12v1H2zM5 4h1v2H5zM10 4h1v2h-1zM5 8h1v5H5zM10 8h1v5h-1z"/><path fill="#8e9c95" d="M2 3h2v2H2zM12 3h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z"/><path fill="#c9d4ce" d="M2 3h1v1H2zM12 3h1v1h-1zM2 12h1v1H2zM12 12h1v1h-1z"/><path fill="#56635c" d="M3 4h1v1H3zM13 4h1v1h-1zM3 13h1v1H3zM13 13h1v1h-1z"/><path fill="#2a3ca6" d="M7 5h2v1H7z"/><path fill="#e2f6ff" d="M7 6h1v1H7z"/><path fill="#72c6ff" d="M8 6h1v1H8zM7 7h1v1H7z"/><path fill="#2f7ceb" d="M8 7h1v1H8zM7 8h1v1H7z"/><path fill="#1b2a8f" d="M8 8h1v1H8zM7 9h2v1H7z"/></svg>
+        </div>
+        <div class="st-sparks cr-sparks"><i style="--x:57%;--y:44%;--d:.4s"></i><i class="k1" style="--x:24%;--y:26%;--d:1.6s"></i><i class="k1" style="--x:80%;--y:30%;--d:2.4s"></i></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═════════════════════════ WHAT CRATES ARE ═════════════════════════ -->
+  <section class="st-wrap st-facts cr-facts" aria-labelledby="facts-title">
+    <h2 class="st-kicker" id="facts-title">What crates are</h2>
+    <ul class="st-fact-list">
+      <li class="st-fact st-in" style="--i:4">
+        <span class="st-slot"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M3 1h2v1H3zM7 1h2v1H7zM1 2h4v1H1zM7 2h4v1H7zM0 3h12v1H0zM0 4h12v1H0zM0 5h2v1H0zM3 5h6v1H3zM10 5h2v1H10zM3 6h6v1H3zM3 7h6v1H3zM3 8h6v1H3z"/><path class="ib" d="M3 9h6v1H3z"/></svg></span>
+        <b>Cosmetics only</b>
+        <span>Crates hold cosmetics only. Nothing in a crate helps you win.</span>
+      </li>
+      <li class="st-fact st-in" style="--i:5">
+        <span class="st-slot"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M4 0h4v1H4zM2 1h2v1H2zM8 1h2v1H8zM1 2h1v2H1zM10 2h1v2h-1zM0 4h1v4H0zM11 4h1v4h-1zM1 8h1v2H1zM10 8h1v2h-1zM2 10h2v1H2zM8 10h2v1H8zM4 11h4v1H4z"/><path class="ib" d="M5 4h2v1h1v2H7v1H5V7H4V5h1zM5 1h2v1H5zM1 5h1v2H1zM10 5h1v2h-1zM5 10h2v1H5z"/></svg></span>
+        <b>Earned by playing</b>
+        <span>You can also earn crates by playing.</span>
+      </li>
+      <li class="st-fact st-in" style="--i:6">
+        <span class="st-slot"><img src="../assets/img/store/gem.png" width="32" height="32" alt="" /></span>
+        <b>Duplicates</b>
+        <span>Duplicates give back a few Sapphires, which only buy cosmetics.</span>
+      </li>
+      <li class="st-fact st-in" style="--i:7">
+        <span class="st-slot"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M8 1h2v2H8zM7 3h2v2H7zM6 5h2v2H6zM5 7h2v2H5zM4 9h2v2H4z"/><path class="ib" d="M1 9h2v2H1zM8 9h3v2H8z"/></svg></span>
+        <b>Opened in game</b>
+        <span>Crates are opened in game with <code>/crates</code>.</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════════════ THE CRATES ═══════════════════════════ -->
+  <div class="st-wrap cr-body" data-crates-body>
+    <section class="cr-list" aria-labelledby="crates-title">
+      <h2 class="st-kicker" id="crates-title" tabindex="-1">Every crate</h2>
+
+      <!-- crates.enabled is false on the game server: the odds still show -->
+      <div class="st-notice cr-note" role="note" data-crates-soon hidden>
+        <span class="st-notice-ico"><svg class="st-ico px" viewBox="0 0 12 12" aria-hidden="true"><path class="ia" d="M4 0h4v1H4zM2 1h2v1H2zM8 1h2v1H8zM1 2h1v1H1zM10 2h1v1H10zM1 3h1v1H1zM5 3h1v1H5zM10 3h1v1H10zM0 4h1v1H0zM5 4h1v1H5zM11 4h1v1H11zM0 5h1v1H0zM5 5h3v1H5zM11 5h1v1H11zM0 6h1v1H0zM11 6h1v1H11zM1 7h1v1H1zM10 7h1v1H10zM1 8h1v1H1zM10 8h1v1H10zM2 9h2v1H2zM8 9h2v1H8zM4 10h4v1H4z"/></svg></span>
+        <p><b>Crates are coming soon.</b> Nothing can be opened yet, and the odds below may change before they open.</p>
+      </div>
+      <div class="st-notice cr-note" role="note" data-crates-stale hidden>
+        <p>The game server isn't answering right now, so this may be out of date.</p>
+      </div>
+
+      <!-- crates.js draws every crate here, straight from the game server -->
+      <div class="cr-view" data-crates-view aria-busy="true">
+        <div class="cr-sk" aria-hidden="true">
+          <div class="cr-sk-crate"><i></i><b style="--w:34%"></b><b style="--w:22%"></b><span><b style="--w:92%"></b><b style="--w:88%"></b><b style="--w:94%"></b><b style="--w:86%"></b><b style="--w:90%"></b></span></div>
+          <div class="cr-sk-crate"><i></i><b style="--w:28%"></b><b style="--w:22%"></b><span><b style="--w:90%"></b><b style="--w:94%"></b><b style="--w:84%"></b></span></div>
+        </div>
+        <noscript>
+          <div class="st-state">
+            <h3>The odds need JavaScript</h3>
+            <p>Turn it on for this site to see every crate and its odds.</p>
+          </div>
+        </noscript>
+      </div>
+    </section>
+
+    <!-- what a duplicate gives back, and the pity rule: filled from the same answer -->
+    <aside class="cr-rules" id="rules" aria-labelledby="rules-title" data-crates-rules hidden>
+      <div class="cr-rules-card">
+        <p class="st-kicker">The rules</p>
+        <h2 class="cr-rules-title" id="rules-title">Duplicates and pity</h2>
+        <p class="cr-rules-lead">Open something you already own and you get Sapphires back instead:</p>
+        <div data-crates-dupes></div>
+        <div class="cr-pity" data-crates-pity></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- what loading the odds came to, for screen readers -->
+  <p class="visually-hidden" role="status" data-crates-status></p>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <ul class="footer-links">
+      <li><a href="../">Home</a></li>
+      <li><a href="../rules/">Rules</a></li>
+      <li><a href="../matches/">Matches</a></li>
+      <li><a data-tierlist-link href="https://tiers.mcsoccer.net/" target="_blank" rel="noopener">Tier List</a></li>
+      <li><a data-discord-link href="../#discord">Discord</a></li>
+      <li><a href="#" data-open-connect>How to join</a></li>
+    </ul>
+
+    <div class="footer-row">
+      <div class="footer-brand">
+        <img src="../assets/img/logo.png" alt="MCS" loading="lazy" />
+        <p class="footer-legal">
+          &copy; <span data-year>2026</span> MCS. All rights reserved.<br>
+          Not an official Minecraft product.<br>
+          Not approved by or associated with Mojang or Microsoft.
+        </p>
+      </div>
+      <ul class="footer-social">
+        <li><a data-discord-link href="../#discord" aria-label="Discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.3 5.3A16.6 16.6 0 0 0 15.2 4l-.2.4a15.5 15.5 0 0 1 3.6 1.2 12.6 12.6 0 0 0-10.9 0A15.5 15.5 0 0 1 11.2 4.4L11 4a16.6 16.6 0 0 0-4.1 1.3C4.3 9.2 3.6 13 4 16.7a16.7 16.7 0 0 0 5 2.6l.7-1.2a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 9.3 0l.4.3a10.8 10.8 0 0 1-1.7.8l.7 1.2a16.7 16.7 0 0 0 5-2.6c.5-4.3-.6-8.1-2.8-11.4ZM9.6 14.6c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm4.8 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg></a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<div class="modal" id="connect" role="dialog" aria-modal="true" aria-labelledby="connect-title" aria-hidden="true" inert>
+  <div class="modal-box">
+    <button class="modal-close" type="button" aria-label="Close" data-close-connect><svg class="px" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 0h2v2H0zM8 0h2v2H8zM2 2h2v2H2zM6 2h2v2H6zM4 4h2v2H4zM2 6h2v2H2zM6 6h2v2H6zM0 8h2v2H0zM8 8h2v2H8z"/></svg></button>
+    <div class="modal-head">
+      <img src="../assets/img/logo.png" alt="" />
+      <div>
+        <h2 id="connect-title">Connect to the <span class="grad">server</span></h2>
+      </div>
+    </div>
+    <ol class="steps">
+      <li>Open <b>Minecraft: Java Edition</b> and go to <b>Multiplayer</b>.</li>
+      <li>Click <b>Add Server</b> and enter
+        <button class="chip" type="button" data-copy-address>
+          <span data-address>play.mcsoccer.net</span>
+          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h10v10h-2V3H5z"/><path fill-rule="evenodd" d="M1 5h10v10H1zM3 7v6h6V7z"/></svg><span class="visually-hidden"> (copy)</span>
+        </button>
+      </li>
+      <li>Join, and <b>accept the resource pack</b>. It carries the kits, crests and goals, so the server needs it.</li>
+      <li>Walk into a pitch's <b>ready zone</b> and the match starts itself.</li>
+    </ol>
+    <p class="modal-note">Click the address to copy it.</p>
+    <p class="visually-hidden" role="status" data-status></p>
+    <button class="btn" type="button" data-close-connect>
+      Got it
+      <svg class="arrow" viewBox="0 0 10 17" aria-hidden="true"><path d="M0 0h2v2h2v2h2v2h2v2h2v1h-2v2H6v2H4v2H2v2H0z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script src="../site.config.js?v=6e5d39ae"></script>
+<script src="../assets/js/site.js?v=fa49b9ca"></script>
+<script src="../assets/js/crates.js?v=6da03f63"></script>
+</body>
+</html>

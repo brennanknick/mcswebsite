@@ -1,0 +1,458 @@
+/* ==================================================================
+   MCS — crate odds (/crates/)
+   Loaded after site.css and store.css, and built from both: the store's
+   floodlit stage, fact cards, notices and state cards, the site's panels
+   and notched chips. The stage here holds a closed oak crate with a
+   Sapphire clasp, under a warm floodlight rather than the store's blue.
+   The rarities are the game's own colours (Rarity.java: white, green,
+   blue, dark purple, gold), lifted just enough to read on this dark
+   page, and every badge also spells its name and fills a five-step
+   ladder, so colour is never the only sign.
+   ================================================================== */
+
+:root {
+  /* core: bars, pips, edges (3:1 or better on a crate card)
+     ink:  text (7:1 or better on a crate card) */
+  --r-common:    #cfd9d2;  --r-common-ink:    #eef4f0;
+  --r-uncommon:  #4fe05a;  --r-uncommon-ink:  #7dff86;
+  --r-rare:      #6b6bff;  --r-rare-ink:      #a3a3ff;
+  --r-epic:      #c040c0;  --r-epic-ink:      #e690e6;
+  --r-legendary: #ffaa00;  --r-legendary-ink: #ffc24d;
+  --cr-warm: 255, 226, 176;
+}
+
+.r-common    { --rc: var(--r-common);    --ri: var(--r-common-ink); }
+.r-uncommon  { --rc: var(--r-uncommon);  --ri: var(--r-uncommon-ink); }
+.r-rare      { --rc: var(--r-rare);      --ri: var(--r-rare-ink); }
+.r-epic      { --rc: var(--r-epic);      --ri: var(--r-epic-ink); }
+.r-legendary { --rc: var(--r-legendary); --ri: var(--r-legendary-ink); }
+
+.cr .px { shape-rendering: crispEdges; }
+
+/* a warm floodlight where the crate sits, instead of the store's blue */
+.cr-glow {
+  background:
+    radial-gradient(36% 46% at 8% 0%, rgba(255, 244, 214, .07), transparent 70%),
+    radial-gradient(30% 40% at 96% 0%, rgba(255, 244, 214, .05), transparent 70%),
+    radial-gradient(30% 34% at 74% 30%, rgba(var(--cr-warm), .08), transparent 72%),
+    radial-gradient(60% 50% at 40% 0%, color-mix(in srgb, var(--grad-3) 7%, transparent), transparent 70%);
+}
+
+/* ── hero ────────────────────────────────────────────────────────── */
+
+.cr-hero-grid { min-height: 470px; }
+/* the text hangs from the top rather than centring, so the crate chips
+   arriving after load grow it downward and the headline stays put */
+@media (min-width: 981px) {
+  .cr-hero .st-hero-text { align-self: start; padding-top: 3.6rem; }
+}
+.cr-title { font-size: 104px; }
+.cr-title .grad { display: inline-block; padding: 0 .04em .08em 0; }
+.cr-glyph { width: 32px; height: 32px; flex: 0 0 32px; }
+
+.cr-hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.75rem; }
+
+/* one chip per crate, to jump straight to it */
+.cr-jump { display: flex; flex-wrap: wrap; gap: .5rem; }
+.cr-jump-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .45rem .85rem .45rem .6rem;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-strong);
+  text-decoration: none;
+  background: rgba(4, 10, 7, .62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 2px 0 rgba(255, 255, 255, .04);
+  clip-path: var(--notch);
+  transition: background-color .2s var(--ease-ui), color .2s var(--ease-ui);
+}
+.cr-jump-chip:hover { color: #fff; background: rgba(20, 38, 28, .85); }
+.cr-jump-chip:focus-visible { outline: 2px solid transparent; box-shadow: inset 0 0 0 2px var(--accent-soft); }
+
+/* the stage: the crate on the centre spot */
+.cr-stage { max-width: 480px; }
+.cr-stage .st-beam {
+  background: linear-gradient(180deg, rgba(var(--cr-warm), 0) 0%, rgba(var(--cr-warm), .06) 45%, rgba(var(--cr-warm), .13) 100%);
+}
+.cr-pool {
+  background: radial-gradient(closest-side, rgba(var(--cr-warm), .26), rgba(var(--cr-warm), .07) 62%, transparent);
+}
+.cr-crate-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 17.5%;
+  width: 46%;
+  height: 7%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(2, 6, 3, .8), rgba(2, 6, 3, .35) 62%, transparent);
+}
+/* 16px art at 12x: it drops onto the spot and stays there */
+.cr-crate-drop {
+  position: absolute;
+  left: 50%;
+  bottom: 19%;
+  width: 192px;
+  height: 192px;
+  margin-left: -96px;
+  animation: st-drop .8s var(--ease-spring) .2s both;
+}
+.cr-crate-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 34px rgba(var(--cr-warm), .16)) drop-shadow(0 18px 24px rgba(0, 0, 0, .35));
+}
+.cr-sparks i { background: #fff3d6; }
+.cr-sparks .k1 { background: var(--sa-light); }
+
+/* ── what crates are ─────────────────────────────────────────────── */
+
+.cr-facts .st-slot img { width: 32px; height: 32px; }
+.cr-facts code { white-space: nowrap; }
+
+/* ── the crates and the rules ────────────────────────────────────── */
+
+.cr-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+  gap: 1.5rem 2rem;
+  margin-top: 4.5rem;
+}
+.cr-body.is-solo { grid-template-columns: minmax(0, 1fr); }
+.cr-list { min-width: 0; }
+.cr-list > .st-kicker:focus { outline: none; }
+
+.cr .st-notice { display: flex; max-width: none; margin: 0 0 1rem; }
+.cr .st-notice[hidden] { display: none; }
+
+.cr-view { position: relative; min-height: 18rem; }
+
+/* a crate: a Minecraft panel lit from the top */
+.cr-crate {
+  position: relative;
+  padding: 1.35rem 1.5rem .9rem;
+  background:
+    radial-gradient(55% 90px at 0% 0%, rgba(var(--cr-warm), .07), transparent 70%),
+    linear-gradient(180deg, #17241e, #0f1814 60%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .085),
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px rgba(255, 255, 255, .07);
+  clip-path: var(--notch-lg);
+  scroll-margin-top: 1.5rem;
+}
+.cr-crate + .cr-crate { margin-top: 1.25rem; }
+
+.cr-head {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .4rem 1.1rem;
+  margin: 0 0 1rem;
+}
+.cr-box { display: block; line-height: 0; }
+.cr-box svg { width: 48px; height: 48px; }
+.cr-box.is-sm svg { width: 16px; height: 16px; }
+.cr-head .cr-box svg { filter: drop-shadow(0 0 14px rgba(var(--cr-warm), .18)); }
+.cr-name { margin: 0; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.cr-price {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: .2rem 0 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+.cr-gem { flex: 0 0 18px; width: 18px; height: 18px; image-rendering: pixelated; }
+.cr-count {
+  align-self: start;
+  margin: .2rem 0 0;
+  padding: .2rem .55rem;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text);
+  background: rgba(255, 255, 255, .06);
+  clip-path: var(--notch);
+}
+.cr-broken { margin: 0 0 .6rem; padding: .9rem 1rem; color: var(--text-strong); background: rgba(0, 0, 0, .25); clip-path: var(--notch); }
+
+/* ── the odds table ── */
+
+.cr-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cr-table th, .cr-table td { padding: .7rem .75rem; text-align: left; vertical-align: middle; }
+.cr-table thead th {
+  padding-top: .35rem;
+  padding-bottom: .55rem;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .09);
+}
+.cr-table .cr-c-pct { text-align: right; white-space: nowrap; }
+.cr-table thead .cr-c-name { padding-left: 1rem; }
+/* the same columns in every crate, so they line up down the page */
+.cr-table thead .cr-c-type { width: 17%; }
+.cr-table thead .cr-c-rar { width: 24%; }
+.cr-table thead .cr-c-pct { width: 29%; }
+
+/* each row carries its rarity: a pixel edge and a faint wash of its colour,
+   and the item's name in that colour, as in the game's tooltips */
+.cr-row { background: linear-gradient(90deg, color-mix(in srgb, var(--rc, #fff) 8%, transparent), transparent 42%); }
+.cr-row + .cr-row { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
+.cr-row:hover { background-color: rgba(255, 255, 255, .025); }
+.cr-row .cr-c-name {
+  padding-left: 1rem;
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ri, #fff);
+  box-shadow: inset 3px 0 0 var(--rc, rgba(255, 255, 255, .3));
+  overflow-wrap: anywhere;
+}
+.cr-row .cr-c-type { font-size: 14.5px; color: var(--text); white-space: nowrap; }
+.cr-row .cr-c-pct b { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: .01em; }
+
+/* the chance as a bar: the API's own percent string, as its width */
+.cr-bar {
+  position: relative;
+  display: inline-block;
+  width: 96px;
+  height: 6px;
+  margin-right: .9rem;
+  vertical-align: 3px;
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, .35);
+}
+.cr-bar i { position: absolute; left: 0; top: 0; bottom: 0; max-width: 100%; background: var(--rc, var(--text-strong)); }
+
+/* ── the rarity badge: a pixel ladder, then the name ── */
+
+.cr-rar {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .26rem .6rem .26rem .5rem;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ri, var(--text-strong));
+  background: color-mix(in srgb, var(--rc, #fff) 12%, rgba(0, 0, 0, .3));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc, #fff) 30%, transparent);
+  clip-path: var(--notch);
+}
+.cr-rar.is-plain { --rc: rgba(255, 255, 255, .5); padding-left: .6rem; }
+.cr-pips { display: inline-flex; align-items: flex-end; gap: 1px; height: 12px; }
+.cr-pips i { display: block; width: 3px; background: rgba(255, 255, 255, .14); }
+.cr-pips i:nth-child(1) { height: 4px; }
+.cr-pips i:nth-child(2) { height: 6px; }
+.cr-pips i:nth-child(3) { height: 8px; }
+.cr-pips i:nth-child(4) { height: 10px; }
+.cr-pips i:nth-child(5) { height: 12px; }
+.cr-pips i.on { background: var(--rc); }
+
+/* ── duplicates and pity ── */
+
+/* its top lines up with the first crate's, under the "Every crate" kicker */
+.cr-rules { position: sticky; top: 1.5rem; margin-top: calc(13px * 1.5 + .6rem); scroll-margin-top: 1.5rem; min-width: 0; }
+.cr-rules-card {
+  padding: 1.5rem 1.5rem 1.4rem;
+  background:
+    radial-gradient(70% 50% at 100% 0%, color-mix(in srgb, var(--sa-glow) 9%, transparent), transparent 70%),
+    rgba(0, 0, 0, .3);
+  box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 3px 0 rgba(255, 255, 255, .035);
+  clip-path: var(--notch-lg);
+}
+.cr-rules-title { margin: 0 0 .5rem; font-size: 24px; font-weight: 750; line-height: 1.2; }
+.cr-rules-lead { margin: 0 0 .9rem; font-size: 14.5px; line-height: 1.55; color: var(--text); }
+.cr-rules-none { margin: 0 0 1rem; font-size: 14.5px; color: var(--text-strong); }
+
+.cr-dupes { width: 100%; margin: 0 0 1.1rem; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cr-dupes thead th {
+  padding: 0 0 .45rem;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--text-faint);
+}
+.cr-dupes thead th:last-child, .cr-dupes td { text-align: right; }
+.cr-dupes tbody th, .cr-dupes td { padding: .5rem 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
+.cr-dupes tbody th { text-align: left; font-weight: 400; }
+.cr-dupes td { font-size: 15px; color: var(--text); white-space: nowrap; }
+/* a fixed slot for the number, so the gems line up in a column */
+.cr-dupes td b { display: inline-block; min-width: 3ch; text-align: right; color: #fff; font-weight: 800; }
+.cr-dupes td .cr-gem { display: inline-block; margin-right: .45rem; vertical-align: -3px; }
+
+.cr-pity-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: .2rem .8rem;
+  margin: 0;
+  padding: .85rem 1rem;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(255, 255, 255, .04);
+  clip-path: var(--notch);
+}
+.cr-pity-line b { color: #fff; font-weight: 700; }
+.cr-pity-k {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+
+/* ── loading, and no odds to show ── */
+
+.cr-sk-crate {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 1.1rem;
+  padding: 1.4rem 1.5rem 1.6rem;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  clip-path: var(--notch-lg);
+}
+.cr-sk-crate + .cr-sk-crate { margin-top: 1.25rem; }
+.cr-sk-crate i { grid-row: span 2; width: 48px; height: 48px; background: rgba(255, 255, 255, .05); clip-path: var(--notch); }
+.cr-sk-crate span { grid-column: 1 / -1; margin-top: 1.2rem; }
+.cr-sk-crate b {
+  display: block;
+  width: var(--w, 50%);
+  height: 12px;
+  margin: .45rem 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .05) 0 40%, rgba(255, 255, 255, .11) 50%, rgba(255, 255, 255, .05) 60% 100%) 0 0 / 300% 100%;
+  animation: st-shimmer 1.4s linear infinite;
+}
+.cr-sk-crate span b { height: 14px; margin: 1.05rem 0; }
+
+.cr-state .cr-state-art { margin-bottom: 1.25rem; }
+.cr-state .cr-state-art svg { width: 64px; height: 64px; filter: saturate(.35) brightness(.62); }
+.cr-state p { max-width: 32rem; }
+
+/* ── responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .cr-title { font-size: 96px; }
+}
+
+@media (max-width: 1099px) {
+  .cr-body { grid-template-columns: minmax(0, 1fr); }
+  .cr-rules { position: static; margin-top: .75rem; }
+  .cr-rules-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 2.5rem; align-items: start; }
+  .cr-rules-card > .st-kicker, .cr-rules-title, .cr-rules-lead { grid-column: 1 / -1; }
+  .cr-rules-card .cr-dupes { margin-bottom: 0; }
+}
+
+@media (max-width: 980px) {
+  .cr-hero-grid { min-height: 0; }
+  .cr-stage { max-width: 380px; margin-bottom: -3rem; }
+  .cr-crate-drop { width: 160px; height: 160px; margin-left: -80px; }
+  .cr-title { font-size: 80px; }
+  .cr-hero-cta { justify-content: center; }
+  .cr-jump { justify-content: center; }
+  .cr-body { margin-top: 3.5rem; }
+}
+
+@media (max-width: 760px) {
+  .cr-rules-card { display: block; }
+  .cr-rules-card .cr-dupes { margin-bottom: 1.1rem; }
+}
+
+/* phones: each row becomes a small card. Name and chance on top, type and
+   rarity under them, and the chance bar along the row's foot. The roles
+   written into the table keep it a table for screen readers. */
+@media (max-width: 640px) {
+  .cr-crate { padding: 1.1rem .9rem .7rem; }
+  .cr-head { grid-template-columns: 32px minmax(0, 1fr); gap: .2rem .85rem; margin-bottom: .75rem; }
+  .cr-head .cr-box svg { width: 32px; height: 32px; }
+  .cr-name { font-size: 22px; }
+  .cr-price { font-size: 14px; }
+  .cr-count { grid-column: 2; justify-self: start; margin: .3rem 0 0; }
+
+  .cr-table, .cr-table tbody { display: block; }
+  .cr-table thead {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .cr-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .35rem .75rem;
+    padding: .75rem .75rem .95rem .9rem;
+    box-shadow: inset 3px 0 0 var(--rc, rgba(255, 255, 255, .3));
+  }
+  .cr-row + .cr-row { box-shadow: inset 3px 0 0 var(--rc, rgba(255, 255, 255, .3)), inset 0 1px 0 rgba(255, 255, 255, .06); }
+  .cr-table .cr-row > * { padding: 0; }
+  .cr-row .cr-c-name { grid-column: 1; grid-row: 1; padding: 0; box-shadow: none; font-size: 16px; }
+  .cr-row .cr-c-pct { grid-column: 2; grid-row: 1; }
+  .cr-row .cr-c-type { grid-column: 1; grid-row: 2; font-size: 13.5px; }
+  .cr-row .cr-c-rar { grid-column: 2; grid-row: 2; text-align: right; }
+  .cr-row .cr-c-pct b { font-size: 16px; }
+  .cr-bar {
+    position: absolute;
+    left: .9rem;
+    right: .75rem;
+    bottom: .4rem;
+    width: auto;
+    height: 3px;
+    margin: 0;
+  }
+  .cr-rar { padding: .2rem .5rem .2rem .42rem; gap: .42rem; font-size: 10.5px; letter-spacing: .12em; }
+
+  .cr-rules-card { padding: 1.25rem 1.1rem 1.15rem; }
+  .cr-rules-title { font-size: 22px; }
+}
+
+@media (max-width: 575px) {
+  .cr-stage { max-width: 300px; margin: -1rem auto -2.25rem; }
+  .cr-crate-drop { width: 128px; height: 128px; margin-left: -64px; }
+  .cr-title { font-size: min(64px, 17vw); }
+  .cr-glyph { width: 16px; height: 16px; flex-basis: 16px; }
+  .cr-jump-chip { font-size: 14px; padding: .4rem .7rem .4rem .5rem; }
+  .cr-body { margin-top: 3rem; }
+}
+
+@media (max-width: 359px) {
+  .cr-crate { padding-inline: .7rem; }
+  .cr-row { padding-left: .75rem; padding-right: .6rem; }
+  .cr-bar { left: .75rem; right: .6rem; }
+  .cr-rar { letter-spacing: .08em; }
+}
+
+@media (forced-colors: active) {
+  .cr-crate, .cr-rules-card, .cr-rar, .cr-jump-chip, .cr-pity-line { border: 1px solid CanvasText; }
+  .cr-bar { border: 1px solid CanvasText; }
+  .cr-bar i, .cr-pips i.on { background: CanvasText; forced-color-adjust: none; }
+}
+
+@media print {
+  .cr-stage, .cr-jump { display: none !important; }
+  .cr-rules { position: static; }
+}
