@@ -160,6 +160,7 @@
 .cr-box.is-sm svg { width: 16px; height: 16px; }
 .cr-head .cr-box svg { filter: drop-shadow(0 0 14px rgba(var(--cr-warm), .18)); }
 .cr-name { margin: 0; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.cr-blurb { margin: .1rem 0 0; font-size: 14px; line-height: 1.4; color: var(--text-faint); }
 .cr-price {
   display: flex;
   align-items: center;

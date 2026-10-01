@@ -198,7 +198,9 @@
     const sorted = ok ? items.map((it, n) => ({ it, n }))
       .sort((a, b) => ((a.it.rarity ? a.it.rarity.rank : 99) - (b.it.rarity ? b.it.rarity.rank : 99)) || a.n - b.n)
       .map((o) => o.it) : [];
-    return { id, name, items: sorted, broken: !ok };
+    // a short theme line under the name ("Petals, rainbows and light"), when the server has one
+    const blurb = typeof x.blurb === "string" ? x.blurb.trim().slice(0, 120) : "";
+    return { id, name, blurb, items: sorted, broken: !ok };
   }
 
   /* ── small pieces ──────────────────────────────────────────────── */
@@ -233,6 +235,7 @@
       crateArt(),
       h("div", { class: "cr-head-text" },
         h("h3", { class: "cr-name", id: nid }, c.name),
+        c.blurb ? h("p", { class: "cr-blurb" }, c.blurb) : null,
         priceLine ? h("p", { class: "cr-price" }, gemGlyph(), priceLine) : null),
       c.broken ? null : h("p", { class: "cr-count" }, c.items.length === 1 ? "1 item" : c.items.length + " items"));
 
@@ -284,10 +287,10 @@
   }
 
   function pityBlock(d) {
-    if (!("pity" in d)) return null;
-    const p = d.pity;
+    // the API leaves out null fields, so a missing pity means there is none
+    const p = "pity" in d ? d.pity : null;
     let rule;
-    if (p === null) {
+    if (p === null || p === undefined) {
       rule = [h("b", null, "None."), " Every opening uses the same odds."];
     } else {
       const o = obj(p);
