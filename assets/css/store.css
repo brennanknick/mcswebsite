@@ -317,7 +317,9 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 
 /* ── what Sapphires are ──────────────────────────────────────────── */
 
-.st-facts { margin-top: .5rem; }
+/* at the foot of the page now, after the FAQ, with the crates line right under it */
+.st-facts { margin-top: 4.5rem; }
+.st-facts + .st-crates { margin-top: .9rem; }
 .st-fact-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -380,6 +382,8 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 /* phones: the link sits under the line, beside the crate */
 @media (max-width: 575px) {
   .st-crates { margin-top: 2.25rem; }
+  .st-facts { margin-top: 3.25rem; }
+  .st-facts + .st-crates { margin-top: .75rem; }
   .st-crates-bar { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: .6rem 1rem; padding: 1rem 1.1rem; }
   .st-crates-bar p { font-size: 14.5px; }
   /* a block of text, so a wrapped link keeps its arrow right after the words */
