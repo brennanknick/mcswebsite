@@ -352,6 +352,11 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 .st-fact b { align-self: end; font-size: 1.05rem; font-weight: 700; line-height: 1.3; color: #fff; }
 .st-fact > span:last-child { font-size: 14px; line-height: 1.5; color: var(--text); }
 
+/* a single card: one wide row, the icon beside two lines of text */
+.st-fact-list.is-one { grid-template-columns: minmax(0, 1fr); }
+.st-fact-list.is-one .st-fact { padding: 1rem 1.25rem; align-items: center; }
+.st-fact-list.is-one .st-fact > span:last-child { max-width: 60ch; }
+
 /* ── crates: bought in game, odds on their own page ─────────────── */
 
 .st-crates { margin-top: 3rem; }
