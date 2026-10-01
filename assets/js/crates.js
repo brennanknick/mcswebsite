@@ -316,7 +316,8 @@
 
     const price = Number.isInteger(d.price) && d.price > 0 ? d.price : 0;
     const cur = str(d.currency).trim() || "Sapphires";
-    const priceLine = price ? count(price) + " " + cur + ", earned or bought" : "";
+    // Brenn: no price line under each crate; players know what a crate costs
+    const priceLine = "";
 
     view.replaceChildren(...crates.map((c, i) => crateSection(c, i, priceLine)));
     view.classList.add("is-ready");
