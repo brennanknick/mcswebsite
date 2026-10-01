@@ -359,10 +359,26 @@
   let metaPromise = null;
   function getMeta(fresh) {
     if (fresh || !metaPromise) {
-      metaPromise = get("/meta", null, 30000).catch((e) => { metaPromise = null; throw e; });
+      metaPromise = get("/meta", null, 30000).then((m) => { learnBadges(m); return m; }).catch((e) => { metaPromise = null; throw e; });
     }
     return metaPromise;
   }
+
+  // Badges from Discord roles, published by the server on meta (only that a player has one,
+  // nothing else about their Discord). Today one: the Champions League.
+  const BADGE = new Map();   // uuid -> {uuid, name}
+  let badgeName = "Champions League";
+  function learnBadges(meta) {
+    const b = obj(obj(obj(meta).badges).champions_league);
+    if (!obj(meta).badges && !("server" in obj(meta))) return;   // a loading meta teaches nothing
+    BADGE.clear();
+    badgeName = str(b.name) || "Champions League";
+    arr(b.players).forEach((p) => { if (UUID_RE.test(str(p.uuid).toLowerCase())) BADGE.set(str(p.uuid).toLowerCase(), p); });
+  }
+  const isCL = (uuid) => BADGE.has(str(uuid).toLowerCase());
+  // the small gold star next to a name, and the chip on a player page
+  const clMark = (uuid) => (isCL(uuid) ? h("span", { class: "mh-cl-mark", title: badgeName }, icon("star"), vh(", " + badgeName)) : null);
+  const clChip = () => h("span", { class: "mh-tag mh-cl" }, icon("star"), badgeName);
 
   /* ── pictures of people and clubs ──────────────────────────────── */
 
@@ -996,7 +1012,7 @@
         h("span", { class: "mh-row-pitch" }, str(m.fieldName) || str(m.fieldId) || "Unknown pitch")),
       h("div", { class: "mh-row-mvp" },
         m.mvp && UUID_RE.test(str(m.mvp.uuid))
-          ? [icon("star", "mh-mvp-star"), avatar(m.mvp.uuid, nameOf(m.mvp), 20), h("span", null, vh("MVP: "), nameOf(m.mvp))]
+          ? [icon("star", "mh-mvp-star"), avatar(m.mvp.uuid, nameOf(m.mvp), 20), h("span", null, vh("MVP: "), nameOf(m.mvp), clMark(m.mvp.uuid))]
           : h("span", { class: "mh-dim" }, num(m.players) + (num(m.players) === 1 ? " player" : " players"))),
       h("span", { class: "mh-row-go", "aria-hidden": "true" }, icon("tri")),
     ]);
@@ -1173,7 +1189,7 @@
 
   async function viewMatch(r, token) {
     if (!ID_RE.test(r.id)) throw new ApiError("notfound");
-    const rec = await get("/matches/" + encodeURIComponent(r.id), null, 3600000);
+    const [rec] = await Promise.all([get("/matches/" + encodeURIComponent(r.id), null, 3600000), getMeta().catch(() => null)]);
     if (token !== S.token) return null;
     if (!rec.teams || !rec.score) throw new ApiError("server");
     if (rec.schema > 1) console.warn("[matches] record schema " + rec.schema + " is newer than this page knows");
@@ -1718,7 +1734,7 @@
       h("div", { class: "mh-lu-main" },
         avatar(p.uuid, nameOf(p), 32),
         h("div", { class: "mh-lu-who" },
-          UUID_RE.test(str(p.uuid)) ? h("a", { class: "mh-lu-name", href: toPlayer(p.uuid), "data-go": true }, nameOf(p)) : h("span", { class: "mh-lu-name" }, nameOf(p)),
+          UUID_RE.test(str(p.uuid)) ? h("a", { class: "mh-lu-name", href: toPlayer(p.uuid), "data-go": true }, nameOf(p), clMark(p.uuid)) : h("span", { class: "mh-lu-name" }, nameOf(p)),
           notes.length ? h("small", null, notes.join(" · ")) : null,
           eloOf(p) ? eloLine(eloOf(p)) : null),
         // badges first, so the position chips form a column down the list
@@ -1855,6 +1871,7 @@
           h("p", { class: "mh-eyebrow" }, "Player"),
           h("h1", { class: "mh-pl-name", id: "mh-pl-name" }, name),
           h("div", { class: "mh-pl-tags" },
+            arr(d.badges).includes("champions_league") || isCL(r.uuid) ? clChip() : null,
             clubChip(club),
             src ? h("span", { class: "mh-dim" }, "Last played " + ago(num(src.lastPlayed))) : null,
             ladderName ? h("span", { class: "mh-dim" }, "On the ranked ladder as " + ladderName) : null),
@@ -2280,6 +2297,19 @@
         h("p", { class: "mh-sec-sub" }, sub),
         hits.length ? h("ul", { class: "mh-sresults is-inline" }, hits.map((x) =>
           h("li", null, h("a", { href: toPlayer(x.uuid), "data-go": true }, avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)))))) : null));
+    }
+
+    // the Champions League: everyone with the badge, A to Z
+    const league = [...BADGE.values()].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+    if (!r.q && league.length) {
+      out.push(h("section", { class: "mh-regulars mh-cl-list", "aria-labelledby": "mh-cl" },
+        h("h2", { class: "mh-sec-title", id: "mh-cl" }, icon("star", "mh-cl-title-star"), badgeName),
+        h("p", { class: "mh-sec-sub" }, league.length + (league.length === 1 ? " player" : " players") + " in the " + badgeName + "."),
+        h("ul", { class: "mh-reg-grid" }, league.map((x, i) => h("li", { style: { "--i": Math.min(i, 16) } },
+          h("a", { href: toPlayer(x.uuid), "data-go": true, title: nameOf(x) },
+            avatar(x.uuid, nameOf(x), 40),
+            h("b", null, nameOf(x)),
+            h("small", { class: "mh-cl-small" }, icon("star"), badgeName)))))));
     }
 
     const regulars = d && str(d.stat) === "games" ? arr(d.items) : [];

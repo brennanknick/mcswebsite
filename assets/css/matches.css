@@ -394,6 +394,15 @@
 /* a small game: listed, never counted */
 .mh-tag.is-small { color: var(--text-strong); background: rgba(255, 255, 255, .06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22); }
 .mh-tag.is-ranked { color: #ffcf6e; background: rgba(255, 190, 70, .12); box-shadow: inset 0 0 0 1px rgba(255, 207, 110, .45); }
+/* the Champions League badge (a Discord role the server publishes): gold, a pixel star */
+.mh-tag.mh-cl { display: inline-flex; align-items: center; gap: .35rem; color: #ffcf6e; background: rgba(255, 190, 70, .12); box-shadow: inset 0 0 0 1px rgba(255, 207, 110, .45); }
+.mh-tag.mh-cl .mh-i { width: 11px; height: 11px; fill: currentColor; }
+.mh-cl-mark { display: inline-flex; align-items: center; margin-left: .35rem; vertical-align: -1px; }
+.mh-cl-mark .mh-i { width: 11px; height: 11px; fill: #ffcf6e; filter: drop-shadow(0 0 4px rgba(255, 207, 110, .5)); }
+.mh-cl-title-star { width: 18px; height: 18px; fill: #ffcf6e; margin-right: .45rem; vertical-align: -1px; }
+.mh-cl-list { margin-bottom: 2.75rem; }
+.mh-cl-list .mh-cl-small { display: inline-flex; align-items: center; gap: .3rem; color: #ffcf6e; }
+.mh-cl-list .mh-cl-small .mh-i { width: 10px; height: 10px; fill: currentColor; }
 
 .mh-rating {
   display: inline-block;
