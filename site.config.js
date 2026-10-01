@@ -40,7 +40,7 @@ window.MCS = {
   // secret (never put a PayNow API key anywhere on this site). While it's
   // empty, /store/ says the store is on its way, makes no calls to PayNow,
   // and the Store link stays out of the nav whatever storeOpen says.
-  paynowStoreId: "",
+  paynowStoreId: "606712387873013760",
 
   // false: /store/ still works in full (for PayNow's reviewers and $0 test
   // orders) but says the store isn't open yet, and the nav has no Store
