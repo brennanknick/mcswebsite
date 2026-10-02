@@ -298,9 +298,9 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 
 /* ── what Sapphires are ──────────────────────────────────────────── */
 
-/* at the foot of the page now, after the FAQ, with the crates line right under it */
+/* used on the crates and thank-you pages */
 .st-facts { margin-top: 4.5rem; }
-.st-facts + .st-crates { margin-top: .9rem; }
+@media (max-width: 575px) { .st-facts { margin-top: 3.25rem; } }
 .st-fact-list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -335,43 +335,98 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 .st-fact b { align-self: end; font-size: 1.05rem; font-weight: 700; line-height: 1.3; color: #fff; }
 .st-fact > span:last-child { font-size: 14px; line-height: 1.5; color: var(--text); }
 
-/* a single card: one wide row, the icon beside two lines of text */
-.st-fact-list.is-one { grid-template-columns: minmax(0, 1fr); }
-.st-fact-list.is-one .st-fact { padding: 1rem 1.25rem; align-items: center; }
-.st-fact-list.is-one .st-fact > span:last-child { max-width: 60ch; }
+/* ── spend them in game: cosmetics and crates ───────────────────── */
 
-/* ── crates: bought in game, odds on their own page ─────────────── */
-
-.st-crates { margin-top: 3rem; }
-.st-crates-bar {
+.st-spend { margin-top: 4.5rem; }
+.st-spend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .9rem;
+  margin-top: .5rem;
+}
+.st-spend-card {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: .75rem 1.5rem;
-  padding: .95rem 1.5rem .95rem 1.1rem;
+  flex-direction: column;
+  padding: 1.5rem 1.6rem 1.45rem;
   background:
-    radial-gradient(40% 160% at 0% 50%, rgba(255, 214, 150, .07), transparent 70%),
-    rgba(0, 0, 0, .28);
-  box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 3px 0 rgba(255, 255, 255, .03);
+    radial-gradient(55% 90% at 0% 0%, color-mix(in srgb, var(--sa-glow) 11%, transparent), transparent 72%),
+    var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge), inset 0 3px 0 rgba(255, 255, 255, .035);
   clip-path: var(--notch);
 }
-.st-crates-art { flex: 0 0 32px; line-height: 0; }
-.st-crates-art svg { width: 32px; height: 32px; }
-.st-crates-bar p { flex: 1 1 20rem; margin: 0; font-size: 15px; line-height: 1.5; color: var(--text-strong); }
-.st-crates-bar .more { flex: 0 1 auto; min-width: 0; }
-.st-crates + .st-bundles { margin-top: 3.5rem; }
-/* phones: the link sits under the line, beside the crate */
-@media (max-width: 575px) {
-  .st-crates { margin-top: 2.25rem; }
-  .st-facts { margin-top: 3.25rem; }
-  .st-facts + .st-crates { margin-top: .75rem; }
-  .st-crates-bar { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; gap: .6rem 1rem; padding: 1rem 1.1rem; }
-  .st-crates-bar p { font-size: 14.5px; }
-  /* a block of text, so a wrapped link keeps its arrow right after the words */
-  .st-crates-bar .more { display: block; grid-column: 2; justify-self: start; }
-  .st-crates-bar .more svg { display: inline-block; margin-left: .45rem; vertical-align: 0; }
-  .st-crates-bar .more:hover { transform: translateX(6px); }
-  .st-crates + .st-bundles { margin-top: 3rem; }
+/* the crate tile is lit warm, like the crate's oak */
+.st-spend-card.is-crates {
+  background:
+    radial-gradient(55% 90% at 0% 0%, rgba(255, 196, 120, .085), transparent 72%),
+    var(--card);
+}
+.st-spend-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .4rem 1.25rem;
+  margin: 1.3rem 0 .3rem;
+}
+.st-spend-head h3 { margin: 0; font-size: 1.2rem; font-weight: 750; line-height: 1.25; color: #fff; }
+.st-spend-head .more:hover { transform: translateX(6px); }
+.st-spend-card p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text); }
+
+/* an inventory slot: dark edge top-left, light edge bottom-right (the
+   inverse of a button's bevel), the 16x16 icon at 2x */
+.st-hotbar span, .st-recipe-slot {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  background: #0a110d;
+  box-shadow: inset 3px 3px 0 #030605, inset -3px -3px 0 #26352d;
+}
+.st-hotbar img, .st-recipe-slot img, .st-recipe-slot > svg { width: 32px; height: 32px; }
+
+/* the hotbar: slots side by side, the white selector on the first; hover
+   walks it along, one slot at a time, as a scroll wheel would */
+.st-hotbar { position: relative; display: flex; align-self: flex-start; }
+.st-hotbar-sel {
+  position: absolute;
+  inset: -3px auto auto -3px;
+  width: 54px;
+  height: 54px;
+  box-shadow: inset 0 0 0 3px #e9f0ec, inset 0 0 0 6px rgba(0, 0, 0, .5), 0 0 16px color-mix(in srgb, var(--sa-glow) 30%, transparent);
+  pointer-events: none;
+}
+.st-spend-card:hover .st-hotbar-sel { animation: st-hotbar 3s steps(1, end) infinite; }
+@keyframes st-hotbar {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(48px); }
+  40%  { transform: translateX(96px); }
+  60%  { transform: translateX(144px); }
+  80%  { transform: translateX(192px); }
+  100% { transform: translateX(0); }
+}
+
+/* the crate tile: crate > ?, a furnace recipe; hover rolls the ? */
+.st-recipe { display: flex; align-items: center; gap: .85rem; }
+.st-recipe-arrow { width: 24px; height: 21px; fill: rgba(255, 255, 255, .3); }
+.st-roll { position: relative; }
+.st-roll-q { fill: var(--sa-light); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--sa-glow) 55%, transparent)); }
+.st-roll img { position: absolute; top: 8px; left: 8px; opacity: 0; }
+.is-crates:hover .st-roll-q { opacity: 0; }
+.is-crates:hover .st-roll img { animation: st-roll 1.25s steps(1, end) infinite; animation-delay: calc(var(--n) * .25s); }
+@keyframes st-roll { 0% { opacity: 1; } 20%, 100% { opacity: 0; } }
+/* no motion: no roll, so the ? stays */
+@media (prefers-reduced-motion: reduce) {
+  .is-crates:hover .st-roll-q { opacity: 1; }
+}
+
+/* narrow: the tiles stack */
+@media (max-width: 767px) {
+  .st-spend { margin-top: 3.25rem; }
+  .st-spend-grid { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .st-spend-card { padding: 1.25rem 1.2rem 1.25rem; }
+  .st-spend-head { margin-top: 1.1rem; }
+  .st-spend-card p { font-size: 14.5px; }
 }
 
 /* ── bundles ─────────────────────────────────────────────────────── */
@@ -1120,7 +1175,7 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 }
 
 @media (forced-colors: active) {
-  .st-card, .st-starter, .st-fact, .st-state, .st-legal-card, .st-dlg-box, .st-notice { border: 1px solid CanvasText; }
+  .st-card, .st-starter, .st-fact, .st-spend-card, .st-state, .st-legal-card, .st-dlg-box, .st-notice { border: 1px solid CanvasText; }
   .st-grad { -webkit-text-fill-color: currentColor; color: CanvasText; background: none; }
 }
 
