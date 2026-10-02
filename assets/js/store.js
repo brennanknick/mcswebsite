@@ -86,7 +86,7 @@
     "sapphires-6000":    { name: "Treasury",     base: 5000,  bonus: 1000, pile: 6 },
     "sapphires-9500":    { name: "Hoard",        base: 7500,  bonus: 2000, pile: 8 },
     "sapphires-13000":   { name: "Crown Jewels", base: 10000, bonus: 3000, pile: 10 },
-    "sapphires-starter": { name: "Starter Pack", base: 500,   bonus: 100,  pile: 2, starter: true },
+    "sapphires-starter": { name: "Starter Pack", base: 500,   bonus: 100,  pile: "starter", starter: true },
   };
 
   const $ = (s, r) => (r || document).querySelector(s);
@@ -369,7 +369,8 @@
       off,
       vat: taxLine(p),
       // a product we don't know and can't size shows the single gem, not a heap
-      pile: IMG + (k ? "pile-" + k.pile : guess ? "pile-" + guessPile(guess) : "gem") + ".png",
+      // ?v: the pile art is loaded from here, not stamped in the HTML, so bump it when the art changes
+      pile: IMG + (k ? "pile-" + k.pile : guess ? "pile-" + guessPile(guess) : "gem") + ".png?v=piles2",
       plain: !k && !guess,
       canBuy: !p.stock || p.stock.available_to_purchase !== false,
       gift: p.is_gifting_disabled !== true,
