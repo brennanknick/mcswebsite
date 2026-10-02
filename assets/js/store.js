@@ -301,8 +301,8 @@
      whether the price already carries it depends on the store's
      tax-inclusive setting, which the storefront API doesn't expose. So
      "Includes" only when the reply proves it, "Plus ... at checkout" only
-     when it proves the opposite, and nothing otherwise: the section note
-     ("PayNow shows any tax before you pay") covers that case.
+     when it proves the opposite, and nothing otherwise: the payments
+     section ("PayNow, which shows any tax before you pay") covers that case.
        1. a regional price says so itself (tax_inclusive);
        2. in the store's own currency, price_original (before any sale, after
           the tax adjustment) above the base price means tax was added;
