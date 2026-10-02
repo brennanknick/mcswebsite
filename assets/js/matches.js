@@ -2467,7 +2467,11 @@
 
   function fxClub(c) {
     c = obj(c);
-    return { id: str(c.id), name: str(c.name) || str(c.id) || "TBD", flag: str(c.flag).slice(0, 8), color: FX_HEX.test(str(c.color)) ? str(c.color) : "#9aa7a0" };
+    // a club's in-game flag is a resource-pack glyph on a CJK code point (a stray
+    // Chinese character outside Minecraft): only a real emoji is shown
+    const flag = str(c.flag).slice(0, 16);
+    const emoji = /^(?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2})/u.test(flag) && !/[\u3000-\u9fff\ue000-\uf8ff]/.test(flag);
+    return { id: str(c.id), name: str(c.name) || str(c.id) || "TBD", flag: emoji ? flag : "", color: FX_HEX.test(str(c.color)) ? str(c.color) : "#9aa7a0" };
   }
   function fxOf(f) {
     f = obj(f);
