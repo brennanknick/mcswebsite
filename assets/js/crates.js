@@ -345,7 +345,7 @@
     say(crates.length === 1 ? "The odds for 1 crate are listed." : "The odds for " + crates.length + " crates are listed.");
     if (refocus) refocusOn(listTitle);
 
-    // a link to one crate (#crate-storm) lands on it once it's drawn
+    // a link to one crate (#crate-stadium) lands on it once it's drawn
     if (firstDraw && location.hash) {
       let t = null;
       try { t = document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch {}
