@@ -52,7 +52,7 @@ window.MCS = {
   // Shown wherever the store needs a contact. While it's empty the store
   // points to the Discord instead, but Mojang's rules and PayNow's review
   // both need a real, monitored email before the store opens.
-  supportEmail: "",
+  supportEmail: "mcsoccersupport@gmail.com",
 
   // PayNow's tax-inclusive pricing (Payment Settings), copied here: true if
   // it's on (buyers pay the price shown, tax included), false if it's off
