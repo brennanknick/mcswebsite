@@ -109,11 +109,6 @@
 .cr-sparks i { background: #fff3d6; }
 .cr-sparks .k1 { background: var(--sa-light); }
 
-/* ── what crates are ─────────────────────────────────────────────── */
-
-.cr-facts .st-slot img { width: 32px; height: 32px; }
-.cr-facts code { white-space: nowrap; }
-
 /* ── the crates and the rules ────────────────────────────────────── */
 
 .cr-body {
