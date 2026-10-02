@@ -45,8 +45,8 @@ window.MCS = {
   // false: /store/ still works in full (for PayNow's reviewers and $0 test
   // orders) but says the store isn't open yet, and the nav has no Store
   // link. true: the notice goes and the Store link shows on every page.
-  // Switch it on once cosmetics can be bought with Sapphires.
-  storeOpen: false,
+  // Opened 2026-10-02, after PayNow accepted the store.
+  storeOpen: true,
 
   // Where buyers write about a purchase, e.g. "support@mcsoccer.net".
   // Shown wherever the store needs a contact. While it's empty the store
