@@ -62,7 +62,7 @@
  *   /api/v1/meta  /api/v1/live  /api/v1/matches  /api/v1/matches/{id}
  *   /api/v1/players  /api/v1/players/{uuid}  /api/v1/leaders  /api/v1/ranked
  *   /api/v1/tournaments  /api/v1/tournaments/current  /api/v1/tournaments/{id}
- *   /api/v1/crates
+ *   /api/v1/crates  /api/v1/fixtures
  *   /crest/{hex}.png
  *
  * Headers the site can read on every response:
@@ -240,6 +240,17 @@ const ROUTES = [
     path: () => "/api/v1/crates",
     params: [],
     ttl: 60, staleFor: LIST_STALE, browser: "public, max-age=60",
+  },
+  {
+    // Scheduled club games (docs/fixtures.md): upcoming, live with the score,
+    // and the last week's results. The fixtures tab looks again every 15 s
+    // while one is live, so a copy is fresh for 5 s and served stale for a
+    // minute at most: an old copy would show a finished game as live.
+    name: "fixtures",
+    re: /^\/api\/v1\/fixtures\/?$/,
+    path: () => "/api/v1/fixtures",
+    params: [],
+    ttl: 5, staleFor: 60, browser: "public, max-age=5",
   },
   {
     // Club crest PNG: 4 or 5 lower-case hex digits, no trailing slash.

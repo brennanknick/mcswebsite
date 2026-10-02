@@ -13,6 +13,7 @@
      ./?p=<uuid>              player    (?mode= &page=)
      ./?tab=leaders           leaderboards (?stat= &mode= &limit=)
      ./?tab=players           player search
+     ./?tab=fixtures          scheduled club games (?club=)
    404.html sends the game's /matches/<id> style chat links here.
    ================================================================== */
 
@@ -534,6 +535,10 @@
       return { view: "leaders", stat: stat in STAT ? stat : "goals", mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25 };
     }
     if (tab === "players") return { view: "players", q: str(q.get("q")).trim().slice(0, 16) };
+    if (tab === "fixtures") {
+      const club = str(q.get("club")).trim();
+      return { view: "fixtures", club: /^[a-z0-9_-]{1,40}$/i.test(club) ? club : "" };
+    }
     if (tab === "ranked") {
       const lim = parseInt(q.get("limit"), 10);
       return { view: "ranked", queue: str(q.get("queue")).toLowerCase() === "4v4" ? "4v4" : "3v3", limit: [250, 500, 1000].includes(lim) ? lim : 100 };
@@ -568,6 +573,10 @@
       case "players":
         q.set("tab", "players");
         if (r.q) q.set("q", r.q);
+        break;
+      case "fixtures":
+        q.set("tab", "fixtures");
+        if (r.club) q.set("club", r.club);
         break;
       case "ranked":
         q.set("tab", "ranked");
@@ -617,7 +626,7 @@
   // shown at the top of page 1 even if a cached list doesn't have them yet
   const S = { route: null, token: 0, lastList: "./", firstRender: true, finished: [], staleRetryAt: 0, noted: false };
 
-  const isIndex = (v) => v === "list" || v === "ranked" || v === "leaders" || v === "players";
+  const isIndex = (v) => v === "list" || v === "ranked" || v === "leaders" || v === "players" || v === "fixtures";
 
   function setChrome(r) {
     const index = isIndex(r.view);
@@ -2447,7 +2456,164 @@
     return wrap;
   }
 
-  const VIEWS = { list: viewList, match: viewMatch, player: viewPlayer, ranked: viewRanked, leaders: viewLeaders, players: viewPlayers };
+  /* ── view: fixtures ────────────────────────────────────────────────
+     Scheduled club games (mostly the Champions League), from the plugin's
+     public /api/v1/fixtures: what is live (with the score, refreshed every
+     15 s while anything is), what is coming up, grouped by day in the
+     reader's own time zone, and the last week's results. A server without
+     fixtures yet (404) says they're on their way. */
+
+  const FX_HEX = /^#[0-9a-f]{6}$/i;
+
+  function fxClub(c) {
+    c = obj(c);
+    return { id: str(c.id), name: str(c.name) || str(c.id) || "TBD", flag: str(c.flag).slice(0, 8), color: FX_HEX.test(str(c.color)) ? str(c.color) : "#9aa7a0" };
+  }
+  function fxOf(f) {
+    f = obj(f);
+    if (!str(f.id)) return null;
+    const sc = obj(f.score), pn = obj(f.pens);
+    const has = (o) => o && Number.isFinite(Number(o.home)) && Number.isFinite(Number(o.away)) && o.home !== null && o.away !== null;
+    return {
+      id: str(f.id), competition: str(f.competition) || "Champions League", label: str(f.label),
+      home: fxClub(f.home), away: fxClub(f.away), kickoff: num(f.kickoff),
+      state: ["SCHEDULED", "LIVE", "FINISHED", "CANCELLED"].includes(f.state) ? f.state : "SCHEDULED",
+      score: has(f.score) ? { home: num(sc.home), away: num(sc.away) } : null,
+      pens: has(f.pens) ? { home: num(pn.home), away: num(pn.away) } : null,
+      pitch: str(f.pitch), recordId: str(f.recordId), knockout: f.knockout === true, decidedBy: str(f.decidedBy),
+    };
+  }
+
+  const fxDay = (ms) => new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" }).format(new Date(ms));
+  const fxTime = (ms) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+  function fxUntil(ms) {
+    const d = ms - Date.now();
+    if (d <= 0) return "any minute";
+    const m = Math.round(d / 60000);
+    if (m < 60) return "in " + m + " min";
+    const hr = Math.round(m / 60);
+    if (hr < 36) return "in " + hr + " h";
+    return "in " + Math.round(hr / 24) + " days";
+  }
+
+  // one club: a pixel pip in its colour, its flag and name
+  const fxSide = (c, cls) => h("span", { class: "mh-fx-side " + (cls || ""), style: { "--c": c.color } },
+    h("i", { class: "mh-fx-pip", "aria-hidden": "true" }),
+    c.flag ? h("span", { class: "mh-fx-flag", "aria-hidden": "true" }, c.flag) : null,
+    h("b", null, c.name));
+  const fxTags = (f) => [f.label ? h("span", { class: "mh-tag" }, f.label) : null,
+    f.knockout ? h("span", { class: "mh-tag is-ranked" }, "Knockout") : null,
+    f.pitch ? h("span", { class: "mh-tag is-void" }, f.pitch) : null].filter(Boolean);
+  const fxScore = (f) => h("span", { class: "mh-fx-score" },
+    h("span", null, num(f.score.home), h("i", null, "\u2013"), num(f.score.away)),
+    f.pens ? h("small", null, `${num(f.pens.home)}\u2013${num(f.pens.away)} pens`) : null);
+
+  // while a fixture is live, look again every 15 s (never in a hidden tab)
+  let fxTimer = 0;
+  function fxRefresh(token) {
+    clearTimeout(fxTimer);
+    fxTimer = setTimeout(() => {
+      if (token !== S.token || !S.route || S.route.view !== "fixtures") return;
+      if (document.hidden) return fxRefresh(token);
+      render({});
+    }, 15000);
+  }
+
+  async function viewFixtures(r, token) {
+    getMeta().then((m) => { if (token === S.token) renderCounters(m); }).catch(() => {});
+    const d = await get("/fixtures", null, 5000).catch((e) => {
+      if (e && e.kind === "notfound") return null;
+      throw e;
+    });
+    if (token !== S.token) return null;
+    setTitle("Fixtures");
+    if (!d) {
+      return [note("off", "Fixtures are on their way",
+        "Scheduled Champions League games will be listed here: kickoff times in your own time zone, live scores and results.", [])];
+    }
+    const all = (Array.isArray(d) ? d : arr(d.fixtures)).map(fxOf).filter(Boolean).filter((f) => f.state !== "CANCELLED");
+    const clubs = [];
+    for (const f of all) for (const c of [f.home, f.away]) if (c.id && !clubs.some((x) => x.id === c.id)) clubs.push(c);
+    clubs.sort((a, b) => a.name.localeCompare(b.name));
+    const want = r.club && clubs.some((c) => c.id === r.club) ? r.club : "";
+    const mine = want ? all.filter((f) => f.home.id === want || f.away.id === want) : all;
+    const live = mine.filter((f) => f.state === "LIVE");
+    const next = mine.filter((f) => f.state === "SCHEDULED").sort((a, b) => a.kickoff - b.kickoff);
+    const done = mine.filter((f) => f.state === "FINISHED").sort((a, b) => b.kickoff - a.kickoff);
+
+    const out = [];
+    if (clubs.length > 1) {
+      out.push(h("div", { class: "mh-filters" },
+        segmented("Club", [["", "All clubs"]].concat(clubs.map((c) => [c.id, c.name])), want, (v) => href({ view: "fixtures", club: v }), "club")));
+    }
+    if (!all.length) {
+      out.push(note("wait", "No fixtures scheduled yet",
+        "When staff schedule Champions League games, they show up here with the kickoff in your own time.",
+        [arrowBtn("Join the server", { on: { click: openConnect } })]));
+      return out;
+    }
+
+    if (live.length) {
+      out.push(h("section", { class: "mh-fx-sec", "aria-labelledby": "mh-fx-live" },
+        h("h2", { class: "mh-live-title", id: "mh-fx-live" }, h("span", { class: "mh-live-dot", "aria-hidden": "true" }), "Live now"),
+        h("ul", { class: "mh-live-list" }, live.map((f) =>
+          h("li", { class: "mh-live-card mh-fx-card", style: { "--home": f.home.color, "--away": f.away.color } },
+            h("div", { class: "mh-live-top" }, h("span", null, [f.competition, f.label].filter(Boolean).join(" \u00b7 ")), h("span", { class: "mh-live-clock is-running" }, "Live")),
+            h("div", { class: "mh-live-board" },
+              fxSide(f.home, "is-home"),
+              f.score ? h("span", { class: "mh-live-score" }, num(f.score.home), h("i", null, "\u2013"), num(f.score.away)) : h("span", { class: "mh-fx-vs" }, "vs"),
+              fxSide(f.away, "is-away")),
+            h("div", { class: "mh-live-foot" },
+              h("span", { class: "mh-dim" }, f.pitch),
+              h("span", { class: "mh-fx-watch" }, "Watch in game: ", h("code", null, "/spectate"))))))));
+      fxRefresh(token);
+    }
+
+    if (next.length) {
+      const days = [];
+      for (const f of next) {
+        const k = fxDay(f.kickoff);
+        if (!days.length || days[days.length - 1][0] !== k) days.push([k, []]);
+        days[days.length - 1][1].push(f);
+      }
+      let i = 0;
+      out.push(h("section", { class: "mh-fx-sec", "aria-labelledby": "mh-fx-next" },
+        h("h2", { class: "mh-sec-title", id: "mh-fx-next" }, "Coming ", h("span", { class: "grad" }, "up")),
+        h("p", { class: "mh-sec-sub" }, "Kickoff times are in your own time zone."),
+        days.map(([label, list]) => h("div", { class: "mh-fx-day" },
+          h("h3", { class: "mh-fx-date" }, label),
+          h("ul", { class: "mh-fx-list" }, list.map((f) =>
+            h("li", { class: "mh-fx-row", style: { "--home": f.home.color, "--away": f.away.color, "--i": Math.min(i++, 12) } },
+              h("time", { class: "mh-fx-time", datetime: new Date(f.kickoff).toISOString() }, fxTime(f.kickoff), h("small", null, fxUntil(f.kickoff))),
+              h("span", { class: "mh-fx-teams" }, fxSide(f.home, "is-home"), h("span", { class: "mh-fx-vs" }, "vs"), fxSide(f.away, "is-away")),
+              h("span", { class: "mh-fx-meta" }, fxTags(f)))))))));
+    }
+
+    if (done.length) {
+      out.push(h("section", { class: "mh-fx-sec", "aria-labelledby": "mh-fx-done" },
+        h("h2", { class: "mh-sec-title", id: "mh-fx-done" }, "Results"),
+        h("p", { class: "mh-sec-sub" }, "The last seven days."),
+        h("ul", { class: "mh-fx-list" }, done.map((f, k) => {
+          const hs = f.score ? f.score.home + (f.pens ? f.pens.home / 100 : 0) : 0;
+          const as = f.score ? f.score.away + (f.pens ? f.pens.away / 100 : 0) : 0;
+          return h("li", { class: "mh-fx-row is-result", style: { "--home": f.home.color, "--away": f.away.color, "--i": Math.min(k, 12) } },
+            h("time", { class: "mh-fx-time", datetime: new Date(f.kickoff).toISOString() }, fxDay(f.kickoff).replace(/^\w+, /, ""), h("small", null, f.label || f.competition)),
+            h("span", { class: "mh-fx-teams" },
+              fxSide(f.home, "is-home" + (as > hs ? " is-loser" : "")),
+              f.score ? fxScore(f) : h("span", { class: "mh-fx-vs" }, "vs"),
+              fxSide(f.away, "is-away" + (hs > as ? " is-loser" : ""))),
+            h("span", { class: "mh-fx-meta" },
+              f.decidedBy === "forfeit" ? h("span", { class: "mh-tag is-void" }, "Forfeit") : null,
+              f.recordId ? h("a", { class: "mh-plink", href: href({ view: "match", id: f.recordId }), "data-go": true }, "Match report") : null));
+        }))));
+    }
+    if (!live.length && !next.length && !done.length) {
+      out.push(note("wait", "Nothing for this club right now", "They have no games scheduled, and none in the last week.", [h("a", { class: "btn btn-dark", href: href({ view: "fixtures" }), "data-go": true }, "All clubs")]));
+    }
+    return out;
+  }
+
+  const VIEWS = { list: viewList, match: viewMatch, player: viewPlayer, ranked: viewRanked, leaders: viewLeaders, players: viewPlayers, fixtures: viewFixtures };
 
   /* ── start ─────────────────────────────────────────────────────── */
 

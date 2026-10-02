@@ -1738,3 +1738,83 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   .mh-live, .mh-tabs, .mh-search, .mh-filters, .mh-pager, .mh-lu-more { display: none !important; }
   .mh-lu-detail[hidden] { display: block !important; }
 }
+
+/* ── fixtures (?tab=fixtures) ────────────────────────────────────── */
+
+.mh-fx-sec { margin-bottom: 2.75rem; }
+.mh-fx-sec > .mh-sec-sub { margin-bottom: 1.25rem; }
+
+/* a live fixture: the live card, its top bar split in the two clubs' colours */
+.mh-fx-card::before { background: linear-gradient(90deg, var(--home, var(--red)) 0 50%, var(--away, var(--blue)) 50% 100%); }
+.mh-fx-card .mh-live-side { gap: .45rem; }
+.mh-fx-watch { font-size: 13px; color: var(--text-faint); white-space: nowrap; }
+.mh-fx-watch code { padding: .05rem .35rem; font-size: 12px; color: var(--accent-soft); background: rgba(0, 0, 0, .35); }
+
+/* a club: a pixel pip in its colour, glowing a little, then flag and name */
+.mh-fx-side { display: flex; align-items: center; gap: .5rem; min-width: 0; color: #fff; }
+.mh-fx-side > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.mh-fx-side.is-home { justify-content: flex-end; text-align: right; }
+.mh-fx-side.is-home .mh-fx-pip { order: 3; }
+.mh-fx-side.is-home .mh-fx-flag { order: 2; }
+.mh-fx-side.is-loser { opacity: .55; }
+.mh-fx-pip {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  background: var(--c);
+  clip-path: var(--px-dot);
+  filter: drop-shadow(0 0 5px var(--c));
+}
+.mh-fx-flag { font-size: 1.05em; line-height: 1; }
+.mh-fx-vs { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--text-faint); }
+
+/* the day, as a kicker over its games */
+.mh-fx-day + .mh-fx-day { margin-top: 1.5rem; }
+.mh-fx-date {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin: 0 0 .65rem;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+.mh-fx-date::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255, 255, 255, .12), transparent); }
+
+/* one game: kickoff, the two clubs facing each other, its tags. A thin bar
+   in each club's colour on its own edge, like a scoreboard. */
+.mh-fx-list { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.mh-fx-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.25rem;
+  padding: .9rem 1.2rem;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--home) 10%, transparent), transparent 30%, transparent 70%, color-mix(in srgb, var(--away) 10%, transparent)),
+    var(--card);
+  box-shadow: inset 0 0 0 1px var(--card-edge), inset 3px 0 0 var(--home), inset -3px 0 0 var(--away);
+  clip-path: var(--notch);
+  animation: mh-rise .5s cubic-bezier(.34, 1.4, .64, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.mh-fx-time { display: grid; gap: .1rem; font-size: 1.15rem; font-weight: 800; line-height: 1.15; color: #fff; font-variant-numeric: tabular-nums; }
+.mh-fx-time small { font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--text-faint); }
+.mh-fx-row.is-result .mh-fx-time { font-size: 1rem; }
+.mh-fx-teams { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: .9rem; min-width: 0; }
+.mh-fx-score { display: grid; justify-items: center; font-size: 1.35rem; font-weight: 800; line-height: 1; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mh-fx-score i { font-style: normal; margin: 0 .3rem; color: var(--text-faint); font-weight: 500; }
+.mh-fx-score small { margin-top: .25rem; font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.mh-fx-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .35rem; }
+
+@media (max-width: 640px) {
+  .mh-fx-row { grid-template-columns: minmax(0, 1fr); gap: .6rem; padding: .85rem 1rem; }
+  .mh-fx-time { display: flex; align-items: baseline; gap: .6rem; }
+  .mh-fx-meta { justify-content: flex-start; }
+  .mh-fx-teams { gap: .6rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mh-fx-row { animation: none; }
+}
