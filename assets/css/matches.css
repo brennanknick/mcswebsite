@@ -1181,7 +1181,7 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 /* ── shot map ────────────────────────────────────────────────────── */
 
 .mh-shotmap-wrap { display: flex; justify-content: center; }
-.mh-shotmap { width: 100%; max-width: 330px; height: auto; shape-rendering: crispEdges; }
+.mh-shotmap { width: 100%; max-width: 460px; height: auto; shape-rendering: crispEdges; }
 .mh-sm-grass { fill: #14452a; }
 .mh-sm-line { fill: none; stroke: rgba(235, 248, 238, .45); stroke-width: 1.5; shape-rendering: geometricPrecision; }
 .mh-sm-goal { fill: #fff; }
@@ -1818,3 +1818,20 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 @media (prefers-reduced-motion: reduce) {
   .mh-fx-row { animation: none; }
 }
+
+/* goal map: scorers' faces, numbered like the list; attempts as open rings */
+.mh-sm-shot .mh-sm-frame { fill: var(--red); }
+.mh-sm-shot.is-blue .mh-sm-frame { fill: var(--blue); }
+.mh-sm-shot image { image-rendering: pixelated; }
+.mh-sm-shot .mh-sm-num { fill: #0b120f; }
+.mh-sm-shot .mh-sm-numt { fill: #fff; font: 800 5.5px var(--font); text-anchor: middle; }
+.mh-sm-shot { transition: filter .15s; cursor: default; }
+.mh-sm-shot.is-hot { filter: drop-shadow(0 0 3px #fff); }
+.mh-sm-try circle { fill: none; stroke: var(--red); stroke-width: 1.1; opacity: .85; }
+.mh-sm-try.is-blue circle { stroke: var(--blue); }
+.mh-sm-try path { stroke: #fff; stroke-width: .9; opacity: .8; }
+.mh-shot-list li { border-radius: 4px; padding: .1rem .3rem; margin-left: -.3rem; transition: background .15s; }
+.mh-shot-list li.is-hot, .mh-shot-list li:focus-visible { background: rgba(255, 255, 255, .06); outline: none; }
+.mh-shot-n { display: inline-grid; place-items: center; min-width: 16px; height: 16px; font-size: 11px; font-weight: 800; color: #fff; background: var(--red); clip-path: var(--notch); }
+.mh-shot-list .is-blue .mh-shot-n { background: var(--blue); }
+.mh-shot-list .mh-ava { border-radius: 2px; }

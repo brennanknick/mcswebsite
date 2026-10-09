@@ -1757,21 +1757,26 @@
   /* where the goals came from */
 
   function shotMapCard(rec, events, sides, who, standing) {
-    const shots = events.filter((e) => standing.has(e) && e.type === "GOAL" && e.from && typeof e.from.dist === "number" && SIDES.includes(e.team));
-    if (!shots.length) return null;
+    const placed = (e) => standing.has(e) && e.from && typeof e.from.dist === "number" && SIDES.includes(e.team);
+    const shots = events.filter((e) => placed(e) && e.type === "GOAL");
+    // attempts that didn't go in (missed, saved, blocked), once the server records them
+    const tries = events.filter((e) => placed(e) && e.type === "SHOT");
+    if (!shots.length && !tries.length) return null;
+    const all = shots.concat(tries);
     const fw = num(obj(rec.field).width), fl = num(obj(rec.field).length);
     // plot on half a pitch, goal at the top: x = across, y = out
-    const halfW = fw > 0 ? fw / 2 : Math.max(12, ...shots.map((e) => Math.abs(num(e.from.side)) + 4));
-    const depth = fl > 0 ? fl / 2 : Math.max(20, ...shots.map((e) => num(e.from.dist) + 6));
+    const halfW = fw > 0 ? fw / 2 : Math.max(12, ...all.map((e) => Math.abs(num(e.from.side)) + 4));
+    const depth = fl > 0 ? fl / 2 : Math.max(20, ...all.map((e) => num(e.from.dist) + 6));
     const W = 200, H = Math.round((W * depth) / (halfW * 2));
     const X = (side) => W / 2 + (num(side) / halfW) * (W / 2);
     const Y = (dist) => (num(dist) / depth) * H;
+    const at = (e, pad) => [Math.round(Math.min(W - pad, Math.max(pad, X(e.from.side)))), Math.round(Math.min(H - pad, Math.max(pad, Y(e.from.dist))))];
     const ns = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-    svg.setAttribute("class", "mh-shotmap");
-    svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", `Where the ${shots.length} goal${shots.length === 1 ? "" : "s"} were scored from`);
+    const el = (tag, attrs) => { const n = document.createElementNS(ns, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, class: "mh-shotmap", role: "img",
+      "aria-label": tries.length
+        ? `Where the ${all.length} shots were taken from, ${shots.length} of them goals`
+        : `Where the ${shots.length} goal${shots.length === 1 ? "" : "s"} were scored from` });
     // box and goal are drawn to scale only when the pitch size is known
     const boxW = Math.min(W, (20 / halfW) * (W / 2)), boxD = Math.min(H, (8 / depth) * H);
     svg.innerHTML =
@@ -1779,25 +1784,61 @@
       `<rect class="mh-sm-line" x="${(W - boxW) / 2}" y="0" width="${boxW}" height="${boxD}"/>` +
       `<path class="mh-sm-line" d="M${W / 2 - 22} ${H} a22 22 0 0 1 44 0"/>` +
       `<rect class="mh-sm-goal" x="${W / 2 - 12}" y="0" width="24" height="3"/>`;
-    shots.forEach((e) => {
-      const g = document.createElementNS(ns, "g");
-      const x = Math.round(Math.min(W - 4, Math.max(4, X(e.from.side)))), y = Math.round(Math.min(H - 4, Math.max(4, Y(e.from.dist))));
-      g.setAttribute("transform", `translate(${x - 4} ${y - 4})`);
-      g.setAttribute("class", "mh-sm-shot is-" + e.team.toLowerCase());
-      g.innerHTML = `<path d="${ICONS.ball[1]}"/><path class="mh-i-cut" d="${ICONS.ball[2]}"/>`;
-      const t = document.createElementNS(ns, "title");
-      t.textContent = `${e.ownGoal ? "Own goal by " : ""}${who(e.player) || "Goal"}, ${num(e.from.dist).toFixed(0)} blocks out (${sides[e.team].name})`;
+    const what = (o) => ({ saved: "saved", missed: "missed", blocked: "blocked", post: "hit the post" })[str(o)] || "no goal";
+    // attempts first, so the goals sit on top
+    tries.forEach((e) => {
+      const [x, y] = at(e, 3);
+      const g = el("g", { class: "mh-sm-try is-" + e.team.toLowerCase() + (str(e.outcome) === "saved" ? " is-saved" : "") });
+      g.appendChild(el("circle", { cx: x, cy: y, r: 2.6 }));
+      if (str(e.outcome) === "saved") g.appendChild(el("path", { d: `M${x - 2} ${y - 2}L${x + 2} ${y + 2}` }));
+      const t = el("title", {});
+      t.textContent = `${who(e.player) || "A shot"}, ${num(e.from.dist).toFixed(0)} blocks out: ${what(e.outcome)}${e.by && str(e.outcome) === "saved" ? " by " + who(e.by) : ""}`;
       g.appendChild(t);
       svg.appendChild(g);
     });
+    // each goal: the scorer's face in a frame of their team's colour, numbered like the list
+    const F = 13;
+    const marks = shots.map((e, k) => {
+      const [x, y] = at(e, F / 2 + 1);
+      const g = el("g", { class: "mh-sm-shot is-" + e.team.toLowerCase(), transform: `translate(${x - F / 2} ${y - F / 2})`, "data-n": k + 1 });
+      g.appendChild(el("rect", { class: "mh-sm-frame", x: -1.5, y: -1.5, width: F + 3, height: F + 3 }));
+      if (UUID_RE.test(str(e.player))) {
+        const img = el("image", { width: F, height: F, href: `https://mc-heads.net/avatar/${e.player}/32`, preserveAspectRatio: "none" });
+        img.addEventListener("error", () => img.setAttribute("href", `https://minotar.net/helm/${e.player.replace(/-/g, "")}/32`), { once: true });
+        g.appendChild(img);
+      } else {
+        const ball = el("g", { transform: `translate(${F / 2 - 4} ${F / 2 - 4})` });
+        ball.innerHTML = `<path d="${ICONS.ball[1]}"/><path class="mh-i-cut" d="${ICONS.ball[2]}"/>`;
+        g.appendChild(ball);
+      }
+      g.appendChild(el("rect", { class: "mh-sm-num", x: F - 4, y: F - 4, width: 7, height: 7 }));
+      const n = el("text", { class: "mh-sm-numt", x: F - 0.5, y: F + 1.6 });
+      n.textContent = String(k + 1);
+      g.appendChild(n);
+      const t = el("title", {});
+      t.textContent = `${k + 1}. ${e.ownGoal ? "Own goal by " : ""}${who(e.player) || "Goal"}, ${num(e.from.dist).toFixed(0)} blocks out (${sides[e.team].name})`;
+      g.appendChild(t);
+      svg.appendChild(g);
+      return g;
+    });
+    // the list and the map light each other up
+    const hot = (k, on) => { if (marks[k]) marks[k].classList.toggle("is-hot", on); if (items[k]) items[k].classList.toggle("is-hot", on); };
+    const items = shots.map((e, k) => h("li", { class: "is-" + e.team.toLowerCase(), on: { mouseenter: () => hot(k, true), mouseleave: () => hot(k, false), focusin: () => hot(k, true), focusout: () => hot(k, false) }, tabindex: "0" },
+      h("span", { class: "mh-shot-n", "aria-hidden": "true" }, String(k + 1)),
+      avatar(e.player, who(e.player) || "Goal", 18),
+      h("b", null, e.ownGoal ? who(e.player) + " (OG)" : who(e.player) || "Goal"),
+      " " + num(e.from.dist).toFixed(0) + " blocks, " + evClock(e, rec),
+      h("span", { class: "mh-dim" }, " · for " + sides[e.team].name)));
+    marks.forEach((g, k) => { g.addEventListener("mouseenter", () => hot(k, true)); g.addEventListener("mouseleave", () => hot(k, false)); });
+    const saved = tries.filter((e) => str(e.outcome) === "saved").length;
     const red = sides.RED, blue = sides.BLUE;
     return h("section", { class: "mh-card mh-shots" + (red.color === blue.color ? " is-same" : ""), "aria-labelledby": "mh-sm", style: { "--red": vivid(red.color), "--blue": vivid(blue.color) } },
-      sectionHead(h("span", { id: "mh-sm" }, "Where the goals came from"), "Each goal, drawn from the net it went into."),
+      sectionHead(h("span", { id: "mh-sm" }, tries.length ? "Where the shots came from" : "Where the goals came from"),
+        tries.length
+          ? `Faces are goals. Open rings are shots that didn't go in${saved ? ", crossed when saved" : ""}.`
+          : "Each goal, drawn from the net it went into, with who scored it."),
       h("div", { class: "mh-shotmap-wrap" }, svg),
-      h("ul", { class: "mh-shot-list" }, shots.map((e) => h("li", { class: "is-" + e.team.toLowerCase() },
-        h("i", { "aria-hidden": "true" }), h("b", null, e.ownGoal ? who(e.player) + " (OG)" : who(e.player) || "Goal"),
-        " " + num(e.from.dist).toFixed(0) + " blocks, " + evClock(e, rec),
-        h("span", { class: "mh-dim" }, " · for " + sides[e.team].name)))));
+      shots.length ? h("ul", { class: "mh-shot-list" }, items) : null);
   }
 
   /* the small print */
