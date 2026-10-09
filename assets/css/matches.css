@@ -1835,3 +1835,12 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-shot-n { display: inline-grid; place-items: center; min-width: 16px; height: 16px; font-size: 11px; font-weight: 800; color: #fff; background: var(--red); clip-path: var(--notch); }
 .mh-shot-list .is-blue .mh-shot-n { background: var(--blue); }
 .mh-shot-list .mh-ava { border-radius: 2px; }
+
+/* schema 2: shot summary under the map, the older-rules note, and save / post rows */
+.mh-shot-sum { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem 1.4rem; margin: .8rem 0 0; font-size: 13px; color: var(--text-faint); }
+.mh-shot-sum span { display: inline-flex; align-items: center; gap: .4rem; }
+.mh-shot-sum i { width: 9px; height: 9px; background: var(--red); clip-path: var(--px-dot); }
+.mh-shot-sum .is-blue i { background: var(--blue); }
+.mh-shot-sum b { color: var(--text-strong); }
+.mh-st-note { margin: .9rem 0 0; font-size: 12px; color: var(--text-faint); text-align: center; }
+.mh-ev.kind-save .mh-ev-ic .mh-i, .mh-ev.kind-post .mh-ev-ic .mh-i { fill: var(--text-strong); }

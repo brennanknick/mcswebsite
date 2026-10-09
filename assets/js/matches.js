@@ -62,10 +62,10 @@
     ["winrate", "Win rate", "rate", "Share of matches won. A draw counts as not won."],
     ["mvps", "MVPs", "count", "Player of the match awards."],
     ["cleansheets", "Clean sheets", "count", "In goal at full time, and the other side didn't score."],
-    ["saves", "Saves", "count", "Shots caught by the keeper, and balls stopped on the line."],
+    ["saves", "Saves", "count", "Shots that were going in, stopped by the keeper or a defender in their own box. Older matches counted saves more loosely."],
     ["steals", "Steals", "count", "Tackles that won the ball."],
     ["tackles", "Tackles", "count", "Hits on the player with the ball."],
-    ["interceptions", "Interceptions", "count", "The other side's balls caught in the air."],
+    ["interceptions", "Interceptions", "count", "The other side's balls caught in the air, and their shots blocked."],
     ["rating", "Rating", "rate", "Average match rating, from 3.0 to 10.0."],
     ["games", "Matches", "count", "Matches played to a result."],
     ["possession", "On the ball", "time", "Total time holding the ball."],
@@ -1201,7 +1201,7 @@
     const [rec] = await Promise.all([get("/matches/" + encodeURIComponent(r.id), null, 3600000), getMeta().catch(() => null)]);
     if (token !== S.token) return null;
     if (!rec.teams || !rec.score) throw new ApiError("server");
-    if (rec.schema > 1) console.warn("[matches] record schema " + rec.schema + " is newer than this page knows");
+    if (rec.schema > 2) console.warn("[matches] record schema " + rec.schema + " is newer than this page knows");
     return report(rec, obj(history.state).number);
   }
 
@@ -1523,6 +1523,23 @@
             h("span", { class: "mh-ev-score" }, scoreText(e.score))];
           break;
         }
+        case "SHOT": {
+          // only the moments worth a row: a save, or off the woodwork. Missed and
+          // blocked shots are on the shot map
+          const out = str(e.outcome);
+          if (out !== "saved" && out !== "post") return;
+          const dist = e.from && typeof e.from.dist === "number" ? h("span", { class: "mh-ev-sub" }, "From " + num(e.from.dist).toFixed(0) + " blocks out") : null;
+          if (out === "saved") {
+            // a save belongs to the side that made it
+            side = k === "RED" ? "BLUE" : k === "BLUE" ? "RED" : "";
+            kind = "save"; ic = "glove";
+            text = [h("b", null, "Saved! "), e.by ? pLink(e.by, who) : "The keeper", " stops ", pLink(e.player, who) || "a shot", dist];
+          } else {
+            kind = "post"; ic = "dot";
+            text = [h("b", null, "Off the woodwork! "), pLink(e.player, who) || "A shot", " hits the post", dist];
+          }
+          break;
+        }
         case "FREEZE":
           side = ""; kind = "mark is-small"; text = ["Play frozen by the referee"]; break;
         case "UNFREEZE":
@@ -1582,8 +1599,8 @@
     const share = pa + pb ? Math.round((pa / (pa + pb)) * 100) : 50;
     // the first four always show; the rest only when either side has one
     const rows = [
-      ["Shots on target", "shotsOnTarget"],
-      ["Attempts", "shots", "Every time a player released the ball, apart from completed passes"],
+      ["Shots on target", "shotsOnTarget", rec.schema >= 2 ? "Goals and saved shots" : null],
+      ["Attempts", "shots", rec.schema >= 2 ? "Real shots at goal: goals, and shots that were saved, blocked, hit the post or missed" : "Every time a player released the ball, apart from completed passes"],
       ["Passes", "passes"], ["Tackles", "tackles"], ["Steals", "steals"], ["Interceptions", "interceptions"],
       ["Saves", "saves"], ["Corners", "corners"], ["Free kicks", "freeKicks"], ["Penalties", "penalties", "Penalties awarded during play"],
       ["Pass-ins", "passIns"], ["Goal kicks", "goalKicks"], ["Own goals", "ownGoals"],
@@ -1604,7 +1621,11 @@
             h("td", { class: "mh-st-a" + (x > y ? " is-more" : "") }, h("span", null, x), h("i", { style: { "--w": (x / m) * 100 + "%" } })),
             h("th", { scope: "row", title: tip || null }, label),
             h("td", { class: "mh-st-b" + (y > x ? " is-more" : "") }, h("i", { style: { "--w": (y / m) * 100 + "%" } }), h("span", null, y)));
-        }))));
+        }))),
+      // records before the new shot rules (schema 1) counted attempts and saves far more loosely
+      !(rec.schema >= 2) && (num(a.shots) + num(b.shots) + num(a.saves) + num(b.saves))
+        ? h("p", { class: "mh-st-note" }, "This match was played before the new shot rules, so its attempts and saves were counted more loosely.")
+        : null);
   }
 
   /* possession flow: who had the ball, 30 seconds at a time */
@@ -1757,9 +1778,9 @@
   /* where the goals came from */
 
   function shotMapCard(rec, events, sides, who, standing) {
-    const placed = (e) => standing.has(e) && e.from && typeof e.from.dist === "number" && SIDES.includes(e.team);
-    const shots = events.filter((e) => placed(e) && e.type === "GOAL");
-    // attempts that didn't go in (missed, saved, blocked), once the server records them
+    const placed = (e) => e.from && typeof e.from.dist === "number" && SIDES.includes(e.team);
+    // goals that stood (not disallowed), and attempts that didn't go in (schema 2: missed, saved, blocked, post)
+    const shots = events.filter((e) => standing.has(e) && placed(e) && e.type === "GOAL");
     const tries = events.filter((e) => placed(e) && e.type === "SHOT");
     if (!shots.length && !tries.length) return null;
     const all = shots.concat(tries);
@@ -1838,6 +1859,14 @@
           ? `Faces are goals. Open rings are shots that didn't go in${saved ? ", crossed when saved" : ""}.`
           : "Each goal, drawn from the net it went into, with who scored it."),
       h("div", { class: "mh-shotmap-wrap" }, svg),
+      tries.length ? h("p", { class: "mh-shot-sum" }, SIDES.map((k) => {
+        const g = shots.filter((e) => e.team === k && !e.ownGoal).length;
+        const t = tries.filter((e) => e.team === k);
+        const sv = t.filter((e) => str(e.outcome) === "saved").length;
+        const n = g + t.length;
+        return h("span", { class: "is-" + k.toLowerCase() }, h("i", { "aria-hidden": "true" }),
+          h("b", null, sides[k].name), ` ${n} ${n === 1 ? "shot" : "shots"}, ${g} ${g === 1 ? "goal" : "goals"}${sv ? `, ${sv} saved` : ""}`);
+      })) : null,
       shots.length ? h("ul", { class: "mh-shot-list" }, items) : null);
   }
 
