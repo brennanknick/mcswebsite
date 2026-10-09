@@ -70,6 +70,8 @@
     ["games", "Matches", "count", "Matches played to a result."],
     ["possession", "On the ball", "time", "Total time holding the ball."],
   ];
+  // which boards have a per-match view: counts and time, not rates or the match count itself
+  const perOk = (stat) => !!STAT[stat] && STAT[stat][2] !== "rate" && stat !== "games";
   // no prototype, so ?stat=constructor can't find Object's own keys
   const STAT = Object.assign(Object.create(null), Object.fromEntries(STATS.map((s) => [s[0], s])));
 
@@ -532,7 +534,9 @@
     if (tab === "leaders") {
       const stat = str(q.get("stat")).toLowerCase();
       const lim = parseInt(q.get("limit"), 10);
-      return { view: "leaders", stat: stat in STAT ? stat : "goals", mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25 };
+      const st = stat in STAT ? stat : "goals";
+      return { view: "leaders", stat: st, mode: modeParam(q.get("mode")), limit: lim === 50 || lim === 100 ? lim : 25,
+        per: q.get("per") === "game" && perOk(st) ? "game" : "" };
     }
     if (tab === "players") return { view: "players", q: str(q.get("q")).trim().slice(0, 16) };
     if (tab === "fixtures") {
@@ -569,6 +573,7 @@
         if (r.stat && r.stat !== "goals") q.set("stat", r.stat);
         if (r.mode) q.set("mode", r.mode);
         if (r.limit && r.limit !== 25) q.set("limit", r.limit);
+        if (r.per && perOk(r.stat)) q.set("per", r.per);
         break;
       case "players":
         q.set("tab", "players");
@@ -2266,40 +2271,63 @@
     return Math.round(v).toLocaleString();
   }
 
+  // per match: "0.82", or a time per match for possession
+  const fmtPer = (stat, v) => (stat === "possession" ? fmtStat(stat, v) : num(v).toFixed(2));
+  const PER_MIN = 5;
+
   async function viewLeaders(r, token) {
+    const per = r.per === "game" && perOk(r.stat);
     // ask for one more row than we show: that's how we know whether
     // "Show more" would actually bring anything
+    const want = { stat: r.stat, mode: r.mode, limit: Math.min(100, r.limit + 1) };
+    if (per) want.per = "game";
     const [meta, d] = await Promise.all([
       getMeta().catch(() => null),
-      get("/leaders", { stat: r.stat, mode: r.mode, limit: Math.min(100, r.limit + 1) }, 30000),
+      get("/leaders", want, 30000),
     ]);
     if (token !== S.token) return null;
     if (meta) renderCounters(meta);
     const def = STAT[r.stat];
-    setTitle(def[1] + " leaderboard");
+    setTitle(def[1] + (per ? " per match" : "") + " leaderboard");
     // the server echoes the stat it actually used; anything else is a
     // board it doesn't know, which we'd rather show as empty than wrong
-    const got = str(d.stat) === r.stat ? arr(d.items) : [];
+    let got = str(d.stat) === r.stat ? arr(d.items) : [];
+    let min = num(d.min) || 1;
+    if (per && str(d.per) !== "game") {
+      // a server from before per-match boards ignores per=game: work it out from the totals,
+      // ranked like the server does (value, then more matches, then name; equal values share a rank)
+      const full = want.limit >= 100 ? d : await get("/leaders", { stat: r.stat, mode: r.mode, limit: 100 }, 30000);
+      if (token !== S.token) return null;
+      min = PER_MIN;
+      got = (str(full.stat) === r.stat ? arr(full.items) : [])
+        .filter((x) => num(x.games) >= min)
+        .map((x) => Object.assign({}, x, { total: num(x.value), value: Math.round((num(x.value) / num(x.games)) * 100) / 100 }))
+        .sort((a, b) => b.value - a.value || num(b.games) - num(a.games) || nameOf(a).localeCompare(nameOf(b)));
+      got.forEach((x, i) => { x.rank = i && x.value === got[i - 1].value ? got[i - 1].rank : i + 1; });
+    }
     const more = got.length > r.limit && r.limit < 100;
     const items = got.slice(0, r.limit);
-    const min = num(d.min) || 1;
+    // the total behind a per-match value, for "41 in 50 matches"
+    const totalOf = (x) => (x.total != null ? num(x.total) : Math.round(num(x.value) * num(x.games)));
     // on the Matches board the value IS the match count: don't print it twice
     const showGames = r.stat !== "games";
 
     const picker = h("div", { class: "mh-statpick", role: "group", "aria-label": "Stat" },
       STATS.map(([k, label]) => h("a", {
-        href: href({ view: "leaders", stat: k, mode: r.mode }), "data-go": true, "data-focus": "stat:" + k,
+        href: href({ view: "leaders", stat: k, mode: r.mode, per: perOk(k) ? r.per : "" }), "data-go": true, "data-focus": "stat:" + k,
         "aria-current": k === r.stat ? "true" : null,
       }, label)));
 
     const out = [
       h("div", { class: "mh-filters" },
         segmented("Mode", [["", "All"], ["MATCH", "Match"], ["SCRIM", "Scrim"], ["QUICK", "Quick"]], r.mode,
-          (v) => href({ view: "leaders", stat: r.stat, mode: v }), "lmode")),
+          (v) => href({ view: "leaders", stat: r.stat, mode: v, per: r.per }), "lmode"),
+        perOk(r.stat) ? segmented("Show", [["", "Total"], ["game", "Per match"]], per ? "game" : "",
+          (v) => href({ view: "leaders", stat: r.stat, mode: r.mode, per: v }), "lper") : null),
       picker,
     ];
 
-    const sub = def[3] + (min > 1 ? ` At least ${min} matches to qualify.` : "") + (showGames ? " Only matches that reached a result count." : "")
+    const sub = def[3] + (per ? " Divided by matches played." : "") + (min > 1 ? ` At least ${min} matches to qualify.` : "") + (showGames ? " Only matches that reached a result count." : "")
       + (d.linkedOnly ? " " + LINKED_ONLY : "");
     if (!items.length) {
       out.push(note("wait", "No one on this board yet", sub, []));
@@ -2311,14 +2339,15 @@
     const podium = items.slice(0, 3);
     const rest = items.slice(3);
     const tied = podium.filter((x) => num(x.rank) === 1).length > 1;
-    const unit = " " + def[1].toLowerCase();
+    const unit = " " + def[1].toLowerCase() + (per ? " per match" : "");
+    const val = (x) => (per ? fmtPer(r.stat, x.value) : fmtStat(r.stat, x.value));
     // after "Show more", focus goes to the first row it brought in
     const firstNew = r.limit > 25 ? (r.limit === 50 ? 25 : 50) : -1;
     const whoLink = (x, i) => h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true, "data-focus": i === firstNew ? "lb-more" : null },
       avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)));
 
     out.push(h("section", { class: "mh-board", "aria-labelledby": "mh-lb" },
-      h("h2", { class: "mh-sec-title", id: "mh-lb" }, def[1], r.mode ? h("span", { class: "mh-dim" }, " · " + modeName(r.mode)) : null),
+      h("h2", { class: "mh-sec-title", id: "mh-lb" }, def[1], per ? " per match" : null, r.mode ? h("span", { class: "mh-dim" }, " · " + modeName(r.mode)) : null),
       h("p", { class: "mh-sec-sub" }, sub, " ",
         h("a", { class: "mh-plink", href: href({ view: "ranked" }), "data-go": true }, "Elo ratings are on the Ranked tab.")),
       h("ol", { class: "mh-podium" + (tied ? " is-tied" : ""), style: { "--n": podium.length } }, podium.map((x, i) =>
@@ -2328,17 +2357,17 @@
             avatar(x.uuid, nameOf(x), 64),
             h("b", { class: "mh-podium-name" }, nameOf(x)),
             x.club ? clubChip(x.club) : null,
-            h("span", { class: "mh-podium-val" }, fmtStat(r.stat, x.value), vh(unit)),
-            showGames ? h("small", null, num(x.games) + (num(x.games) === 1 ? " match" : " matches")) : null)))),
+            h("span", { class: "mh-podium-val" }, val(x), vh(unit)),
+            showGames ? h("small", null, (per ? fmtStat(r.stat, totalOf(x)) + " in " : "") + num(x.games) + (num(x.games) === 1 ? " match" : " matches")) : null)))),
       rest.length ? h("table", { class: "mh-lb-table" },
-        h("caption", { class: "visually-hidden" }, def[1] + " leaderboard, from 4th place"),
+        h("caption", { class: "visually-hidden" }, def[1] + (per ? " per match" : "") + " leaderboard, from 4th place"),
         h("thead", null, h("tr", null,
-          h("th", { scope: "col" }, "#"), h("th", { scope: "col" }, "Player"), h("th", { scope: "col", class: "mh-lb-val" }, def[1]),
+          h("th", { scope: "col" }, "#"), h("th", { scope: "col" }, "Player"), h("th", { scope: "col", class: "mh-lb-val" }, per ? "Per match" : def[1]),
           showGames ? h("th", { scope: "col", class: "mh-lb-games" }, "Matches") : null)),
         h("tbody", null, rest.map((x, j) => h("tr", null,
           h("td", { class: "mh-lb-rank" }, num(x.rank)),
           h("td", { class: "mh-lb-player" }, whoLink(x, j + 3), x.club ? clubChip(x.club) : null),
-          h("td", { class: "mh-lb-val" }, fmtStat(r.stat, x.value)),
+          h("td", { class: "mh-lb-val", title: per ? fmtStat(r.stat, totalOf(x)) + " in " + num(x.games) + " matches" : null }, val(x)),
           showGames ? h("td", { class: "mh-lb-games" }, num(x.games)) : null)))) : null,
       more
         ? h("div", { class: "mh-more" }, h("a", { class: "btn btn-dark", href: href(Object.assign({}, r, { limit: r.limit === 25 ? 50 : 100 })), "data-go": true, "data-keep": true, "data-focus": "lb-more" }, "Show more"))
