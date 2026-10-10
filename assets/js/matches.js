@@ -465,6 +465,11 @@
   const LINKED_ONLY = "Only linked players are ranked: type /link in game.";
   const isSmall = (m) => arr(obj(m).flags).includes("SMALL") || obj(m).small === true;
   const smallTag = () => h("span", { class: "mh-tag is-small" }, "Not counted");
+  // the referee's Experimental Field (power-ups, ball tweaks): listed, never counted, like SMALL
+  const isExp = (m) => arr(obj(m).flags).includes("EXPERIMENTAL") || obj(m).experimental === true;
+  const expTag = () => h("span", { class: "mh-tag is-exp", title: "Played on the Experimental Field, so it doesn't count toward stats" }, "Experimental");
+  // one tag says it: Experimental when it is (a small experimental match too), else Not counted
+  const uncountedTag = (m) => (isExp(m) ? expTag() : isSmall(m) ? smallTag() : null);
 
   function modeTag(mode, knockout, queue) {
     // a ranked match is labelled by its queue, not its mode (doc 2.3)
@@ -1022,7 +1027,7 @@
         sideCell(blue, "away", win === "BLUE", win === "RED", hiddenWin && win === "BLUE")),
       h("div", { class: "mh-row-meta" },
         modeTag(m.mode, m.knockout, m.queue),
-        isSmall(m) ? smallTag() : null,
+        uncountedTag(m),
         h("span", { class: "mh-row-pitch" }, str(m.fieldName) || str(m.fieldId) || "Unknown pitch")),
       h("div", { class: "mh-row-mvp" },
         m.mvp && UUID_RE.test(str(m.mvp.uuid))
@@ -1263,7 +1268,7 @@
         heroSide(blue, win === "BLUE", win && win !== "BLUE", scorerList("BLUE"))),
       h("ul", { class: "mh-hero-chips" },
         h("li", null, modeTag(rec.mode, rec.knockout, rec.queue)),
-        isSmall(rec) ? h("li", null, smallTag()) : null,
+        uncountedTag(rec) ? h("li", null, uncountedTag(rec)) : null,
         // side names alone can't prove a fixture (doc 4.15); the source can
         rec.source === "fixture" ? h("li", null, "Club fixture") : null,
         eloAverages(rec) ? h("li", { class: "mh-elo-avg" }, "Avg Elo " + eloAverages(rec).RED + " v " + eloAverages(rec).BLUE) : null,
@@ -1341,6 +1346,7 @@
       RULES_CHANGED: "The rules were changed partway through this match.",
       SHOOTOUT_FORCED: "A referee sent this match straight to penalties.",
       SMALL: "A side had 2 or fewer players when it started, so this match doesn't count toward stats or leaderboards.",
+      EXPERIMENTAL: "This match was played on the Experimental Field, with power-ups and ball tweaks, so it doesn't count toward stats or leaderboards.",
     };
     if (QUEUE_RE.test(str(rec.queue)) && rec.outcome !== "COMPLETED") {
       say.push(rec.outcome === "INTERRUPTED"
@@ -1350,6 +1356,8 @@
     if (res.decidedBy === "FORFEIT") say.push("Every player on one side left and stayed away, so the other side won by forfeit. The score is what it was when they went.");
     arr(rec.flags).forEach((f) => {
       if (f === "TEST") return;
+      // an experimental match already says it doesn't count; its size doesn't need saying too
+      if (f === "SMALL" && isExp(rec)) return;
       say.push(FLAGS[f] || "Flagged: " + str(f).toLowerCase().replace(/_/g, " ") + ".");
     });
     return say.map((t) => h("p", { class: "callout mh-callout" }, t));
@@ -2060,7 +2068,7 @@
         h("b", { class: "mh-grow-score" }, num(sc[0]) + "–" + num(sc[1]), so.length === 2 && num(so[0]) + num(so[1]) > 0 ? h("small", null, ` (${num(so[0])}–${num(so[1])} pens)`) : null),
         h("span", { class: "mh-dotname", style: sideVars(them) }, h("i"), h("span", { class: "mh-dotname-t" }, them.name))),
       h("span", { class: "mh-grow-me" },
-        isSmall(g) ? smallTag() : null,
+        uncountedTag(g),
         g.position ? h("span", { class: "mh-pos", title: POSITIONS[g.position] || g.position }, g.position) : null,
         num(g.goals) ? countBadge("is-goal", "ball", num(g.goals), "goal", "goals") : null,
         num(g.assists) ? countBadge("is-assist", "boot", num(g.assists), "assist", "assists") : null,
