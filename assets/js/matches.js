@@ -2592,6 +2592,7 @@
       score: has(f.score) ? { home: num(sc.home), away: num(sc.away) } : null,
       pens: has(f.pens) ? { home: num(pn.home), away: num(pn.away) } : null,
       pitch: str(f.pitch), recordId: str(f.recordId), knockout: f.knockout === true, decidedBy: str(f.decidedBy),
+      halves: num(f.halves), halfMinutes: num(f.halfMinutes), format: str(f.format),
     };
   }
 
@@ -2614,7 +2615,10 @@
     h("b", null, c.name));
   const fxTags = (f) => [f.label ? h("span", { class: "mh-tag" }, f.label) : null,
     f.knockout ? h("span", { class: "mh-tag is-ranked" }, "Knockout") : null,
-    f.pitch ? h("span", { class: "mh-tag is-void" }, f.pitch) : null].filter(Boolean);
+    f.pitch ? h("span", { class: "mh-tag is-void" }, f.pitch) : null,
+    // how long it plays: "2 × 10 min", the plugin's full wording on hover
+    f.halves && f.halfMinutes ? h("span", { class: "mh-tag is-void", title: f.format || null },
+      f.halves === 1 ? f.halfMinutes + " min" : f.halves + " × " + f.halfMinutes + " min") : null].filter(Boolean);
   const fxScore = (f) => h("span", { class: "mh-fx-score" },
     h("span", null, num(f.score.home), h("i", null, "\u2013"), num(f.score.away)),
     f.pens ? h("small", null, `${num(f.pens.home)}\u2013${num(f.pens.away)} pens`) : null);
