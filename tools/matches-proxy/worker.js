@@ -160,7 +160,7 @@ const ROUTES = [
     name: "matches",
     re: /^\/api\/v1\/matches\/?$/,
     path: () => "/api/v1/matches",
-    params: ["page", "size", "field", "mode", "player", "results", "ranked"],
+    params: ["page", "size", "field", "mode", "player", "results", "ranked", "fixtures"],
     ttl: LIST_TTL, staleFor: LIST_STALE, browser: LIST_BROWSER,
   },
   {
@@ -191,7 +191,7 @@ const ROUTES = [
     name: "leaders",
     re: /^\/api\/v1\/leaders\/?$/,
     path: () => "/api/v1/leaders",
-    params: ["stat", "mode", "min", "limit"],
+    params: ["stat", "mode", "min", "limit", "per"],
     ttl: LIST_TTL, staleFor: LIST_STALE, browser: LIST_BROWSER,
   },
   {

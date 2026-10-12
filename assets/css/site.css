@@ -1469,6 +1469,11 @@ code, kbd {
   .feature-render { width: 340px; }
 }
 
+/* the league link says just "League" until the bar has room for all of it */
+@media (max-width: 1399px) {
+  .nav-links .nav-league-long { display: none; }
+}
+
 @media (max-width: 1199px) {
   .section-title, .feature-title { font-size: calc(1.375rem + 1.5vw); }
   .feature.img-left .feature-render { left: 3rem; }

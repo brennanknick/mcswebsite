@@ -1821,14 +1821,30 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   .mh-fx-row { animation: none; }
 }
 
-/* goal map: scorers' faces, numbered like the list; attempts as open rings */
+/* goal map: numbered dots in the team's colour; the scorer's face pops up while pointed at.
+   The map may spill a face past its edge, so goals near the line keep their true spot. */
+.mh-shotmap { overflow: visible; }
+.mh-sm-shot { cursor: default; }
+.mh-sm-shot .mh-sm-numt { fill: #fff; stroke: none; font: 800 5.4px var(--font); text-anchor: middle; pointer-events: none; }
 .mh-sm-shot .mh-sm-frame { fill: var(--red); }
 .mh-sm-shot.is-blue .mh-sm-frame { fill: var(--blue); }
 .mh-sm-shot image { image-rendering: pixelated; }
-.mh-sm-shot .mh-sm-num { fill: #0b120f; }
-.mh-sm-shot .mh-sm-numt { fill: #fff; font: 800 5.5px var(--font); text-anchor: middle; }
-.mh-sm-shot { transition: filter .15s; cursor: default; }
-.mh-sm-shot.is-hot { filter: drop-shadow(0 0 3px #fff); }
+.mh-sm-shot .mh-sm-num { fill: #0b120f; stroke: none; }
+.mh-sm-face {
+  opacity: 0;
+  transform: scale(.45);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: opacity .14s ease, transform .2s cubic-bezier(.2, 1.5, .45, 1);
+  pointer-events: none;
+}
+.mh-sm-shot.is-hot .mh-sm-face { opacity: 1; transform: scale(1); }
+.mh-sm-dot, .mh-sm-shot > .mh-sm-numt { transition: opacity .12s; }
+.mh-sm-shot.is-hot .mh-sm-dot, .mh-sm-shot.is-hot > .mh-sm-numt { opacity: 0; }
+.mh-sm-shot.is-hot { filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .7)); }
+@media (prefers-reduced-motion: reduce) {
+  .mh-sm-face { transition: none; transform: none; }
+}
 .mh-sm-try circle { fill: none; stroke: var(--red); stroke-width: 1.1; opacity: .85; }
 .mh-sm-try.is-blue circle { stroke: var(--blue); }
 .mh-sm-try path { stroke: #fff; stroke-width: .9; opacity: .8; }
@@ -1836,7 +1852,6 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-shot-list li.is-hot, .mh-shot-list li:focus-visible { background: rgba(255, 255, 255, .06); outline: none; }
 .mh-shot-n { display: inline-grid; place-items: center; min-width: 16px; height: 16px; font-size: 11px; font-weight: 800; color: #fff; background: var(--red); clip-path: var(--notch); }
 .mh-shot-list .is-blue .mh-shot-n { background: var(--blue); }
-.mh-shot-list .mh-ava { border-radius: 2px; }
 
 /* schema 2: shot summary under the map, the older-rules note, and save / post rows */
 .mh-shot-sum { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem 1.4rem; margin: .8rem 0 0; font-size: 13px; color: var(--text-faint); }
@@ -1846,3 +1861,92 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-shot-sum b { color: var(--text-strong); }
 .mh-st-note { margin: .9rem 0 0; font-size: 12px; color: var(--text-faint); text-align: center; }
 .mh-ev.kind-save .mh-ev-ic .mh-i, .mh-ev.kind-post .mh-ev-ic .mh-i { fill: var(--text-strong); }
+
+/* ── Champions League page (champions-league/) ───────────────────── */
+
+.lg-head { margin: .25rem 0 2.25rem; }
+.lg-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2rem;
+  padding: 2.4rem 2.5rem 2.5rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    radial-gradient(28% 115% at 86% 50%, rgba(255, 226, 150, .11), transparent 70%),
+    radial-gradient(45% 80% at 8% 0%, rgba(200, 242, 92, .08), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .018) 0 64px, transparent 64px 128px),
+    rgba(2, 6, 4, .5);
+  box-shadow: inset 0 0 0 1px var(--card-edge), 0 28px 60px -34px rgba(0, 0, 0, .85);
+  animation: lg-rise .6s cubic-bezier(.2, .8, .2, 1) both;
+}
+/* a gold rim along the top: the trophy's colour, not the kit's */
+.lg-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #7a5c18, #ffe29a 50%, #7a5c18);
+}
+.lg-text { min-width: 0; }
+.lg-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 0;
+  padding: .32rem .75rem;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #1c1505;
+  background: #ffe29a;
+  clip-path: var(--notch);
+  animation: lg-rise .6s cubic-bezier(.2, .8, .2, 1) both .05s;
+}
+.lg-kicker i { width: 8px; height: 8px; background: currentColor; clip-path: var(--px-dot); }
+.lg-title {
+  margin: .9rem 0 .7rem;
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+  animation: lg-rise .6s cubic-bezier(.2, .8, .2, 1) both .12s;
+}
+.lg-sub { margin: 0; max-width: 34rem; font-size: 17px; color: var(--text); animation: lg-rise .6s cubic-bezier(.2, .8, .2, 1) both .2s; }
+.lg-art { position: relative; display: grid; place-items: center; padding-right: .75rem; }
+/* a pool of floodlight under the emblem */
+.lg-art::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: 170px;
+  height: 30px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(255, 226, 150, .16), transparent);
+}
+.lg-emblem { width: 150px; height: 150px; overflow: visible; filter: drop-shadow(0 0 26px rgba(255, 226, 150, .22)); animation: lg-turn-in .9s cubic-bezier(.2, .8, .2, 1) both .15s; }
+.lg-orbit { fill: none; stroke: rgba(255, 226, 150, .22); stroke-width: 1; stroke-dasharray: 2 4; }
+.lg-star { fill: #ffe29a; animation: lg-twinkle 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * -.4s); }
+.lg-ball path { fill: #f4f1e6; }
+.lg-ball .lg-ball-cut { fill: #0b1210; }
+@keyframes lg-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes lg-turn-in { from { opacity: 0; transform: rotate(-50deg) scale(.7); } }
+@keyframes lg-twinkle { 50% { opacity: .3; } }
+@media (max-width: 767px) {
+  .lg-card { grid-template-columns: minmax(0, 1fr); padding: 1.9rem 1.4rem 2rem; }
+  .lg-art { display: none; }
+  .lg-title { font-size: min(2.75rem, 11.5vw); }
+  .lg-sub { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-card, .lg-kicker, .lg-title, .lg-sub, .lg-emblem, .lg-star { animation: none; }
+}
+
+/* a fixture's match report: the competition, linking back to its page */
+.mh-tag.is-league { color: #fff6dc; background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 220, 140, .55); text-decoration: none; transition: background .15s; }
+.mh-tag.is-league:hover { background: rgba(255, 226, 150, .16); }

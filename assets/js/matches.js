@@ -13,7 +13,9 @@
      ./?p=<uuid>              player    (?mode= &page=)
      ./?tab=leaders           leaderboards (?stat= &mode= &limit=)
      ./?tab=players           player search
-     ./?tab=fixtures          scheduled club games (?club=)
+   Club fixtures (the Champions League) have a page of their own,
+   ../champions-league/ (?club=), drawn by this same script; the old
+   ./?tab=fixtures goes there, and its games stay out of the match list.
    404.html sends the game's /matches/<id> style chat links here.
    ================================================================== */
 
@@ -37,6 +39,25 @@
   const liveList = $("[data-mh-live-list]");
   const staleNote = $("[data-mh-stale]");
   const searchSlot = $("[data-mh-search]");
+
+  // champions-league/ runs this script too, with data-mh-league: fixtures only, nothing else
+  const LEAGUE = main.hasAttribute("data-mh-league");
+  const LEAGUE_URL = "../champions-league/";
+  const CLUB_RE = /^[a-z0-9_-]{1,40}$/i;
+  {
+    const q = new URLSearchParams(location.search);
+    // a match or player link that lands on the league page belongs to match history
+    if (LEAGUE && (q.has("m") || q.has("p") || q.has("tab"))) {
+      location.replace("../matches/" + location.search);
+      return;
+    }
+    // match history's old Fixtures tab is the league page now
+    if (!LEAGUE && q.get("tab") === "fixtures") {
+      const club = String(q.get("club") || "").trim();
+      location.replace(LEAGUE_URL + (CLUB_RE.test(club) ? "?club=" + encodeURIComponent(club) : ""));
+      return;
+    }
+  }
 
   /* ── what the data looks like ──────────────────────────────────── */
 
@@ -533,6 +554,10 @@
 
   function parseRoute(search) {
     const q = new URLSearchParams(search);
+    if (LEAGUE) {
+      const club = str(q.get("club")).trim();
+      return { view: "fixtures", club: CLUB_RE.test(club) ? club : "" };
+    }
     if (q.has("m")) return { view: "match", id: str(q.get("m")).trim() };
     if (q.has("p")) return { view: "player", uuid: str(q.get("p")).trim().toLowerCase(), mode: modeParam(q.get("mode")), page: pageParam(q.get("page")) };
     const tab = q.get("tab");
@@ -546,7 +571,7 @@
     if (tab === "players") return { view: "players", q: str(q.get("q")).trim().slice(0, 16) };
     if (tab === "fixtures") {
       const club = str(q.get("club")).trim();
-      return { view: "fixtures", club: /^[a-z0-9_-]{1,40}$/i.test(club) ? club : "" };
+      return { view: "fixtures", club: CLUB_RE.test(club) ? club : "" };
     }
     if (tab === "ranked") {
       const lim = parseInt(q.get("limit"), 10);
@@ -585,7 +610,6 @@
         if (r.q) q.set("q", r.q);
         break;
       case "fixtures":
-        q.set("tab", "fixtures");
         if (r.club) q.set("club", r.club);
         break;
       case "ranked":
@@ -601,7 +625,10 @@
         if (r.page > 1) q.set("page", r.page);
     }
     const s = q.toString();
-    return "./" + (s ? "?" + s : "");
+    const tail = s ? "?" + s : "";
+    // fixtures live on the league page and everything else in match history: each links to the other
+    if (r.view === "fixtures") return (LEAGUE ? "./" : LEAGUE_URL) + tail;
+    return (LEAGUE ? "../matches/" : "./") + tail;
   }
   const toMatch = (id, number) => h("a", { href: href({ view: "match", id }), "data-go": true, state: number ? { number } : null });
   const toPlayer = (uuid) => href({ view: "player", uuid });
@@ -641,15 +668,15 @@
   function setChrome(r) {
     const index = isIndex(r.view);
     head.hidden = !index;
-    bar.hidden = !index || !API;
-    tabs.hidden = !index || !API;
-    counters.hidden = !index || !API || !counters.children.length;
+    bar.hidden = LEAGUE || !index || !API;
+    tabs.hidden = LEAGUE || !index || !API;
+    counters.hidden = LEAGUE || !index || !API || !counters.children.length;
     $$("a", tabs).forEach((a) => {
       if (a.dataset.tab === r.view) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     });
     // live matches lead every index view, not only the list
-    if (index) liveStart();
+    if (index && !LEAGUE) liveStart();
     else liveStop();
   }
 
@@ -699,6 +726,10 @@
       history.replaceState(history.state, "", location.pathname + href(r).replace(/^\.\//, ""));
     }
     if (r.view === "list") S.lastList = href(r);
+    if (r.view === "fixtures" && !LEAGUE) {
+      location.replace(href(r));
+      return;
+    }
 
     setChrome(r);
 
@@ -893,9 +924,17 @@
 
   /* ── view: the match list ──────────────────────────────────────── */
 
+  // The match ids of recent club fixtures. Fixture games live on the league page, so the match list
+  // leaves them out; the fixtures list keeps a week of results, which covers the newest pages.
+  async function fixtureRecords() {
+    const d = await get("/fixtures", null, 60000).catch(() => null);
+    return new Set((d ? (Array.isArray(d) ? d : arr(d.fixtures)) : []).map((f) => str(obj(f).recordId)).filter(Boolean));
+  }
+
   async function viewList(r, token) {
-    const params = { page: r.page, size: 20, mode: r.mode, field: r.field, results: r.results ? 1 : "", ranked: r.ranked };
-    const [meta, list, rankedOn] = await Promise.all([getMeta().catch(() => null), get("/matches", params, 15000), rankedRunning()]);
+    // fixtures=0: a server that can leave fixture games out does, and says "fixtures": false
+    const params = { page: r.page, size: 20, mode: r.mode, field: r.field, results: r.results ? 1 : "", ranked: r.ranked, fixtures: 0 };
+    const [meta, list, rankedOn, fxIds] = await Promise.all([getMeta().catch(() => null), get("/matches", params, 15000), rankedRunning(), fixtureRecords()]);
     if (token !== S.token) return null;
     if (meta) renderCounters(meta);
     setTitle(r.page > 1 ? `Matches, page ${r.page}` : "Match History");
@@ -904,11 +943,12 @@
     // keep the Ranked option unless ranked is positively off and nothing
     // ranked is on screen (a switched-off queue still has its old matches)
     const out = [filters(r, meta, rankedOn !== false || arr(list.items).some((m) => m.ranked === true))];
-    let items = arr(list.items);
+    const notFixture = (m) => list.fixtures === false || (m.fixture !== true && !fxIds.has(m.id));
+    let items = arr(list.items).filter(notFixture);
     // A match that just ended can be missing from a list the browser or the
     // proxy cached a moment before the whistle: add it (doc 2.3 order)
     if (r.page === 1 && S.finished.length) {
-      const extra = S.finished.filter((m) => !items.some((x) => x.id === m.id) &&
+      const extra = S.finished.filter((m) => notFixture(m) && !items.some((x) => x.id === m.id) &&
         (!r.mode || m.mode === r.mode) && (!r.field || m.fieldId === r.field) && (!r.results || m.outcome === "COMPLETED") &&
         (!r.ranked || m.ranked === true));
       if (extra.length) {
@@ -925,7 +965,8 @@
         [arrowBtn("Show every match", { href: href({ view: "list" }), "data-go": true })]));
       return out;
     }
-    if (!items.length) {
+    // a page of nothing but fixture games is still a page, not the end of the list
+    if (!items.length && !arr(list.items).length) {
       if (r.ranked === "1" && num(list.total) === 0 && !r.mode && !r.field) {
         out.push(note("wait", "No ranked matches yet", "Queue for ranked from the lobby hotbar and yours could be the first.",
           [arrowBtn("Join the server", { on: { click: openConnect } })]));
@@ -1054,7 +1095,7 @@
       return h("li", null, b, h("span", null, label));
     }));
     if (meta.first) counters.appendChild(h("li", { class: "is-since" }, h("span", null, "Recording since"), h("b", null, F.date.format(new Date(meta.first)))));
-    counters.hidden = !(S.route && isIndex(S.route.view));
+    counters.hidden = LEAGUE || !(S.route && isIndex(S.route.view));
   }
   function countUp(el, to, delay) {
     const t0 = performance.now() + delay, dur = 900;
@@ -1252,7 +1293,9 @@
 
     const hero = h("section", { class: "mh-hero", "aria-labelledby": "mh-hero-title", style: { "--red": vivid(red.color), "--blue": vivid(blue.color) } },
       h("div", { class: "mh-hero-top" },
-        h("a", { class: "mh-back", href: S.lastList, "data-go": true }, icon("tri"), "Match history"),
+        fixtureRec(rec)
+          ? h("a", { class: "mh-back", href: href({ view: "fixtures" }) }, icon("tri"), leagueName(rec))
+          : h("a", { class: "mh-back", href: S.lastList, "data-go": true }, icon("tri"), "Match history"),
         h("span", { class: "mh-hero-when" }, F.full.format(new Date(num(rec.startedAt))))),
       h("h1", { class: "mh-hero-title visually-hidden", id: "mh-hero-title" },
         `${red.name} ${num(sc.RED)}, ${blue.name} ${num(sc.BLUE)}`),
@@ -1269,8 +1312,8 @@
       h("ul", { class: "mh-hero-chips" },
         h("li", null, modeTag(rec.mode, rec.knockout, rec.queue)),
         uncountedTag(rec) ? h("li", null, uncountedTag(rec)) : null,
-        // side names alone can't prove a fixture (doc 4.15); the source can
-        rec.source === "fixture" ? h("li", null, "Club fixture") : null,
+        // side names alone can't prove a fixture (doc 4.15); the source and tournament can
+        fixtureRec(rec) ? h("li", null, h("a", { class: "mh-tag is-league", href: href({ view: "fixtures" }) }, leagueName(rec))) : null,
         eloAverages(rec) ? h("li", { class: "mh-elo-avg" }, "Avg Elo " + eloAverages(rec).RED + " v " + eloAverages(rec).BLUE) : null,
         h("li", null, str(obj(rec.field).name) || "Unknown pitch"),
         h("li", null, rulesLine(rec)),
@@ -1294,6 +1337,10 @@
     out.push(shots ? h("div", { class: "mh-report-grid is-even" }, shots, infoCard(rec, sides)) : infoCard(rec, sides));
     return out;
   }
+
+  // a club fixture: played through the cup machinery, so its source is "tournament" with the id "fixtures"
+  const fixtureRec = (rec) => rec.source === "fixture" || str(obj(rec.tournament).id) === "fixtures";
+  const leagueName = (rec) => str(obj(rec.tournament).name) || "Champions League";
 
   function heroSide(side, winner, loser, scorers) {
     return h("div", { class: "mh-hero-side" + (winner ? " is-winner" : "") + (loser ? " is-loser" : ""), style: sideVars(side) },
@@ -1830,25 +1877,35 @@
       g.appendChild(t);
       svg.appendChild(g);
     });
-    // each goal: the scorer's face in a frame of their team's colour, numbered like the list
-    const F = 13;
+    // each goal: a numbered dot in its team's colour. The scorer's face pops up only while it's
+    // pointed at (here or in the list), so a busy map stays readable; it loads the first time.
+    const D = 8, F = 16;
     const marks = shots.map((e, k) => {
-      const [x, y] = at(e, F / 2 + 1);
-      const g = el("g", { class: "mh-sm-shot is-" + e.team.toLowerCase(), transform: `translate(${x - F / 2} ${y - F / 2})`, "data-n": k + 1 });
-      g.appendChild(el("rect", { class: "mh-sm-frame", x: -1.5, y: -1.5, width: F + 3, height: F + 3 }));
-      if (UUID_RE.test(str(e.player))) {
-        const img = el("image", { width: F, height: F, href: `https://mc-heads.net/avatar/${e.player}/32`, preserveAspectRatio: "none" });
-        img.addEventListener("error", () => img.setAttribute("href", `https://minotar.net/helm/${e.player.replace(/-/g, "")}/32`), { once: true });
-        g.appendChild(img);
-      } else {
-        const ball = el("g", { transform: `translate(${F / 2 - 4} ${F / 2 - 4})` });
-        ball.innerHTML = `<path d="${ICONS.ball[1]}"/><path class="mh-i-cut" d="${ICONS.ball[2]}"/>`;
-        g.appendChild(ball);
-      }
-      g.appendChild(el("rect", { class: "mh-sm-num", x: F - 4, y: F - 4, width: 7, height: 7 }));
-      const n = el("text", { class: "mh-sm-numt", x: F - 0.5, y: F + 1.6 });
+      const [x, y] = at(e, D / 2 + 1);
+      const g = el("g", { class: "mh-sm-shot is-" + e.team.toLowerCase(), transform: `translate(${x} ${y})`, "data-n": k + 1 });
+      g.appendChild(el("rect", { class: "mh-sm-dot", x: -D / 2, y: -D / 2, width: D, height: D }));
+      const n = el("text", { class: "mh-sm-numt", x: 0, y: 1.9 });
       n.textContent = String(k + 1);
       g.appendChild(n);
+      const face = el("g", { class: "mh-sm-face" });
+      face.appendChild(el("rect", { class: "mh-sm-frame", x: -F / 2 - 1.5, y: -F / 2 - 1.5, width: F + 3, height: F + 3 }));
+      g.appendChild(face);
+      g._face = () => {
+        g._face = null;
+        if (UUID_RE.test(str(e.player))) {
+          const img = el("image", { x: -F / 2, y: -F / 2, width: F, height: F, href: `https://mc-heads.net/avatar/${e.player}/32`, preserveAspectRatio: "none" });
+          img.addEventListener("error", () => img.setAttribute("href", `https://minotar.net/helm/${e.player.replace(/-/g, "")}/32`), { once: true });
+          face.appendChild(img);
+        } else {
+          const ball = el("g", { transform: "translate(-4 -4)" });
+          ball.innerHTML = `<path d="${ICONS.ball[1]}"/><path class="mh-i-cut" d="${ICONS.ball[2]}"/>`;
+          face.appendChild(ball);
+        }
+        face.appendChild(el("rect", { class: "mh-sm-num", x: F / 2 - 3.5, y: F / 2 - 3.5, width: 7, height: 7 }));
+        const fn = el("text", { class: "mh-sm-numt", x: F / 2, y: F / 2 + 1.9 });
+        fn.textContent = String(k + 1);
+        face.appendChild(fn);
+      };
       const t = el("title", {});
       t.textContent = `${k + 1}. ${e.ownGoal ? "Own goal by " : ""}${who(e.player) || "Goal"}, ${num(e.from.dist).toFixed(0)} blocks out (${sides[e.team].name})`;
       g.appendChild(t);
@@ -1856,10 +1913,18 @@
       return g;
     });
     // the list and the map light each other up
-    const hot = (k, on) => { if (marks[k]) marks[k].classList.toggle("is-hot", on); if (items[k]) items[k].classList.toggle("is-hot", on); };
+    const hot = (k, on) => {
+      const g = marks[k];
+      if (g) {
+        if (on && g._face) g._face();
+        // on top of its neighbours while its face is up (moved once: a move resets the hover)
+        if (on && svg.lastChild !== g) svg.appendChild(g);
+        g.classList.toggle("is-hot", on);
+      }
+      if (items[k]) items[k].classList.toggle("is-hot", on);
+    };
     const items = shots.map((e, k) => h("li", { class: "is-" + e.team.toLowerCase(), on: { mouseenter: () => hot(k, true), mouseleave: () => hot(k, false), focusin: () => hot(k, true), focusout: () => hot(k, false) }, tabindex: "0" },
       h("span", { class: "mh-shot-n", "aria-hidden": "true" }, String(k + 1)),
-      avatar(e.player, who(e.player) || "Goal", 18),
       h("b", null, e.ownGoal ? who(e.player) + " (OG)" : who(e.player) || "Goal"),
       " " + num(e.from.dist).toFixed(0) + " blocks, " + evClock(e, rec),
       h("span", { class: "mh-dim" }, " · for " + sides[e.team].name)));
@@ -1869,8 +1934,8 @@
     return h("section", { class: "mh-card mh-shots" + (red.color === blue.color ? " is-same" : ""), "aria-labelledby": "mh-sm", style: { "--red": vivid(red.color), "--blue": vivid(blue.color) } },
       sectionHead(h("span", { id: "mh-sm" }, tries.length ? "Where the shots came from" : "Where the goals came from"),
         tries.length
-          ? `Faces are goals. Open rings are shots that didn't go in${saved ? ", crossed when saved" : ""}.`
-          : "Each goal, drawn from the net it went into, with who scored it."),
+          ? `Numbered dots are goals: hover one to see who scored. Rings are shots that didn't go in${saved ? ", crossed when saved" : ""}.`
+          : "Each goal, numbered like the list. Hover one to see who scored."),
       h("div", { class: "mh-shotmap-wrap" }, svg),
       tries.length ? h("p", { class: "mh-shot-sum" }, SIDES.map((k) => {
         const g = shots.filter((e) => e.team === k && !e.ownGoal).length;
@@ -1887,13 +1952,13 @@
 
   function infoCard(rec, sides) {
     const f = obj(rec.field), r = obj(rec.rules);
-    const src = {
+    const src = fixtureRec(rec) ? "A club fixture" : {
       queue: "The pitch's ready zone", ranked: "The ranked queue", referee: "A referee", menu: "The referee menu", fixture: "A club fixture", test: "A practice shootout",
     }[rec.source] || "Unknown";
     const played = arr(rec.halves).reduce((t, x) => t + num(x.seconds), 0);
     const rows = [
       ["Pitch", [str(f.name) || str(f.id), num(f.length) && num(f.width) ? h("small", null, ` ${Math.round(f.length)} × ${Math.round(f.width)} blocks`) : null]],
-      ["Mode", modeName(rec.mode) + (rec.knockout ? " (knockout)" : "") + (rec.source === "fixture" ? " · club fixture" : "") + (QUEUE_RE.test(str(rec.queue)) ? " · ranked " + rec.queue : "")],
+      ["Mode", modeName(rec.mode) + (rec.knockout ? " (knockout)" : "") + (fixtureRec(rec) ? " · " + leagueName(rec) : "") + (QUEUE_RE.test(str(rec.queue)) ? " · ranked " + rec.queue : "")],
       ["Rules", [rulesLine(rec), num(r.scorePerGoal) > 1 ? ` · goals worth ${r.scorePerGoal} points` : ""]],
       ["Started by", rec.startedBy && UUID_RE.test(str(rec.startedBy.uuid))
         ? [h("a", { class: "mh-plink", href: toPlayer(rec.startedBy.uuid), "data-go": true }, nameOf(rec.startedBy)), rec.source === "referee" || rec.source === "menu" ? " (referee)" : ""]
@@ -2641,7 +2706,7 @@
       throw e;
     });
     if (token !== S.token) return null;
-    setTitle("Fixtures");
+    setTitle(LEAGUE ? "Champions League" : "Fixtures");
     if (!d) {
       return [note("off", "Fixtures are on their way",
         "Scheduled Champions League games will be listed here: kickoff times in your own time zone, live scores and results.", [])];
