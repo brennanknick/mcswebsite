@@ -1394,13 +1394,17 @@
       SHOOTOUT_FORCED: "A referee sent this match straight to penalties.",
       SMALL: "A side had 2 or fewer players when it started, so this match doesn't count toward stats or leaderboards.",
       EXPERIMENTAL: "This match was played on the Experimental Field, with power-ups and ball tweaks, so it doesn't count toward stats or leaderboards.",
+      // a stopped match that staff later gave to one side (/fixtures award): same id, now COMPLETED
+      AWARDED: "A referee stopped this match early, and staff later gave it to " +
+        (str(obj(obj(rec.teams)[res.winner]).name) || "one side") + " by forfeit. The score is as it was when it stopped.",
     };
+    const awarded = arr(rec.flags).includes("AWARDED");
     if (QUEUE_RE.test(str(rec.queue)) && rec.outcome !== "COMPLETED") {
       say.push(rec.outcome === "INTERRUPTED"
         ? "A restart voids a ranked match: nobody's Elo moved."
         : "This ranked match didn't count. Only players who left and didn't come back lost Elo.");
     }
-    if (res.decidedBy === "FORFEIT") say.push("Every player on one side left and stayed away, so the other side won by forfeit. The score is what it was when they went.");
+    if (res.decidedBy === "FORFEIT" && !awarded) say.push("Every player on one side left and stayed away, so the other side won by forfeit. The score is what it was when they went.");
     arr(rec.flags).forEach((f) => {
       if (f === "TEST") return;
       // an experimental match already says it doesn't count; its size doesn't need saying too
