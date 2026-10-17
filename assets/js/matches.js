@@ -2661,6 +2661,8 @@
       score: has(f.score) ? { home: num(sc.home), away: num(sc.away) } : null,
       pens: has(f.pens) ? { home: num(pn.home), away: num(pn.away) } : null,
       pitch: str(f.pitch), recordId: str(f.recordId), knockout: f.knockout === true, decidedBy: str(f.decidedBy),
+      // booked before a time was agreed: kickoff is the deadline
+      tbd: f.tbd === true, winner: f.winner === "home" || f.winner === "away" ? f.winner : "",
       halves: num(f.halves), halfMinutes: num(f.halfMinutes), format: str(f.format),
     };
   }
@@ -2814,11 +2816,14 @@
 
     if (next.length) {
       const days = [];
-      for (const f of next) {
+      for (const f of next.filter((x) => !x.tbd)) {
         const k = fxDay(f.kickoff);
         if (!days.length || days[days.length - 1][0] !== k) days.push([k, []]);
         days[days.length - 1][1].push(f);
       }
+      // booked before the clubs agreed a time: together at the end, each with its deadline
+      const later = next.filter((x) => x.tbd);
+      if (later.length) days.push(["Time to be agreed", later]);
       let i = 0;
       out.push(h("section", { class: "mh-fx-sec", "aria-labelledby": "mh-fx-next" },
         h("h2", { class: "mh-sec-title", id: "mh-fx-next" }, "Coming ", h("span", { class: "grad" }, "up")),
@@ -2827,7 +2832,9 @@
           h("h3", { class: "mh-fx-date" }, label),
           h("ul", { class: "mh-fx-list" }, list.map((f) =>
             h("li", { class: "mh-fx-row", style: { "--home": f.home.color, "--away": f.away.color, "--i": Math.min(i++, 12) } },
-              h("time", { class: "mh-fx-time", datetime: new Date(f.kickoff).toISOString() }, fxTime(f.kickoff), h("small", null, fxUntil(f.kickoff))),
+              f.tbd
+                ? h("span", { class: "mh-fx-time is-tbd", title: "The clubs haven't agreed a time yet" }, "TBD", h("small", null, "by " + fxDay(f.kickoff).replace(/^\w+, /, "")))
+                : h("time", { class: "mh-fx-time", datetime: new Date(f.kickoff).toISOString() }, fxTime(f.kickoff), h("small", null, fxUntil(f.kickoff))),
               h("span", { class: "mh-fx-teams" }, fxSide(f.home, "is-home"), h("span", { class: "mh-fx-vs" }, "vs"), fxSide(f.away, "is-away")),
               h("span", { class: "mh-fx-meta" }, fxTags(f)))))))));
     }
@@ -2837,8 +2844,10 @@
         h("h2", { class: "mh-sec-title", id: "mh-fx-done" }, "Results"),
         h("p", { class: "mh-sec-sub" }, "The last seven days."),
         h("ul", { class: "mh-fx-list" }, done.map((f, k) => {
-          const hs = f.score ? f.score.home + (f.pens ? f.pens.home / 100 : 0) : 0;
-          const as = f.score ? f.score.away + (f.pens ? f.pens.away / 100 : 0) : 0;
+          let hs = f.score ? f.score.home + (f.pens ? f.pens.home / 100 : 0) : 0;
+          let as = f.score ? f.score.away + (f.pens ? f.pens.away / 100 : 0) : 0;
+          // the server's word on who won (a forfeit can be given at any score)
+          if (f.winner) { hs = f.winner === "home" ? 1 : 0; as = f.winner === "away" ? 1 : 0; }
           return h("li", { class: "mh-fx-row is-result", style: { "--home": f.home.color, "--away": f.away.color, "--i": Math.min(k, 12) } },
             h("time", { class: "mh-fx-time", datetime: new Date(f.kickoff).toISOString() }, fxDay(f.kickoff).replace(/^\w+, /, ""), h("small", null, f.label || f.competition)),
             h("span", { class: "mh-fx-teams" },
@@ -2846,7 +2855,8 @@
               f.score ? fxScore(f) : h("span", { class: "mh-fx-vs" }, "vs"),
               fxSide(f.away, "is-away" + (hs > as ? " is-loser" : ""))),
             h("span", { class: "mh-fx-meta" },
-              f.decidedBy === "forfeit" ? h("span", { class: "mh-tag is-void" }, "Forfeit") : null,
+              f.decidedBy === "forfeit" ? h("span", { class: "mh-tag is-void" }, f.recordId ? "Forfeit" : "Forfeit, not played") : null,
+              f.decidedBy === "entered" ? h("span", { class: "mh-tag is-void", title: "The score was typed in by staff" }, "Entered by staff") : null,
               f.recordId ? h("a", { class: "mh-plink", href: href({ view: "match", id: f.recordId }), "data-go": true }, "Match report") : null));
         }))));
     }

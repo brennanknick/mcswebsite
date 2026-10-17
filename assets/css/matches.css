@@ -2008,3 +2008,6 @@ a.mh-tbl-club:hover b, a.mh-tbl-club:focus-visible b { text-decoration: underlin
 @media (prefers-reduced-motion: reduce) {
   .mh-tbl tbody tr { animation: none; }
 }
+
+/* a fixture booked before a time was agreed */
+.mh-fx-time.is-tbd { color: var(--accent-soft); letter-spacing: .06em; }
