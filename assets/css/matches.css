@@ -1932,8 +1932,10 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .lg-emblem { width: 150px; height: 150px; overflow: visible; filter: drop-shadow(0 0 26px rgba(255, 226, 150, .22)); animation: lg-turn-in .9s cubic-bezier(.2, .8, .2, 1) both .15s; }
 .lg-orbit { fill: none; stroke: rgba(255, 226, 150, .22); stroke-width: 1; stroke-dasharray: 2 4; }
 .lg-star { fill: #ffe29a; animation: lg-twinkle 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * -.4s); }
-.lg-ball path { fill: #f4f1e6; }
-.lg-ball .lg-ball-cut { fill: #0b1210; }
+.lg-ball-w { fill: #f4f1e6; }
+.lg-ball-s { fill: #c4cac4; }
+.lg-ball-o { fill: #96a09a; }
+.lg-ball-k { fill: #181c1a; }
 @keyframes lg-rise { from { opacity: 0; transform: translateY(12px); } }
 @keyframes lg-turn-in { from { opacity: 0; transform: rotate(-50deg) scale(.7); } }
 @keyframes lg-twinkle { 50% { opacity: .3; } }
