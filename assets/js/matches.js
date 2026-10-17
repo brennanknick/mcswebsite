@@ -2692,6 +2692,62 @@
     h("span", null, num(f.score.home), h("i", null, "\u2013"), num(f.score.away)),
     f.pens ? h("small", null, `${num(f.pens.home)}\u2013${num(f.pens.away)} pens`) : null);
 
+  // The league table (plugin 6eb908f: "standings" beside "fixtures"). The server works it out
+  // from every finished fixture, so it is never rebuilt from the list here (that keeps a week).
+  // Win 3, draw 1; a forfeit or a referee's call goes to the side it was given to. Null until
+  // somebody has played: a table of noughts says nothing.
+  const LEAGUE_KEY = "championsleague";
+  const compKey = (s) => str(s).toLowerCase().replace(/\s+/g, "");
+  function tableOf(d) {
+    const all = arr(obj(d).standings).map(obj);
+    const t = all.find((x) => compKey(x.competition) === LEAGUE_KEY) || all.find((x) => arr(x.rows).length) || null;
+    if (!t) return null;
+    const rows = arr(t.rows).map(obj).map((x, i) => ({
+      pos: num(x.position) || i + 1, club: fxClub(x.club),
+      p: num(x.played), w: num(x.won), d: num(x.drawn), l: num(x.lost),
+      gf: num(x.goalsFor), ga: num(x.goalsAgainst), gd: num(x.goalDifference), pts: num(x.points),
+      form: arr(x.form).map(str).filter((f) => f === "W" || f === "D" || f === "L").slice(-5),
+    })).filter((x) => x.club.id || x.club.name !== "TBD");
+    return rows.some((x) => x.p > 0) ? { name: str(t.competition) || "Champions League", rows } : null;
+  }
+
+  function tableCard(t, want) {
+    const signed = (n) => (n > 0 ? "+" + n : String(n));
+    const th = (abbr, title, cls) => h("th", { scope: "col", class: cls }, h("abbr", { title }, abbr));
+    return h("section", { class: "mh-fx-sec mh-tbl-sec", "aria-labelledby": "mh-fx-table" },
+      h("h2", { class: "mh-sec-title", id: "mh-fx-table" }, "League ", h("span", { class: "grad" }, "table")),
+      h("p", { class: "mh-sec-sub" }, "3 points for a win, 1 for a draw. Every result this season counts."),
+      h("div", { class: "mh-tbl-wrap" },
+        h("table", { class: "mh-tbl" },
+          h("caption", { class: "visually-hidden" }, t.name + " table: matches played, won, drawn and lost, goals for and against, goal difference, points, and the last five results, oldest first"),
+          h("thead", null, h("tr", null,
+            th("#", "Position", "c-pos"),
+            h("th", { scope: "col", class: "c-club" }, "Club"),
+            th("P", "Played", "c-n"),
+            th("W", "Won", "c-n c-wdl"), th("D", "Drawn", "c-n c-wdl"), th("L", "Lost", "c-n c-wdl"),
+            th("GF", "Goals for", "c-n c-goals"), th("GA", "Goals against", "c-n c-goals"),
+            th("GD", "Goal difference", "c-n"),
+            th("Pts", "Points", "c-n c-pts"),
+            h("th", { scope: "col", class: "c-form" }, "Form"))),
+          h("tbody", null, t.rows.map((x, i) => h("tr", {
+            class: [x.pos === 1 ? "is-top" : "", want && x.club.id === want ? "is-mine" : ""].join(" ").trim() || null,
+            style: { "--c": x.club.color, "--i": Math.min(i, 12) },
+          },
+            h("td", { class: "c-pos" }, x.pos === 1 ? icon("trophy", "mh-tbl-cup") : null, String(x.pos)),
+            h("td", { class: "c-club" },
+              (x.club.id ? (kids) => h("a", { class: "mh-tbl-club", href: href({ view: "fixtures", club: x.club.id }), "data-go": true, title: x.club.name + "'s games" }, kids)
+                : (kids) => h("span", { class: "mh-tbl-club" }, kids))([
+                h("i", { class: "mh-fx-pip", "aria-hidden": "true" }),
+                x.club.flag ? h("span", { class: "mh-fx-flag", "aria-hidden": "true" }, x.club.flag) : null,
+                h("b", null, x.club.name)])),
+            h("td", { class: "c-n" }, x.p),
+            h("td", { class: "c-n c-wdl" }, x.w), h("td", { class: "c-n c-wdl" }, x.d), h("td", { class: "c-n c-wdl" }, x.l),
+            h("td", { class: "c-n c-goals" }, x.gf), h("td", { class: "c-n c-goals" }, x.ga),
+            h("td", { class: "c-n c-gd" + (x.gd > 0 ? " is-up" : x.gd < 0 ? " is-down" : "") }, signed(x.gd)),
+            h("td", { class: "c-n c-pts" }, h("b", null, x.pts)),
+            h("td", { class: "c-form" }, x.form.length ? h("span", { class: "mh-tbl-form" }, x.form.map(resultBadge)) : h("span", { class: "mh-dim" }, "\u2013"))))))));
+  }
+
   // while a fixture is live, look again every 15 s (never in a hidden tab)
   let fxTimer = 0;
   function fxRefresh(token) {
@@ -2752,6 +2808,9 @@
               h("span", { class: "mh-fx-watch" }, "Watch in game: ", h("code", null, "/spectate"))))))));
       fxRefresh(token);
     }
+
+    const table = tableOf(d);
+    if (table) out.push(tableCard(table, want));
 
     if (next.length) {
       const days = [];

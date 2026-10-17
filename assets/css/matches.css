@@ -1950,3 +1950,59 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 /* a fixture's match report: the competition, linking back to its page */
 .mh-tag.is-league { color: #fff6dc; background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 220, 140, .55); text-decoration: none; transition: background .15s; }
 .mh-tag.is-league:hover { background: rgba(255, 226, 150, .16); }
+
+/* ── the league table (Champions League page) ─────────────────────── */
+
+.mh-tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -.25rem; padding: 0 .25rem; }
+.mh-tbl { width: 100%; border-collapse: separate; border-spacing: 0 .35rem; font-size: 15px; font-variant-numeric: tabular-nums; }
+.mh-tbl thead th { padding: 0 .65rem .3rem; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-faint); text-align: center; white-space: nowrap; }
+.mh-tbl thead th.c-club, .mh-tbl thead th.c-form { text-align: left; }
+.mh-tbl abbr { text-decoration: none; cursor: help; }
+.mh-tbl tbody tr { animation: mh-rise .5s cubic-bezier(.34, 1.4, .64, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.mh-tbl td {
+  padding: .7rem .65rem;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--c) 12%, transparent), transparent 38%),
+    var(--card);
+  color: var(--text);
+  text-align: center;
+  white-space: nowrap;
+}
+/* each club's colour down its own edge, like the fixture rows */
+.mh-tbl td:first-child { border-radius: var(--radius) 0 0 var(--radius); box-shadow: inset 3px 0 0 var(--c); }
+.mh-tbl td:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.mh-tbl td + td { background: var(--card); }
+.mh-tbl td.c-club { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 8%, transparent), transparent 70%), var(--card); }
+.mh-tbl .c-pos { width: 3.2rem; font-weight: 800; color: var(--text-strong); }
+.mh-tbl .c-club { width: 100%; text-align: left; }
+.mh-tbl-club { display: inline-flex; align-items: center; gap: .55rem; color: #fff; text-decoration: none; }
+.mh-tbl-club b { font-weight: 700; }
+a.mh-tbl-club:hover b, a.mh-tbl-club:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
+.mh-tbl .c-gd.is-up { color: var(--win); }
+.mh-tbl .c-gd.is-down { color: var(--loss); }
+.mh-tbl td.c-pts { font-size: 17px; color: #fff; }
+.mh-tbl th.c-pts { color: var(--text-strong); }
+.mh-tbl .c-form { text-align: left; }
+.mh-tbl-form { display: inline-flex; gap: 3px; vertical-align: middle; }
+/* the leader: a gold number and a little cup */
+.mh-tbl tr.is-top .c-pos { color: #ffd98a; }
+.mh-tbl-cup { width: 12px; height: 11px; margin-right: .3rem; vertical-align: -1px; fill: #ffd98a; }
+.mh-tbl tr.is-top td { box-shadow: inset 0 1px 0 rgba(255, 217, 138, .22), inset 0 -1px 0 rgba(255, 217, 138, .22); }
+.mh-tbl tr.is-top td:first-child { box-shadow: inset 3px 0 0 var(--c), inset 0 1px 0 rgba(255, 217, 138, .22), inset 0 -1px 0 rgba(255, 217, 138, .22); }
+/* the club picked in the filter above */
+.mh-tbl tr.is-mine td { background-color: rgba(255, 255, 255, .07); }
+@media (max-width: 760px) {
+  .mh-tbl .c-goals { display: none; }
+}
+@media (max-width: 560px) {
+  .mh-tbl { font-size: 14px; }
+  .mh-tbl .c-wdl { display: none; }
+  .mh-tbl td, .mh-tbl thead th { padding-inline: .45rem; }
+  .mh-tbl .c-pos { width: 2.4rem; }
+}
+@media (max-width: 400px) {
+  .mh-tbl .c-form { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mh-tbl tbody tr { animation: none; }
+}
