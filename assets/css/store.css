@@ -770,16 +770,18 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
 :root {
   --vip:        #ffc107;   /* the VIP badge: gold over orange */
   --vip-shade:  #8a5800;
-  --mvp:        #ff5722;   /* the MVP badge: red-orange over red */
-  --mvp-hi:     #ff9800;
-  --mvp-shade:  #8f1500;
+  --mvp:        #ff7811;   /* MVP's one colour: the middle of its fade
+                             (#ff5722 alone reads as staff red) */
+  --mvp-from:   #ff5722;   /* MVP's name fade, where text can take one */
+  --mvp-to:     #ff9800;
+  --mvp-shade:  #8f3300;
 }
 
 html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 
 /* warm gradient text, from VIP's gold to MVP's red-orange */
 .st-gold {
-  background: radial-gradient(ellipse 70% 95% at 42% 40%, #fffbe8 0%, #ffe27a 28%, var(--vip) 52%, var(--mvp-hi) 76%, var(--mvp) 100%);
+  background: radial-gradient(ellipse 70% 95% at 42% 40%, #fffbe8 0%, #ffe27a 28%, var(--vip) 52%, var(--mvp-to) 76%, var(--mvp) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -849,9 +851,9 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   bottom: -16px;
   background:
     radial-gradient(110% 270px at 50% 0%, color-mix(in srgb, var(--mvp) 21%, transparent), transparent 80%),
-    linear-gradient(180deg, #26140e, #181410 45%, #111712);
+    linear-gradient(180deg, #27180d, #181510 45%, #111712);
   box-shadow:
-    inset 0 3px 0 color-mix(in srgb, var(--mvp-hi) 85%, transparent),
+    inset 0 3px 0 color-mix(in srgb, var(--mvp-to) 85%, transparent),
     inset 0 0 0 1px color-mix(in srgb, var(--mvp) 40%, transparent),
     inset 0 -3px 0 rgba(0, 0, 0, .5);
   clip-path: var(--notch-lg);
@@ -900,7 +902,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 /* the name colour each rank gets, shown in it: VIP's gold, MVP's gradient */
 .st-rk-name.is-vip { color: var(--vip); }
 .st-rk-name.is-mvp {
-  background: linear-gradient(90deg, #ff3b1a, var(--mvp) 40%, var(--mvp-hi));
+  background: linear-gradient(90deg, var(--mvp-from), var(--mvp-to));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
