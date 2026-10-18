@@ -758,6 +758,198 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
   }
 }
 
+/* ── ranks: VIP and VIP+, perk by perk ──────────────────────────────
+   Not released yet: store.js sets html[data-ranks] from ranksOpen (or
+   ?ranks=1 on localhost), and the section only shows when it's "on".
+   Each rank column is lit in its own badge's colours, taken straight
+   from the rank art: VIP's orange, VIP+'s gold. VIP+ stands raised.
+   The lights sit under the table, and --rk-perk / --rk-rank keep them
+   on their columns at every width. */
+
+:root {
+  --vip:        #ff9800;   /* the VIP badge: orange over red */
+  --vip-shade:  #8f2a00;
+  --plus:       #ffc107;   /* the VIP+ badge: gold over orange */
+  --plus-hi:    #ffeb3b;
+  --plus-shade: #8a5800;
+}
+
+html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
+
+/* gold gradient text, cut from the VIP+ badge */
+.st-gold {
+  background: radial-gradient(ellipse 70% 95% at 42% 40%, #fffbe8 0%, #ffef8a 30%, var(--plus) 62%, var(--vip) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.st-ranks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr);
+  align-items: start;
+  gap: 2rem 4rem;
+  margin-top: 5.5rem;
+  scroll-margin-top: 1.5rem;
+}
+.st-rk-side { position: sticky; top: 2rem; }
+.st-rk-lead { margin: .9rem 0 0; color: var(--text); }
+.st-rk-notes {
+  display: grid;
+  gap: .6rem;
+  margin: 1.5rem 0 0;
+  padding: 1.25rem 0 0;
+  list-style: none;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+.st-rk-notes li { position: relative; padding-left: 1.2rem; }
+.st-rk-notes li::before {
+  content: "";
+  position: absolute;
+  top: .5em;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--plus);
+  clip-path: var(--px-star);
+}
+.st-rk-notes b { font-weight: 750; color: #fff; }
+
+.st-rk {
+  --rk-perk: 46%;
+  --rk-rank: 27%;
+  position: relative;
+  margin: 16px 0;   /* room for the raised VIP+ column */
+}
+.st-rk-card {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(50% 40% at 0% 0%, color-mix(in srgb, var(--sa-glow) 7%, transparent), transparent 72%),
+    linear-gradient(180deg, #131f19, #0d1612 70%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .07),
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px rgba(255, 255, 255, .06);
+  clip-path: var(--notch-lg);
+}
+.st-rk-col { position: absolute; top: 0; bottom: 0; width: var(--rk-rank); pointer-events: none; }
+.st-rk-col.is-vip {
+  left: var(--rk-perk);
+  background: radial-gradient(100% 230px at 50% 0%, color-mix(in srgb, var(--vip) 13%, transparent), transparent 80%);
+}
+.st-rk-col.is-plus {
+  left: calc(var(--rk-perk) + var(--rk-rank));
+  top: -16px;
+  bottom: -16px;
+  background:
+    radial-gradient(110% 270px at 50% 0%, color-mix(in srgb, var(--plus) 20%, transparent), transparent 80%),
+    linear-gradient(180deg, #211e10, #151811 45%, #111712);
+  box-shadow:
+    inset 0 3px 0 color-mix(in srgb, var(--plus-hi) 75%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--plus) 36%, transparent),
+    inset 0 -3px 0 rgba(0, 0, 0, .5);
+  clip-path: var(--notch-lg);
+}
+
+.st-rk-table {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.st-rk-table .c-perk { width: var(--rk-perk); }
+.st-rk-table .c-rank { width: var(--rk-rank); }
+.st-rk-table th, .st-rk-table td { padding: .72rem .75rem; vertical-align: middle; }
+
+.st-rk-table thead th { position: relative; padding: 2.3rem .5rem 1.15rem; text-align: center; }
+.st .st-rk-badge { display: block; width: 111px; height: 33px; max-width: none; margin: 0 auto; }
+.st .is-plus .st-rk-badge { width: 129px; }
+/* a tab on the raised column's top edge */
+.st-rk-req {
+  position: absolute;
+  top: -27px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: .16rem .55rem;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #241703;
+  background: var(--plus);
+  clip-path: var(--notch);
+}
+
+.st-rk-table tbody th { padding-left: 1.6rem; font-weight: 600; text-align: left; color: var(--text-strong); }
+.st-rk-table tbody td { text-align: center; font-weight: 700; color: #fff; }
+/* a hairline between rows, but none under a group's name */
+.st-rk-table tbody tr + tr > * { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .055); }
+.st-rk-table .st-rk-group + tr > * { box-shadow: none; }
+.st-rk-table tbody tr:not(.st-rk-group):hover > * { background: rgba(255, 255, 255, .025); }
+
+.st-rk-price td b { font-size: 30px; font-weight: 800; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+
+/* a group's name, as the page's kickers */
+.st-rk-group th {
+  padding: 1.55rem 1.6rem .5rem;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: .2em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+}
+.st-rk-group th::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: .6rem;
+  vertical-align: 1px;
+  background: var(--sa-light);
+  clip-path: var(--px-star);
+}
+
+/* pixel ticks in each rank's own colour, with a one-pixel shade under
+   them; crosses stay quiet */
+.st-rk-yes, .st-rk-no { display: inline-block; vertical-align: middle; shape-rendering: crispEdges; }
+.st-rk-yes { width: 20px; height: 14px; }
+.st-rk-no { width: 16px; height: 14px; fill: rgba(255, 255, 255, .2); }
+.is-vip .st-rk-yes { fill: var(--vip); filter: drop-shadow(0 2px 0 var(--vip-shade)); }
+.is-plus .st-rk-yes { fill: var(--plus); filter: drop-shadow(0 2px 0 var(--plus-shade)); }
+
+/* the reveal: the raised column rises, then the rows, one after another */
+.reveal-on .st-rk tr {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity .35s ease, transform .5s var(--ease-spring);
+  transition-delay: calc(var(--r, 0) * 40ms + 80ms);
+}
+.reveal-on .st-rk .st-rk-col.is-plus {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity .4s ease, transform .65s var(--ease-spring);
+}
+.reveal-on .st-rk.is-in tr,
+.reveal-on .st-rk.is-in .st-rk-col.is-plus { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on .st-rk tr, .reveal-on .st-rk .st-rk-col { opacity: 1 !important; transform: none !important; }
+}
+@media print {
+  .reveal-on .st-rk tr, .reveal-on .st-rk .st-rk-col { opacity: 1 !important; transform: none !important; transition: none !important; }
+}
+
 /* ── how it works ───────────────────────────────────────────────── */
 
 .st-faq {
@@ -1097,6 +1289,9 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
   .st-starter-buy .st-price { align-items: flex-start; text-align: left; }
   .st-faq { grid-template-columns: minmax(0, 1fr); }
   .st-faq-head { position: static; }
+  .st-ranks { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .st-rk-side { position: static; }
+  .st-rk-notes { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 2rem; }
   .st-ig-card { padding: 2rem 1.75rem; }
   .st-ty h1 { font-size: 64px; }
   .st-steps { grid-template-columns: minmax(0, 1fr); }
@@ -1119,7 +1314,18 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
   .st-title { font-size: min(76px, 19vw); }
   .st-title.is-off { font-size: min(44px, 11.4vw); }
   .st-lead { font-size: 1.1rem; }
-  .st-bundles, .st-ingame, .st-faq { margin-top: 4rem; }
+  .st-bundles, .st-ingame, .st-faq, .st-ranks { margin-top: 4rem; }
+  .st-rk-notes { grid-template-columns: minmax(0, 1fr); }
+  .st-rk { --rk-perk: 40%; --rk-rank: 30%; }
+  .st-rk-table { font-size: 14px; }
+  .st-rk-table th, .st-rk-table td { padding: .62rem .3rem; }
+  .st-rk-table thead th { padding: 2rem .25rem 1rem; }
+  .st-rk-table tbody th { padding-left: .95rem; }
+  .st-rk-group th { padding: 1.3rem .95rem .45rem; font-size: 11px; letter-spacing: .16em; }
+  .st .st-rk-badge { width: 74px; height: 22px; }
+  .st .is-plus .st-rk-badge { width: 86px; }
+  .st-rk-req { top: -25px; padding-inline: .45rem; font-size: 10px; letter-spacing: .1em; }
+  .st-rk-price td b { font-size: 24px; }
   .st-grid { gap: .6rem; }
   .st-card { padding: .9rem .85rem 1rem; }
   .st-art { height: 92px; margin: .9rem 0 .6rem; }
@@ -1172,11 +1378,14 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
   .st-amt { font-size: 28px; }
   .st-price b { font-size: 1.1rem; }
   .st-dlg-art { display: none; }
+  .st-rk { --rk-perk: 38%; --rk-rank: 31%; }
+  .st-rk-table thead th { padding-inline: 0; }
 }
 
 @media (forced-colors: active) {
   .st-card, .st-starter, .st-fact, .st-spend-card, .st-state, .st-legal-card, .st-dlg-box, .st-notice { border: 1px solid CanvasText; }
-  .st-grad { -webkit-text-fill-color: currentColor; color: CanvasText; background: none; }
+  .st-grad, .st-gold { -webkit-text-fill-color: currentColor; color: CanvasText; background: none; }
+  .st-rk-table { border: 1px solid CanvasText; }
 }
 
 @media print {

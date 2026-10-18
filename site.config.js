@@ -48,6 +48,11 @@ window.MCS = {
   // Opened 2026-10-02, after PayNow accepted the store.
   storeOpen: true,
 
+  // The VIP and VIP+ ranks on /store/ (the perk table). false: hidden.
+  // true: shown. Leave false until the rank products are released on
+  // PayNow and in game.
+  ranksOpen: false,
+
   // Where buyers write about a purchase, e.g. "support@mcsoccer.net".
   // Shown wherever the store needs a contact. While it's empty the store
   // points to the Discord instead, but Mojang's rules and PayNow's review
@@ -65,6 +70,7 @@ window.MCS = {
 
   // Testing only, and only on localhost: /store/?paynowApi=http://localhost:PORT
   // points the store at a local mock of PayNow's API, ?paynowStore=<id>
-  // swaps the Store ID, and ?paynowTag=<slug> reads another product tag.
-  // Each lasts for the tab. They do nothing on mcsoccer.net.
+  // swaps the Store ID, ?paynowTag=<slug> reads another product tag, and
+  // ?ranks=1 shows the ranks before ranksOpen does. Each lasts for the
+  // tab. They do nothing on mcsoccer.net.
 };

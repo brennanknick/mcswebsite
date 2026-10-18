@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=d6a7c521" />
-<link rel="stylesheet" href="../assets/css/store.css?v=f0579c54" />
+<link rel="stylesheet" href="../assets/css/store.css?v=196a40d3" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -32,8 +32,8 @@
 </script>
 <!-- Loaded up here, before anything paints, so the page opens straight
      into the right state (on its way / not open yet / open) with no flash. -->
-<script src="../site.config.js?v=ed53f30e"></script>
-<script src="../assets/js/store.js?v=68db7d63" data-page="store"></script>
+<script src="../site.config.js?v=bad29116"></script>
+<script src="../assets/js/store.js?v=2a17f5da" data-page="store"></script>
 </head>
 <body>
 
@@ -200,6 +200,71 @@
     <!-- what loading the bundles came to, for screen readers (outside the
          box above, which every render empties) -->
     <p class="visually-hidden" role="status" data-catalog-status></p>
+  </section>
+
+  <!-- ═══════════════════════════ RANKS ════════════════════════════
+       VIP and VIP+, perk by perk. Not released yet: hidden unless
+       ranksOpen is true in site.config.js (?ranks=1 previews it on
+       localhost only). The badges are the in-game rank art at a whole
+       scale. Every perk is cosmetic (Mojang's rules). -->
+  <section class="st-wrap st-ranks" id="ranks" aria-labelledby="ranks-title" data-show="on" data-ranks>
+    <div class="st-rk-side">
+      <p class="st-kicker">Ranks</p>
+      <h2 class="st-h2" id="ranks-title">Pick a <span class="st-gold">rank</span></h2>
+      <p class="st-rk-lead">Stand out on the pitch, in chat and on Discord.</p>
+      <ul class="st-rk-notes">
+        <li><b>VIP</b> is yours for good.</li>
+        <li><b>VIP+</b> needs VIP. Each one adds 30 days.</li>
+        <li>When VIP+ ends, you keep VIP.</li>
+        <li>Both are sold in game for Sapphires too.</li>
+        <li>Cosmetic only. No edge in a match.</li>
+      </ul>
+    </div>
+
+    <!-- the card, then one light per rank column (VIP+ stands raised),
+         then the table on top. The lights line up with the columns
+         through --rk-perk and --rk-rank. -->
+    <div class="st-rk" data-reveal="rk">
+      <div class="st-rk-card" aria-hidden="true"></div>
+      <div class="st-rk-col is-vip" aria-hidden="true"></div>
+      <div class="st-rk-col is-plus" aria-hidden="true"></div>
+      <table class="st-rk-table">
+        <caption class="visually-hidden">What VIP and VIP+ each get</caption>
+        <colgroup><col class="c-perk" /><col class="c-rank" /><col class="c-rank" /></colgroup>
+        <thead>
+          <tr style="--r:0">
+            <td></td>
+            <th scope="col" class="is-vip"><img class="st-rk-badge" src="../assets/img/ranks/vip.png" width="111" height="33" alt="VIP" /></th>
+            <th scope="col" class="is-plus"><span class="st-rk-req" aria-hidden="true">Needs VIP</span><img class="st-rk-badge" src="../assets/img/ranks/vip-plus.png" width="129" height="33" alt="VIP+" /></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="st-rk-price" style="--r:1"><th scope="row">Price</th><td class="is-vip"><b>$20</b></td><td class="is-plus"><b>$10</b></td></tr>
+          <tr style="--r:2"><th scope="row">Lasts</th><td class="is-vip">Forever</td><td class="is-plus">30 days</td></tr>
+        </tbody>
+        <tbody>
+          <tr class="st-rk-group" style="--r:3"><th scope="colgroup" colspan="3">In game</th></tr>
+          <tr style="--r:4"><th scope="row">Rank tag in chat and tab</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+          <tr style="--r:5"><th scope="row">Coloured name</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+          <tr style="--r:6"><th scope="row">Join message</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+        </tbody>
+        <tbody>
+          <tr class="st-rk-group" style="--r:7"><th scope="colgroup" colspan="3">Cosmetics</th></tr>
+          <tr style="--r:8"><th scope="row">VIP trail</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+          <tr style="--r:9"><th scope="row">VIP celebration</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+          <tr style="--r:10"><th scope="row">VIP+ cosmetics</th><td class="is-vip"><svg class="st-rk-no px" viewBox="0 0 8 7" aria-hidden="true"><path d="M0 0h2v1H0zM6 0h2v1H6zM1 1h2v1H1zM5 1h2v1H5zM2 2h4v1H2zM3 3h2v1H3zM2 4h4v1H2zM1 5h2v1H1zM5 5h2v1H5zM0 6h2v1H0zM6 6h2v1H6z"/></svg><span class="visually-hidden">No</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+        </tbody>
+        <tbody>
+          <tr class="st-rk-group" style="--r:11"><th scope="colgroup" colspan="3">Sapphires</th></tr>
+          <tr style="--r:12"><th scope="row">Sapphires every month</th><td class="is-vip"><svg class="st-rk-no px" viewBox="0 0 8 7" aria-hidden="true"><path d="M0 0h2v1H0zM6 0h2v1H6zM1 1h2v1H1zM5 1h2v1H5zM2 2h4v1H2zM3 3h2v1H3zM2 4h4v1H2zM1 5h2v1H1zM5 5h2v1H5zM0 6h2v1H0zM6 6h2v1H6z"/></svg><span class="visually-hidden">No</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+        </tbody>
+        <tbody>
+          <tr class="st-rk-group" style="--r:13"><th scope="colgroup" colspan="3">Discord and website</th></tr>
+          <tr style="--r:14"><th scope="row">Discord role</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+          <tr style="--r:15"><th scope="row">Badge on the website</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-plus"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <!-- ═════════════════════════════ FAQ ════════════════════════════ -->
