@@ -97,6 +97,9 @@ function clean(v, n) {
 }
 const ID = /^[A-Za-z0-9_.:-]{1,100}$/;
 const NAME = /^[A-Za-z0-9_]{1,16}$/;
+/** A settings scope the game server knows (docs/admin-api.md, "Settings (knobs)"). */
+const SCOPE = /^(pitch:[A-Za-z0-9_-]{1,64}|server|sounds|ranks|crates|cosmetics)$/;
+const LINE = /^[A-Za-z0-9_-]{1,64}$/;
 
 /* ── sessions ──────────────────────────────────────────────────────── */
 
@@ -252,6 +255,7 @@ async function plugin(env, method, path, params = {}, timeoutMs = PLUGIN_TIMEOUT
   try { body = text ? JSON.parse(text) : null; } catch {}
   if (r.ok && (!body || body.ok !== false)) return { ok: true, status: r.status, body };
   let error = body && typeof body.error === "string" && body.error.trim() ? body.error.trim()
+    : body && typeof body.message === "string" && body.message.trim() ? body.message.trim()
     : !body && text && text.length < 300 && !/^\s*</.test(text) ? text.trim() : null;
   if (error === "not allowed") error = "The game server says your account isn't allowed to do that. It needs your Minecraft account linked and set as owner in game (/rank set).";
   else if (error === "reason required") error = "Give a reason.";
@@ -613,23 +617,80 @@ async function api(request, env, s, path) {
       return done(r, p.op === "take" ? "took a cosmetic" : "gave a cosmetic", `${p.cosmetic} ${p.op === "take" ? "from" : "to"} ${input.name ? clean(input.name, 16) : p.id}: ${p.reason}`);
     }
 
-    /* bow skins: the game server's bow panel, through its admin routes */
-    /* settings: the staff menus' knobs, for a pitch, the server, ranks, crates or cosmetics */
+    /* settings: the staff menus' knobs. No scope: the list of scopes; a scope: its settings */
     case "GET /knobs": {
       const scope = clean(q.get("scope"), 80);
-      if (!/^(pitch:[A-Za-z0-9_-]{1,64}|server|ranks|crates|cosmetics)$/.test(scope)) return fail(400, "Which settings?");
-      const r = await plugin(env, "GET", "/discord/admin/knobs", { scope });
+      if (scope && !SCOPE.test(scope)) return fail(400, "Which settings?");
+      const r = await plugin(env, "GET", "/discord/admin/knobs", scope ? { scope } : {});
       return r.ok ? json({ ok: true, ...(r.body || {}) }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
     }
     case "POST /knobs": {
       const scope = clean(input.scope, 80);
       const key = clean(input.key, 80);
-      const value = input.value == null ? "" : String(input.value).slice(0, 500);
+      // a list (the command allow-list) can run long: it's comma separated text
+      const value = input.value == null ? "" : String(input.value).replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 2000);
       const reason = clean(input.reason, 120);
-      if (!/^(pitch:[A-Za-z0-9_-]{1,64}|server|ranks|crates|cosmetics)$/.test(scope) || !/^[A-Za-z0-9_.:-]{1,80}$/.test(key) || !reason) return fail(400, "Which setting, and why?");
+      if (!SCOPE.test(scope) || !/^[A-Za-z0-9_.:-]{1,80}$/.test(key) || !reason) return fail(400, "Which setting, and why?");
       const r = await plugin(env, "POST", "/discord/admin/knobs", { scope, key, value, reason, by: by(s) });
       return done(r, "changed a setting", `${scope} ${key} = ${value.slice(0, 60)}: ${reason}`);
     }
+
+    /* the server: who's on, every pitch, the pack; restart, call off, reload, resend the pack */
+    case "GET /server": {
+      const r = await plugin(env, "GET", "/discord/admin/server");
+      return r.ok ? json({ ok: true, ...(r.body || {}) }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
+    }
+    case "POST /server/restart":
+    case "POST /server/restart/cancel":
+    case "POST /server/reload":
+    case "POST /server/pack/resend": {
+      if (s.role !== "owner") return fail(403, "Only owners can do that.");
+      const p = { reason: clean(input.reason, 120), by: by(s) };
+      if (!p.reason) return fail(400, "Give a reason.");
+      if (path === "/server/restart") {
+        p.delay = Math.max(10, Math.min(600, Math.round(Number(input.delay) || 60)));
+        if (input.force === true) p.force = "true";
+      }
+      const r = await plugin(env, "POST", "/discord/admin" + path, p);
+      const what = { "/server/restart": "asked for a restart", "/server/restart/cancel": "called off a restart", "/server/reload": "reloaded the config", "/server/pack/resend": "sent the pack again" }[path];
+      return done(r, what, `${p.delay ? `in ${p.delay} s${p.force ? ", forced" : ""}: ` : ""}${p.reason}`);
+    }
+
+    /* the wallet's tools (owners): a store order looked up, added by hand or taken back; a wallet fixed */
+    case "GET /wallet/audit": {
+      if (s.role !== "owner") return fail(403, "Only owners can use the wallet tools.");
+      const term = clean(q.get("q"), 80);
+      if (!term) return fail(400, "Give an order, line or pretty id.");
+      const r = await plugin(env, "GET", "/discord/admin/wallet/audit", { q: term });
+      return r.ok ? json({ ok: true, ...(r.body || {}) }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
+    }
+    case "POST /wallet/grant": {
+      if (s.role !== "owner") return fail(403, "Only owners can use the wallet tools.");
+      const p = { id: clean(input.id, 40), amount: Math.round(Number(input.amount) || 0), line: clean(input.line, 64), order: clean(input.order, 64), pretty: clean(input.pretty, 64), reason: clean(input.reason, 120), by: by(s) };
+      if (input.starter === true) p.starter = "true";
+      if (!p.id || !(p.amount > 0 && p.amount <= 1000000) || !p.reason) return fail(400, "Give a player, an amount and a reason.");
+      if (!LINE.test(p.line)) return fail(400, "The line id takes only letters, numbers, - and _.");
+      const r = await plugin(env, "POST", "/discord/admin/wallet/grant", p);
+      return done(r, "added a store order by hand", `${p.amount}${p.starter ? " (starter)" : ""} to ${input.name ? clean(input.name, 36) : p.id}, line ${p.line}: ${p.reason}`);
+    }
+    case "POST /wallet/reverse": {
+      if (s.role !== "owner") return fail(403, "Only owners can use the wallet tools.");
+      const p = { line: clean(input.line, 64), kind: ["refund", "chargeback", "revoke"].includes(input.kind) ? input.kind : "", reason: clean(input.reason, 120), by: by(s) };
+      if (!LINE.test(p.line) || !p.kind || !p.reason) return fail(400, "Give the line id, how it's taken back, and a reason.");
+      const r = await plugin(env, "POST", "/discord/admin/wallet/reverse", p);
+      return done(r, "took back a store order", `line ${p.line} (${p.kind}): ${p.reason}`);
+    }
+    case "POST /wallet/reset":
+    case "POST /wallet/unpause": {
+      if (s.role !== "owner") return fail(403, "Only owners can use the wallet tools.");
+      const p = { id: clean(input.id, 40), key: clean(input.key, 64), reason: clean(input.reason, 120), by: by(s) };
+      if (!p.id || !p.reason) return fail(400, "Give a player and a reason.");
+      if (!/^[A-Za-z0-9_-]{8,59}$/.test(p.key)) return fail(400, "Reload the page and try again.");
+      const r = await plugin(env, "POST", "/discord/admin" + path, p);
+      return done(r, path === "/wallet/reset" ? "reset a wallet to zero" : "cleared a wallet's debt", `${input.name ? clean(input.name, 36) : p.id}: ${p.reason}`);
+    }
+
+    /* bow skins: the game server's bow panel, through its admin routes */
 
     case "GET /bows": {
       const r = await plugin(env, "GET", "/discord/admin/bows");

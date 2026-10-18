@@ -64,6 +64,58 @@ const SAMPLE = {
 };
 const SAMPLE_PNG = fs.readFileSync("C:/Users/brenn/soccer/rank-art/mcs/tags/vip_tag.png");
 
+// stage 2 samples (docs/admin-api.md): the scopes, a few knobs of every type, the server, an order's audit
+const SCOPES = [{ id: "pitch:field_4", name: "4v4 Field #1", level: "admin" }, { id: "pitch:warsaw", name: "Warsaw Stadium", level: "admin" },
+  { id: "server", name: "Server", level: "owner" }, { id: "sounds", name: "Sounds", level: "owner" }, { id: "ranks", name: "Ranks", level: "owner" },
+  { id: "crates", name: "Crates", level: "owner" }, { id: "cosmetics", name: "Cosmetics", level: "owner" }];
+const KNOBS = {
+  pitch: [
+    { key: "boxseconds", label: "Box clock", group: "Match Rules", type: "int", value: 12, min: 0, max: 60, step: 1, unit: "seconds", level: "admin", help: "Starts when a side has the ball in its own box. 0 is off.", needsReload: false, inWorld: false },
+    { key: "halfMinutes", label: "Half length", group: "Settings", type: "int", value: 10, min: 1, max: 30, unit: "minutes", level: "admin" },
+    { key: "ballspeed", label: "Ball speed", group: "Settings", type: "number", value: 1.15, min: 0.5, max: 2, step: 0.05, level: "admin" },
+    { key: "buzzer", label: "Buzzer beaters", group: "Match Rules", type: "bool", value: true, level: "admin" },
+    { key: "fieldtype", label: "Match type", group: "Match type and names", type: "choice", value: "match", options: ["quick", "scrim", "match", "knockout"], level: "admin" },
+    { key: "homename", label: "Home side's name", group: "Match type and names", type: "text", value: "Red", max: 24, level: "admin" },
+    { key: "stands", label: "Stands", group: "Pitch & Watching", type: "text", value: "set", level: "admin", inWorld: true },
+  ],
+  server: [
+    { key: "teams.red.colour", label: "Red team colour", group: "Team colours", type: "colour", value: "red", options: ["red", "dark_red", "gold", "yellow", "blue", "aqua", "green", "white"], level: "owner" },
+    { key: "teams.blue.colour", label: "Blue team colour", group: "Team colours", type: "colour", value: "blue", options: ["red", "dark_red", "gold", "yellow", "blue", "aqua", "green", "white"], level: "owner" },
+    { key: "commands.restrict", label: "Only allowed commands", group: "Commands", type: "bool", value: true, level: "owner" },
+    { key: "commands.allowed", label: "Allowed commands", group: "Commands", type: "list", value: ["link", "unlink", "stats", "rules", "party", "warp", "vote", "cosmetics", "spectate", "leave"], level: "owner" },
+  ],
+  ranks: [
+    { key: "ranks.display", label: "Show ranks", group: "Release", type: "bool", value: false, level: "owner", help: "Labels, colours and the tab order." },
+    { key: "ranks.open", label: "Sell ranks in game", group: "Release", type: "bool", value: false, level: "owner" },
+    { key: "ranks.vip.sapphires", label: "VIP price", group: "Prices", type: "int", value: 2000, min: 0, unit: "Sapphires", level: "owner" },
+  ],
+  crates: [
+    { key: "crates.enabled", label: "Crates on", group: "Crates", type: "bool", value: true, level: "owner" },
+    { key: "crates.launchAt", label: "Launch time", group: "Crates", type: "time", value: "2026-10-17T22:00:00-04:00", level: "owner" },
+    { key: "crates.price", label: "Price", group: "Crates", type: "int", value: 300, min: 0, unit: "Sapphires", level: "owner" },
+  ],
+  cosmetics: [{ key: "trails.enabled", label: "Trails", group: "Cosmetics", type: "bool", value: true, level: "owner" }],
+};
+KNOBS.sounds = ["whistle", "kick", "net", "post", "crowd", "goal", "save", "pass"].flatMap((snd) => [
+  { key: `${snd}.on`, label: `${snd[0].toUpperCase()}${snd.slice(1)}: on`, group: `${snd[0].toUpperCase()}${snd.slice(1)}`, type: "bool", value: true, level: "owner" },
+  { key: `${snd}.sound`, label: `${snd[0].toUpperCase()}${snd.slice(1)}: sound`, group: `${snd[0].toUpperCase()}${snd.slice(1)}`, type: "text", value: `soccer:${snd}`, max: 64, level: "owner" },
+  { key: `${snd}.volume`, label: `${snd[0].toUpperCase()}${snd.slice(1)}: volume`, group: `${snd[0].toUpperCase()}${snd.slice(1)}`, type: "number", value: 1, min: 0, max: 4, step: 0.1, level: "owner" },
+]);
+let benchRestart = null;
+const serverSample = () => ({
+  players: [{ uuid: SAMPLE_PLAYER.uuid, name: "DuckyWins", pitch: "4v4 Field #1" }, { uuid: "a1b2c3d4-0000-4000-8000-000000000002", name: "karlazuz" }],
+  pitches: [{ id: "field_4", name: "4v4 Field #1", running: true, players: 8, countdown: -1, waiting: 0, type: "match" },
+    { id: "warsaw", name: "Warsaw Stadium", running: false, players: 0, countdown: 7, waiting: 6, type: "knockout" },
+    { id: "field_3", name: "3v3 Field", running: false, players: 0, countdown: -1, waiting: 0, type: "quick" }],
+  busy: true,
+  pack: { source: "an external link", url: "https://raw.githubusercontent.com/example/pack.zip", required: true, loaded: 2, online: 2 },
+  restart: benchRestart,
+});
+const AUDIT = { lines: [
+  { at: Date.now() - 86400e3, kind: "grant", uuid: SAMPLE_PLAYER.uuid, name: "DuckyWins", amount: 1050, delta: 1050, line: "L123", order: "O987", pretty: "MCS-1042", reason: "PayNow", by: "paynow" },
+  { at: Date.now() - 3600e3, kind: "spend", uuid: SAMPLE_PLAYER.uuid, name: "DuckyWins", amount: 300, delta: -300, line: "L123", order: "", pretty: "", reason: "Stadium Crate", by: "DuckyWins" }],
+  grant: { uuid: SAMPLE_PLAYER.uuid, amount: 1050, at: Date.now() - 86400e3, starter: false, reversed: false } };
+
 async function pluginBench(req, url) {
   const p = url.pathname.replace(/^\/__plugin/, "");
   if (req.method === "GET") {
@@ -71,6 +123,11 @@ async function pluginBench(req, url) {
     // the bench has no admin secret, so the real server answers 401 (or 404 for a route it lacks): use samples
     if ((r.status === 404 || r.status === 401) && p.startsWith("/discord/admin/")) {
       if (p.startsWith("/discord/admin/bows/tex/")) return { status: 200, body: SAMPLE_PNG, type: "image/png" };
+      if (p === "/discord/admin/knobs" && !url.searchParams.get("scope")) return { status: 200, body: JSON.stringify({ scopes: SCOPES }) };
+      if (p === "/discord/admin/knobs" && KNOBS[(url.searchParams.get("scope") || "").split(":")[0]]) {
+        const scope = url.searchParams.get("scope");
+        return { status: 200, body: JSON.stringify({ scope, knobs: KNOBS[scope.split(":")[0]] }) };
+      }
       if (p === "/discord/admin/knobs") {
         const scope = url.searchParams.get("scope") || "";
         const knobs = scope.startsWith("pitch:") ? [
@@ -87,12 +144,22 @@ async function pluginBench(req, url) {
         ];
         return { status: 200, body: JSON.stringify({ scope, knobs }) };
       }
+      if (p === "/discord/admin/server") return { status: 200, body: JSON.stringify(serverSample()) };
+      if (p === "/discord/admin/wallet/audit") return url.searchParams.get("q") === "none" ? { status: 200, body: JSON.stringify({ lines: [] }) } : { status: 200, body: JSON.stringify(AUDIT) };
       if (SAMPLE[p]) return { status: 200, body: JSON.stringify(SAMPLE[p]) };
     }
     return { status: r.status, body: await r.text() };
   }
   if (p === "/discord/admin/sapphires") return { status: 200, body: JSON.stringify({ ok: true, repeat: false, balance: 1250 + (url.searchParams.get("op") === "take" ? -1 : 1) * Number(url.searchParams.get("amount") || 0) }) };
   if (p === "/discord/admin/rank") return { status: 200, body: JSON.stringify({ ok: true, message: `DuckyWins: ${url.searchParams.get("op")} ${url.searchParams.get("rank")} (bench).` }) };
+  if (p === "/discord/admin/server/restart") { benchRestart = { at: Date.now() + 1000 * Number(url.searchParams.get("delay") || 60), by: url.searchParams.get("by") }; return { status: 200, body: JSON.stringify({ ok: true, at: benchRestart.at, message: `Restarting in ${url.searchParams.get("delay")} seconds; players were told.` }) }; }
+  if (p === "/discord/admin/server/restart/cancel") { benchRestart = null; return { status: 200, body: JSON.stringify({ ok: true, message: "Restart called off." }) }; }
+  if (p === "/discord/admin/server/reload") return { status: 409, body: JSON.stringify({ ok: false, error: "something is on (field_4); a reload would end it. Try again when they're idle." }) };
+  if (p === "/discord/admin/server/pack/resend") return { status: 200, body: JSON.stringify({ ok: true, message: "Sent the pack to 2 players." }) };
+  if (p === "/discord/admin/wallet/grant") return { status: 200, body: JSON.stringify({ ok: true, repeat: false, balance: 1850, message: `+${url.searchParams.get("amount")} to ${url.searchParams.get("id")} (line ${url.searchParams.get("line")})` }) };
+  if (p === "/discord/admin/wallet/reverse") return { status: 200, body: JSON.stringify({ ok: true, repeat: false, message: `Took back 1,050 (line ${url.searchParams.get("line")}, ${url.searchParams.get("kind")}).` }) };
+  if (p === "/discord/admin/wallet/reset" || p === "/discord/admin/wallet/unpause") return { status: 200, body: JSON.stringify({ ok: true, balance: 0, canSpend: true, message: `${url.searchParams.get("id")}: debt cleared.` }) };
+  if (p === "/discord/admin/knobs") return { status: 200, body: JSON.stringify({ ok: true, message: `Set ${url.searchParams.get("key")} = ${url.searchParams.get("value")}.`, value: url.searchParams.get("value") }) };
   if (p === "/discord/admin/cosmetics") return { status: 200, body: JSON.stringify({ ok: true, changed: true, message: "DuckyWins now owns it (bench)." }) };
   console.log(`  (bench) pretend ${req.method} ${p}${url.search}`);
   if (p === "/discord/matches/wipe" && url.searchParams.get("dry")) return { status: 200, body: JSON.stringify({ ok: true, players: 6, fixture: false }) };

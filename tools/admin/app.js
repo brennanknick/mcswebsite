@@ -690,7 +690,8 @@
           ME && ME.role === "owner"
             ? h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:1rem" },
               h("button", { class: "btn btn-sm", type: "button", onclick: () => sapphires(p, "give") }, "Give Sapphires"),
-              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => sapphires(p, "take") }, "Take Sapphires"))
+              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => sapphires(p, "take") }, "Take Sapphires"),
+              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => fixWallet(p) }, "Fix wallet"))
             : h("p", { class: "row-sub", style: "margin-top:.8rem" }, "Only owners can give or take Sapphires."),
         ], { i: 0 }),
         panel("Rank", [
@@ -864,64 +865,134 @@
     if (r) { toast(`Uploaded ${r.sent} frame${r.sent === 1 ? "" : "s"}. The pack rebuilds by itself.`); bows(); }
   }
 
+  /* ── shared by the pages below ────────────────────────────────── */
+
+  // Each page load is numbered: an answer that comes back after another page (or tab) opened is
+  // dropped. And a page's timers, stopped by route() when another page opens.
+  let pageSeq = 0;
+  let leave = null;
+  const actionRow = (title, sub, ...actions) => h("div", { class: "row" },
+    h("div", { class: "row-main" }, h("div", { class: "row-title" }, title), sub ? h("div", { class: "row-sub" }, h("span", null, sub)) : null),
+    h("div", { class: "row-actions" }, actions));
+  const reasonField = (placeholder) => ({ name: "reason", label: "Reason", maxlength: 120, required: true, placeholder: placeholder || null });
+  // "dashboard:karl (5943...)" -> "karl"; anything else as it is
+  const byName = (by) => { const m = /^dashboard:(.*) \(\d+\)$/.exec(String(by || "")); return m ? m[1] : String(by || ""); };
+
   /* ── Settings: the staff menus' knobs ─────────────────────────── */
 
-  const SCOPES = [["pitch", "Pitches"], ["server", "Server"], ["ranks", "Ranks release"], ["crates", "Crates"], ["cosmetics", "Cosmetics"]];
-  let knobScope = "pitch";
+  // docs/admin-api.md, "Settings (knobs)": the game server lists the scopes, and every pitch is one
+  // (they share the Pitches tab). The hash is #/settings/<scope id>: pitch:<id>, server, sounds...
+  let knobTab = "pitch";
   let knobPitch = "";
+  let knobScopes = null;
 
   async function settings(arg) {
+    const seq = pageSeq;
     if (arg) {
-      const [sc, pid] = decodeURIComponent(arg).split(":");
-      if (SCOPES.some(([k]) => k === sc)) knobScope = sc;
-      if (sc === "pitch" && pid) knobPitch = pid;
+      const a = decodeURIComponent(arg);
+      if (a.startsWith("pitch:")) { knobTab = "pitch"; knobPitch = a.slice(6); } else knobTab = a;
     }
-    const tabs = h("div", { class: "tabs" }, SCOPES.map(([k, label]) =>
-      h("button", { type: "button", "aria-pressed": String(knobScope === k), onclick: () => { knobScope = k; location.hash = `#/settings/${k}`; } }, label)));
-    main.replaceChildren(pageHead("Settings", "Settings", "The same settings as the staff menus in game: change them here or there."),
-      panel(null, [h("div", { class: "panel-head" }, tabs)]), h("div", { class: "loading" }, "Loading…"));
-    let scope = knobScope;
-    const extra = [];
-    if (knobScope === "pitch") {
-      const ps = await pitches();
-      if (!ps.length) return main.replaceChildren(main.children[0], main.children[1], errorBox("The game server's pitches couldn't be loaded."));
-      if (!ps.some((p) => p.id === knobPitch)) knobPitch = ps[0].id;
+    const top = pageHead("Settings", "Settings", "The same settings as the staff menus in game: change them here or there.");
+    main.replaceChildren(top, h("div", { class: "loading" }, "Loading…"));
+    if (!knobScopes) {
+      const sc = await call("GET", "/knobs");
+      if (seq !== pageSeq) return;
+      if (sc.httpStatus === 404 && !sc.scopes) return main.replaceChildren(top, needsUpdate("Changing settings here"));
+      if (!sc.ok) return main.replaceChildren(top, errorBox(sc.error));
+      knobScopes = Array.isArray(sc.scopes) ? sc.scopes : [];
+    }
+    const pitchScopes = knobScopes.filter((x) => String(x.id).startsWith("pitch:"));
+    const tabList = [...(pitchScopes.length ? [{ id: "pitch", name: "Pitches" }] : []), ...knobScopes.filter((x) => !String(x.id).startsWith("pitch:"))];
+    if (!tabList.length) return main.replaceChildren(top, panel(null, empty("The game server has no settings to show.")));
+    if (!tabList.some((t) => t.id === knobTab)) knobTab = tabList[0].id;
+    const bar = panel(null, [h("div", { class: "panel-head" }, h("div", { class: "tabs" }, tabList.map((t) =>
+      h("button", { type: "button", "aria-pressed": String(knobTab === t.id), onclick: () => { location.hash = `#/settings/${encodeURIComponent(t.id)}`; } }, t.name || t.id))))]);
+    let scope = knobTab;
+    if (knobTab === "pitch") {
+      if (!pitchScopes.some((p) => p.id === `pitch:${knobPitch}`)) knobPitch = pitchScopes[0].id.slice(6);
       scope = `pitch:${knobPitch}`;
-      const pick = h("select", { class: "input", style: "max-width:320px", onchange: (e) => { knobPitch = e.target.value; location.hash = `#/settings/pitch:${encodeURIComponent(knobPitch)}`; } },
-        ps.map((p) => h("option", { value: p.id, selected: p.id === knobPitch || null }, p.name || p.id)));
-      extra.push(h("label", { class: "field", style: "margin-top:.8rem" }, h("span", null, "Pitch"), pick));
-      main.children[1].append(...extra);
+      bar.append(h("label", { class: "field", style: "margin-top:.8rem;max-width:320px" }, h("span", null, "Pitch"),
+        h("select", { class: "input", onchange: (e) => { location.hash = `#/settings/${encodeURIComponent(e.target.value)}`; } },
+          pitchScopes.map((p) => h("option", { value: p.id, selected: p.id === scope || null }, p.name || p.id.slice(6))))));
     }
+    main.replaceChildren(top, bar, h("div", { class: "loading" }, "Loading…"));
     const r = await call("GET", `/knobs?scope=${encodeURIComponent(scope)}`);
-    const head = main.children[0], bar = main.children[1];
-    if (r.httpStatus === 404 && !r.knobs) return main.replaceChildren(head, bar, needsUpdate("Changing settings here"));
-    if (!r.ok) return main.replaceChildren(head, bar, errorBox(r.error));
-    drawKnobs(head, bar, scope, r.knobs || []);
+    if (seq !== pageSeq) return;
+    if (!r.ok) return main.replaceChildren(top, bar, errorBox(r.error));
+    drawKnobs(top, bar, scope, r.knobs || []);
   }
 
+  // the 16 chat colours, for a colour knob's swatch (its options are names or #hex)
+  const MC_COLOURS = { black: "#000000", dark_blue: "#0000aa", dark_green: "#00aa00", dark_aqua: "#00aaaa", dark_red: "#aa0000", dark_purple: "#aa00aa",
+    gold: "#ffaa00", gray: "#aaaaaa", grey: "#aaaaaa", dark_gray: "#555555", dark_grey: "#555555", blue: "#5555ff", green: "#55ff55", aqua: "#55ffff",
+    red: "#ff5555", light_purple: "#ff55ff", yellow: "#ffff55", white: "#ffffff" };
+  const swatchOf = (v) => { const c = String(v || "").trim(); return /^#[0-9a-f]{6}$/i.test(c) ? c : MC_COLOURS[c.toLowerCase().replace(/[\s-]+/g, "_")] || null; };
+  const optionOf = (o) => (o && typeof o === "object" ? { value: String(o.value), label: String(o.label ?? o.value) } : { value: String(o), label: String(o) });
+  const nice = (t) => String(t).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+  /** A datetime-local value as an ISO time with this browser's offset ("2026-10-24T22:00:00-04:00"); "" when empty. */
+  function isoLocal(v) {
+    if (!v) return "";
+    const d = new Date(v);
+    if (isNaN(d)) return "";
+    const off = -d.getTimezoneOffset();
+    return `${localInput(d.getTime())}:00${off >= 0 ? "+" : "-"}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
+  }
+
+  /** The control for one knob: { el, get(), on(fn), show(value)? }. Values go to the server as its docs say. */
   function knobInput(k, locked) {
     const v = k.value;
     const dis = locked || k.inWorld || null;
+    const withUnit = (el) => (k.unit ? h("span", { class: "knob-in" }, el, h("span", { class: "knob-unit" }, k.unit)) : el);
     if (k.type === "bool") {
-      const i = h("input", { type: "checkbox", checked: v === true || v === "true" || null, disabled: dis });
-      return { el: h("label", { class: "check" }, i, h("span", null, v === true || v === "true" ? "On" : "Off")), get: () => i.checked, on: (fn) => i.addEventListener("change", () => { i.nextSibling.textContent = i.checked ? "On" : "Off"; fn(); }) };
+      const on = v === true || v === "true";
+      const i = h("input", { type: "checkbox", checked: on || null, disabled: dis });
+      const label = h("span", null, on ? "On" : "Off");
+      return { el: h("label", { class: "check" }, i, label), get: () => i.checked, show: (x) => (x ? "On" : "Off"),
+        on: (fn) => i.addEventListener("change", () => { label.textContent = i.checked ? "On" : "Off"; fn(); }) };
     }
-    if (k.type === "enum") {
-      const sel = h("select", { class: "input", disabled: dis }, (k.options || []).map((o) => {
-        const val = typeof o === "object" ? o.value : o, label = typeof o === "object" ? o.label : o;
-        return h("option", { value: val, selected: String(val) === String(v) || null }, label);
-      }));
-      return { el: sel, get: () => sel.value, on: (fn) => sel.addEventListener("change", fn) };
+    if (k.type === "choice" || k.type === "enum" || k.type === "colour") {
+      const opts = (k.options || []).map(optionOf);
+      if (v != null && v !== "" && !opts.some((o) => o.value === String(v))) opts.unshift({ value: String(v), label: String(v) });
+      const sel = h("select", { class: "input", disabled: dis }, opts.map((o) =>
+        h("option", { value: o.value, selected: o.value === String(v ?? "") || null }, k.type === "colour" || /^[a-z][a-z0-9_]*$/.test(o.label) ? nice(o.label) : o.label)));
+      if (k.type !== "colour") return { el: withUnit(sel), get: () => sel.value, on: (fn) => sel.addEventListener("change", fn) };
+      const sw = h("i", { class: "swatch" });
+      const paint = () => { const c = swatchOf(sel.value); sw.style.background = c || "transparent"; sw.hidden = !c; };
+      paint();
+      return { el: h("span", { class: "knob-in" }, sw, sel), get: () => sel.value, show: (x) => nice(x), on: (fn) => sel.addEventListener("change", () => { paint(); fn(); }) };
     }
-    const type = k.type === "int" ? "number" : k.type === "colour" ? "color" : k.type === "time" ? "datetime-local" : "text";
-    let val = v == null ? "" : v;
-    if (k.type === "time" && v) { const d = new Date(Number(v) || v); if (!isNaN(d)) val = localInput(d.getTime()); }
-    const i = h("input", { class: "input", type, value: val, min: k.min ?? null, max: k.max ?? null, disabled: dis, style: k.type === "colour" ? "padding:2px;height:42px" : null });
-    const get = () => k.type === "int" ? Number(i.value) : k.type === "time" ? (i.value ? new Date(i.value).getTime() : "") : i.value;
-    return { el: i, get, on: (fn) => i.addEventListener("input", fn) };
+    if (k.type === "int" || k.type === "number") {
+      const i = h("input", { class: "input", type: "number", value: v ?? "", min: k.min ?? null, max: k.max ?? null, step: k.step ?? (k.type === "int" ? 1 : "any"), disabled: dis, inputmode: k.type === "int" ? "numeric" : "decimal" });
+      return { el: withUnit(i), get: () => (i.value === "" ? "" : Number(i.value)), on: (fn) => i.addEventListener("input", fn) };
+    }
+    if (k.type === "time") {
+      const d = v ? new Date(v) : null;
+      const i = h("input", { class: "input", type: "datetime-local", value: d && !isNaN(d) ? localInput(d.getTime()) : "", disabled: dis });
+      const zone = (Intl.DateTimeFormat().resolvedOptions().timeZone || "").replace(/_/g, " ");
+      return { el: h("span", { class: "knob-list" }, i, h("small", null, zone ? `Your time (${zone}). Empty is not set.` : "Your time. Empty is not set.")), get: () => isoLocal(i.value), show: (x) => (x ? fmtWhen(new Date(x).getTime()) : "Not set"), on: (fn) => i.addEventListener("input", fn) };
+    }
+    if (k.type === "list") {
+      const items = (Array.isArray(v) ? v : String(v ?? "").split(",")).map((x) => String(x).trim()).filter(Boolean);
+      const t = h("textarea", { class: "input", rows: Math.min(6, Math.max(2, Math.ceil(items.join(", ").length / 44))), disabled: dis, spellcheck: "false" });
+      t.value = items.join(", ");
+      return { el: h("span", { class: "knob-list" }, t, h("small", null, "Comma separated")),
+        get: () => t.value.split(/[,\n]/).map((x) => x.trim()).filter(Boolean).join(","),
+        show: (x) => (x ? x.split(",").join(", ") : "(empty)"), on: (fn) => t.addEventListener("input", fn) };
+    }
+    const i = h("input", { class: "input", type: "text", value: v ?? "", maxlength: k.max ?? null, disabled: dis, autocomplete: "off", spellcheck: "false" });
+    return { el: withUnit(i), get: () => i.value, on: (fn) => i.addEventListener("input", fn) };
   }
 
-  function drawKnobs(head, bar, scope, knobs) {
+  /** True when a control's value is what the server has: an edit put back drops out of the save. */
+  function sameValue(k, x) {
+    if (k.type === "bool") return x === (k.value === true || k.value === "true");
+    if (k.type === "time") return (x ? new Date(x).getTime() : 0) === (k.value ? new Date(k.value).getTime() : 0);
+    if (k.type === "list") return x === (Array.isArray(k.value) ? k.value : String(k.value ?? "").split(",")).map((t) => String(t).trim()).filter(Boolean).join(",");
+    return String(x) === String(k.value ?? "");
+  }
+
+  function drawKnobs(top, bar, scope, knobs) {
     const owner = ME && ME.role === "owner";
     const changed = new Map();
     const groups = new Map();
@@ -938,26 +1009,56 @@
       saveBar.firstChild.textContent = changed.size ? `${changed.size} unsaved change${changed.size === 1 ? "" : "s"}` : "No changes";
       saveBar.querySelector(".btn:not(.btn-dark)").disabled = !changed.size;
     };
+    const findable = [];
     let i = 0;
-    const panels = [...groups].map(([g, list]) => panel(g, h("div", { class: "rows" }, list.map((k) => {
-      const locked = k.level === "owner" && !owner;
-      const input = knobInput(k, locked);
-      input.on(() => { changed.set(k.key, { k, value: input.get() }); mark(); });
-      const notes = [k.help || null, k.needsReload ? "Takes effect after a reload." : null, k.inWorld ? "Set in game (it needs someone standing there)." : null, locked ? "Owners only." : null].filter(Boolean);
-      return h("div", { class: "row" },
-        h("div", { class: "row-main" }, h("div", { class: "row-title" }, k.label || k.key, k.level === "owner" ? h("span", { class: "tag is-warn" }, "Owner") : null),
-          notes.length ? h("div", { class: "row-sub" }, notes.map((n) => h("span", null, n))) : null),
-        h("div", { class: "row-actions", style: "min-width:200px" }, input.el));
-    })), { i: i++ }));
-    main.replaceChildren(head, bar, ...(panels.length ? panels : [panel(null, empty("Nothing to set here."))]), saveBar);
+    const panels = [...groups].map(([g, list]) => {
+      const rows = list.map((k) => {
+        const locked = k.level === "owner" && !owner;
+        const input = knobInput(k, locked);
+        input.on(() => {
+          const value = input.get();
+          if (sameValue(k, value)) changed.delete(k.key); else changed.set(k.key, { k, value, input });
+          mark();
+        });
+        const notes = [k.help || null, k.needsReload ? "Takes effect after a reload." : null, k.inWorld ? "Set in game (it needs someone standing there)." : null, locked ? "Owners only." : null].filter(Boolean);
+        const row = h("div", { class: k.type === "list" ? "row is-wide" : "row" },
+          h("div", { class: "row-main" }, h("div", { class: "row-title" }, k.label || k.key),
+            notes.length ? h("div", { class: "row-sub" }, notes.map((n) => h("span", null, n))) : null),
+          h("div", { class: "row-actions knob-cell" }, input.el));
+        return { row, text: [k.label, k.key, k.help, g].filter(Boolean).join(" ").toLowerCase() };
+      });
+      const p = panel(g, h("div", { class: "rows" }, rows.map((x) => x.row)), { i: i++ });
+      findable.push({ p, rows });
+      return p;
+    });
+    // a big scope (Sounds has hundreds) gets a finder
+    let finder = null;
+    if (knobs.length > 12) {
+      const box = h("input", { class: "input", type: "search", placeholder: `Find one of ${knobs.length} settings`, autocomplete: "off", spellcheck: "false", "aria-label": "Find a setting" });
+      const none = h("p", { class: "empty", hidden: true }, "No setting matches that.");
+      box.addEventListener("input", () => {
+        const words = box.value.toLowerCase().split(/\s+/).filter(Boolean);
+        let any = 0;
+        for (const f of findable) {
+          let shown = 0;
+          for (const x of f.rows) { const ok = words.every((w) => x.text.includes(w)); x.row.hidden = !ok; if (ok) shown++; }
+          f.p.hidden = !shown;
+          any += shown;
+        }
+        none.hidden = !!any;
+      });
+      finder = h("div", { class: "knob-find" }, box, none);
+    }
+    main.replaceChildren(top, bar, ...[finder, ...(panels.length ? panels : [panel(null, empty("Nothing to set here."))]), saveBar].filter(Boolean));
 
     async function save() {
       const r = await formDialog({
         title: "Save these settings?", okLabel: "Save",
-        text: h("div", null, [...changed.values()].map(({ k, value }) => h("p", { class: "row-sub" }, `${k.label || k.key}: ${typeof value === "boolean" ? (value ? "On" : "Off") : value}`))),
-        fields: [{ name: "reason", label: "Reason", maxlength: 120, required: true, placeholder: "Longer halves for the league" }],
+        text: h("div", null, [...changed.values()].map(({ k, value, input }) =>
+          h("p", { class: "row-sub" }, `${k.label || k.key}: ${input.show ? input.show(value) : value === "" ? "(empty)" : value}${k.unit && !input.show ? ` ${k.unit}` : ""}`))),
+        fields: [reasonField("Longer halves for the league")],
         submit: async (v) => {
-          for (const { k, value } of changed.values()) {
+          for (const { k, value } of [...changed.values()]) {
             const res = await call("POST", "/knobs", { scope, key: k.key, value, reason: v.reason });
             if (!res.ok) return { ok: false, error: `${k.label || k.key}: ${res.error}` };
             changed.delete(k.key);
@@ -967,6 +1068,223 @@
       });
       if (r) { toast("Saved."); settings(); } else mark();
     }
+  }
+
+  /* ── Server: who's on, the pitches, the pack; restart and reload ── */
+
+  const leftText = (at) => { const t = Math.max(0, Math.round((at - Date.now()) / 1000)); return t >= 60 ? `${Math.floor(t / 60)} min ${pad(t % 60)} s` : `${t} s`; };
+  const clock = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" });
+
+  // quiet: a refresh (the timer or the button), drawn over the page as it is, never replaying its rise
+  async function server(quiet) {
+    const seq = pageSeq;
+    const top = pageHead("Server", "Server", "Who's on, what every pitch is doing and the resource pack. Restart, reload or send the pack again from here.",
+      h("button", { class: "btn btn-dark", type: "button", onclick: () => server(true) }, "Refresh"));
+    if (!quiet) main.replaceChildren(top, h("div", { class: "loading" }, "Loading…"));
+    const r = await call("GET", "/server");
+    if (seq !== pageSeq) return;
+    if (leave) leave();
+    const poll = setTimeout(() => server(true), document.hidden ? 30000 : 10000);
+    const tick = setInterval(() => { for (const el of $$("[data-left]", main)) el.textContent = leftText(Number(el.dataset.left)); }, 1000);
+    leave = () => { clearTimeout(poll); clearInterval(tick); };
+    if (r.httpStatus === 404 && !r.pitches) { leave(); leave = null; return main.replaceChildren(top, needsUpdate("The server page")); }
+    const note = $("[data-server-note]", main);
+    if (!r.ok) {
+      if (quiet && note) { note.textContent = `Not answering right now (restarting?). Last heard ${note.dataset.at || ""}`; note.classList.add("is-bad"); return; }
+      return main.replaceChildren(top, errorBox(r.error));
+    }
+    // a refresh redraws only when something changed, and never under an open dialog, so the
+    // buttons stay put (and keep focus) between changes
+    const sig = JSON.stringify(r);
+    if (quiet && note && (sig === serverSig || dlg.open)) {
+      if (sig === serverSig) { const at = clock(Date.now()); note.textContent = `Updated ${at}. It refreshes by itself.`; note.dataset.at = at; note.classList.remove("is-bad"); }
+      return;
+    }
+    serverSig = sig;
+    if (quiet) settle();
+    drawServer(top, r);
+  }
+  let serverSig = "";
+
+  function drawServer(top, st) {
+    const players = Array.isArray(st.players) ? st.players : [];
+    const ps = Array.isArray(st.pitches) ? st.pitches : [];
+    const inUse = ps.filter((p) => p.running || p.players > 0 || p.countdown >= 0);
+    const pk = st.pack || null;
+    const rs = st.restart || null;
+    const TYPE = { quick: "Quick", scrim: "Scrim", match: "Match", knockout: "Knockout", ranked: "Ranked" };
+    const heard = clock(Date.now());
+    main.replaceChildren(...[top,
+      rs ? panel(null, h("div", { class: "row" },
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, h("span", { class: "dot is-live" }), h("span", null, "Restarting in ", h("b", { "data-left": rs.at }, leftText(rs.at)))),
+          h("div", { class: "row-sub" }, h("span", null, `At ${clock(rs.at)}`), rs.by ? h("span", null, `Asked by ${byName(rs.by)}`) : null)),
+        h("div", { class: "row-actions" }, h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: cancelRestart }, "Call it off")))) : null,
+      h("div", { class: "grid" },
+        panel("Right now", [
+          h("div", { class: "form-row" },
+            h("div", { class: "stat" }, h("b", null, players.length), h("span", null, players.length === 1 ? "player on" : "players on")),
+            h("div", { class: "stat" }, h("b", null, `${inUse.length}/${ps.length}`), h("span", null, "pitches in use")),
+            h("div", { class: "stat" }, h("b", null, pk ? `${pk.loaded}/${pk.online}` : "?"), h("span", null, "have the pack"))),
+          h("p", { class: "row-sub server-note", "data-server-note": "", "data-at": heard, style: "margin-top:.8rem" }, `Updated ${heard}. It refreshes by itself.`),
+        ], { i: 0, aside: st.busy ? h("span", { class: "tag is-warn" }, "Something's on") : h("span", { class: "tag is-good" }, "All quiet") }),
+        panel("Restart and reload", h("div", { class: "rows" },
+          actionRow("Restart the server", "Everyone is told, with a countdown. The host starts it again, back in about a minute.",
+            h("button", { class: "btn btn-sm", type: "button", disabled: rs ? true : null, onclick: () => restartServer(st) }, "Restart")),
+          actionRow("Reload the config", st.busy ? "Not while anything is on: a reload ends every match. Wait until every pitch is idle." : "Reads config.yml again. It would end every match, so it only works while every pitch is idle.",
+            h("button", { class: "btn btn-dark btn-sm", type: "button", disabled: st.busy ? true : null, onclick: reloadConfig }, "Reload")),
+          actionRow("Send the pack again", "Sends the resource pack to everyone online once more, for when it didn't load.",
+            h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: resendPack }, "Send"))), { i: 1 })),
+      h("div", { class: "grid" },
+        panel("Pitches", ps.length ? h("div", { class: "rows" }, ps.map((p) => h("div", { class: "row" },
+          h("div", { class: "row-main" },
+            h("div", { class: "row-title" }, p.name || p.id, p.type ? h("span", { class: "tag" }, TYPE[p.type] || p.type) : null,
+              p.running ? h("span", { class: "tag is-live" }, "Match on") : p.countdown >= 0 ? h("span", { class: "tag is-warn" }, `Starts in ${p.countdown} s`) : null),
+            h("div", { class: "row-sub" }, h("span", null, `${p.players || 0} playing`), p.waiting ? h("span", null, `${p.waiting} waiting`) : null)),
+          h("a", { class: "btn btn-dark btn-sm", href: `#/settings/${encodeURIComponent("pitch:" + p.id)}` }, "Settings")))) : empty("No pitches."), { i: 2 }),
+        panel(`Players on (${players.length})`, players.length ? h("div", { class: "rows" }, players.map((p) => h("div", { class: "row" },
+          h("div", { class: "row-main" }, h("div", { class: "row-title" }, head(p.name, 24), p.name, p.pitch ? h("span", { class: "tag" }, p.pitch) : null)),
+          h("a", { class: "btn btn-dark btn-sm", href: `#/players/${encodeURIComponent(p.uuid)}` }, "Open")))) : empty("Nobody's on right now."), { i: 3 })),
+      pk ? panel("Resource pack", [
+        h("p", null, `${pk.loaded} of ${pk.online} online have it loaded. ${pk.required ? "Players must accept it." : "Players may turn it down."}`),
+        h("p", { class: "row-sub", style: "overflow-wrap:anywhere" }, `From ${pk.source}${pk.url ? `: ${pk.url}` : ""}`),
+      ], { i: 4 }) : null].filter(Boolean));
+  }
+
+  async function restartServer(st) {
+    const r = await formDialog({
+      title: "Restart the server?", okLabel: "Restart", bad: true,
+      text: st.busy ? h("p", { class: "note" }, "Something is on right now: a match, players on a pitch or a countdown. Tick the box to restart anyway.")
+        : "Everyone online is told and sees the countdown.",
+      fields: [
+        { name: "delay", type: "select", label: "When", value: "60", options: [["10", "In 10 seconds"], ["30", "In 30 seconds"], ["60", "In 1 minute"], ["120", "In 2 minutes"], ["300", "In 5 minutes"], ["600", "In 10 minutes"]].map(([value, label]) => ({ value, label })) },
+        st.busy ? { name: "force", type: "checkbox", label: "Restart even though something's on", value: false } : null,
+        reasonField("Plugin update"),
+      ].filter(Boolean),
+      submit: (v) => call("POST", "/server/restart", { delay: Number(v.delay), force: v.force === true, reason: v.reason }),
+    });
+    if (r) { toast(r.message || "The restart is counting down."); server(true); }
+  }
+
+  async function cancelRestart() {
+    const r = await formDialog({ title: "Call off the restart?", okLabel: "Call it off", text: "Players are told it's off.", fields: [reasonField("Not needed after all")],
+      submit: (v) => call("POST", "/server/restart/cancel", { reason: v.reason }) });
+    if (r) { toast(r.message || "Called off."); server(true); }
+  }
+
+  async function reloadConfig() {
+    const r = await formDialog({ title: "Reload the config?", okLabel: "Reload", text: "The game server reads config.yml again. It's refused if a match starts in the meantime.", fields: [reasonField("Edited config.yml")],
+      submit: (v) => call("POST", "/server/reload", { reason: v.reason }) });
+    if (r) { toast(r.message || "Config reloaded."); server(true); }
+  }
+
+  async function resendPack() {
+    const r = await formDialog({ title: "Send the pack again?", okLabel: "Send", text: "Everyone online gets the resource pack prompt once more.", fields: [reasonField("Players had no textures")],
+      submit: (v) => call("POST", "/server/pack/resend", { reason: v.reason }) });
+    if (r) { toast(r.message || "Sent."); server(true); }
+  }
+
+  /* ── Wallet tools (owners): store orders and wallet repairs ────── */
+
+  async function wallet() {
+    const seq = pageSeq;
+    const input = h("input", { class: "input", type: "search", placeholder: "Order, line or pretty id", maxlength: 80, autocomplete: "off", spellcheck: "false", "aria-label": "Order, line or pretty id" });
+    const out = h("div");
+    const form = h("form", { class: "search", onsubmit: (e) => { e.preventDefault(); look(); } }, input, h("button", { class: "btn", type: "submit" }, "Look up"));
+    const tool = (title, text, label, cls, fn, i) => panel(title, [h("p", null, text),
+      h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:.9rem" }, h("button", { class: `btn btn-sm ${cls}`, type: "button", onclick: () => fn() }, label))], { i });
+    main.replaceChildren(
+      pageHead("Sapphires", "Wallet tools", "Store orders and wallet repairs. Every change needs a reason, tells the player in game and goes in the Activity log."),
+      panel("Look up a store order", [form, out], { i: 0 }),
+      h("div", { class: "grid" },
+        tool("Add an order by hand", "For a PayNow order whose command never reached the game. Each line counts once: the same line again changes nothing.", "Add an order", "", () => storeGrant(), 1),
+        tool("Take an order back", "A refund, chargeback or revoke. Each line is taken back once, and a line that hasn't arrived yet is stopped from arriving later.", "Take one back", "btn-bad", () => storeReverse(), 2),
+        tool("Fix a wallet", "Bring a wallet that went below zero back to zero so its owner can spend again, or reset both parts to zero.", "Fix a wallet", "btn-dark", () => fixWallet(), 3)));
+    input.focus();
+
+    async function look() {
+      const term = input.value.trim();
+      if (!term) return;
+      out.replaceChildren(h("div", { class: "loading" }, "Looking…"));
+      const r = await call("GET", `/wallet/audit?q=${encodeURIComponent(term)}`);
+      if (seq !== pageSeq || term !== input.value.trim()) return;
+      if (r.httpStatus === 404 && !r.lines) return out.replaceChildren(needsUpdate("The wallet tools"));
+      if (!r.ok) return out.replaceChildren(errorBox(r.error));
+      const lines = Array.isArray(r.lines) ? r.lines : [];
+      const g = r.grant || null;
+      const lineId = (lines.find((l) => l.line) || {}).line || term;
+      const who = g && (lines.find((l) => l.uuid === g.uuid && l.name) || {}).name;
+      if (!lines.length && !g && !r.tombstone) return out.replaceChildren(empty(`Nothing in the wallet's books for "${term}".`));
+      out.replaceChildren(h("div", { style: "margin-top:.9rem" },
+        g ? h("div", { class: "row" },
+          h("div", { class: "row-main" },
+            h("div", { class: "row-title" }, h("span", { class: "score" }, `+${Number(g.amount || 0).toLocaleString()}`), who || g.uuid,
+              g.starter ? h("span", { class: "tag" }, "Starter pack") : null,
+              g.reversed ? h("span", { class: "tag is-bad" }, `Taken back: ${g.reverseKind || "?"}`) : h("span", { class: "tag is-good" }, "In their wallet")),
+            h("div", { class: "row-sub" }, g.at ? h("span", null, `Arrived ${fmtWhen(g.at)}`) : null,
+              g.reversed && g.reversedAt ? h("span", null, `Taken back ${fmtWhen(g.reversedAt)}${g.reversedPaid != null ? ` (${Number(g.reversedPaid).toLocaleString()} came off)` : ""}`) : null)),
+          h("div", { class: "row-actions" }, g.reversed ? null : h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => storeReverse(lineId, look) }, "Take it back"))) : null,
+        r.tombstone ? h("p", { class: "note", style: "margin:.6rem 0" }, `Taken back before it arrived, so it can't arrive later: ${r.tombstone}`) : null,
+        lines.length ? h("div", { class: "rows" }, lines.map((l) => {
+          const d = Number(l.delta ?? l.amount ?? 0);
+          return h("div", { class: "row" },
+            h("div", { class: "row-main" },
+              h("div", { class: "row-title" }, h("span", { class: "score" }, `${d > 0 ? "+" : ""}${d.toLocaleString()}`), h("span", { class: "tag" }, l.kind || ""), l.name || l.uuid || ""),
+              h("div", { class: "row-sub" }, l.at ? h("span", null, fmtWhen(l.at)) : null, l.reason ? h("span", null, l.reason) : null, l.by ? h("span", null, byName(l.by)) : null,
+                h("span", null, [l.line && `line ${l.line}`, l.order && `order ${l.order}`, l.pretty].filter(Boolean).join(" · ")))),
+            l.uuid ? h("a", { class: "btn btn-dark btn-sm", href: `#/players/${encodeURIComponent(l.uuid)}` }, "Player") : h("span"));
+        })) : null));
+    }
+  }
+
+  async function storeGrant() {
+    const r = await formDialog({
+      title: "Add a store order by hand", okLabel: "Add it",
+      text: "Copy the ids from the order in PayNow, so the books match PayNow.",
+      fields: [
+        { name: "id", label: "Player", maxlength: 36, required: true, placeholder: "Name or UUID" },
+        { type: "row", fields: [
+          { name: "amount", type: "number", label: "Sapphires", min: 1, max: 1000000, required: true },
+          { name: "line", label: "Line id", maxlength: 64, required: true }] },
+        { type: "row", fields: [
+          { name: "order", label: "Order id", maxlength: 64, placeholder: "If there is one" },
+          { name: "pretty", label: "Pretty id", maxlength: 64, placeholder: "If there is one" }] },
+        { name: "starter", type: "checkbox", label: "It's the Starter Pack (once per player)", value: false },
+        reasonField("PayNow's command never arrived"),
+      ],
+      submit: (v) => (/^[A-Za-z0-9_-]{1,64}$/.test(v.line)
+        ? call("POST", "/wallet/grant", { id: v.id, name: v.id, amount: Number(v.amount), line: v.line, order: v.order, pretty: v.pretty, starter: v.starter === true, reason: v.reason })
+        : { ok: false, error: "The line id takes only letters, numbers, - and _." }),
+    });
+    if (r) toast(r.repeat ? "That line was already in. Nothing changed." : (r.message || "Added."));
+  }
+
+  async function storeReverse(line, then) {
+    const r = await formDialog({
+      title: "Take a store order back", okLabel: "Take it back", bad: true,
+      text: "Its Sapphires come off the player's wallet. If they've spent them it goes below zero, and spending stops until it's fixed.",
+      fields: [
+        { name: "line", label: "Line id", value: line || "", maxlength: 64, required: true },
+        { name: "kind", type: "select", label: "Why", options: [{ value: "refund", label: "Refund" }, { value: "chargeback", label: "Chargeback" }, { value: "revoke", label: "Revoke" }] },
+        reasonField("Refunded in PayNow"),
+      ],
+      submit: (v) => call("POST", "/wallet/reverse", { line: v.line, kind: v.kind, reason: v.reason }),
+    });
+    if (r) { toast(r.repeat ? "Already taken back. Nothing changed." : (r.message || "Taken back.")); if (then) then(); }
+  }
+
+  async function fixWallet(p) {
+    const key = keyId();   // one per click: a re-send changes nothing
+    const r = await formDialog({
+      title: p ? `Fix ${p.name}'s wallet` : "Fix a wallet", okLabel: "Fix it", bad: true,
+      fields: [
+        p ? null : { name: "id", label: "Player", maxlength: 36, required: true, placeholder: "Name or UUID" },
+        { name: "what", type: "select", label: "What to do", options: [{ value: "unpause", label: "Clear the debt: only what's below zero" }, { value: "reset", label: "Reset everything to zero" }] },
+        reasonField("Chargeback settled"),
+      ].filter(Boolean),
+      submit: (v) => call("POST", v.what === "reset" ? "/wallet/reset" : "/wallet/unpause", { id: p ? p.uuid : v.id, name: p ? p.name : v.id, key, reason: v.reason }),
+    });
+    if (r) { toast(r.repeat ? "Already done. Nothing changed." : (r.message || "Done.")); if (p) profile(p.uuid); }
   }
 
   /* ── Activity ─────────────────────────────────────────────────── */
@@ -988,7 +1306,7 @@
 
   /* ── the router ───────────────────────────────────────────────── */
 
-  const ROUTES = { "": home, fixtures, matches, reports, tiers, players, bows, settings, activity };
+  const ROUTES = { "": home, fixtures, matches, reports, tiers, players, wallet, bows, settings, server, activity };
 
   // A page rises in when it's opened. The first click or key inside it ends that, so
   // the redraws a button causes (a tab, a save, a move) don't replay the animation.
@@ -999,6 +1317,8 @@
 
   let arrived = false;
   function route() {
+    pageSeq++;
+    if (leave) { leave(); leave = null; }
     // the page rises in once, when the dashboard first opens: never on a section switch
     if (!arrived) { main.classList.add("is-entering"); arrived = true; }
     const [name, arg] = location.hash.replace(/^#\/?/, "").split("/");
