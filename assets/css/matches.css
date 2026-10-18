@@ -1961,6 +1961,8 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-tbl thead th.c-club, .mh-tbl thead th.c-form { text-align: left; }
 .mh-tbl abbr { text-decoration: none; cursor: help; }
 .mh-tbl tbody tr { animation: mh-rise .5s cubic-bezier(.34, 1.4, .64, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+/* after the first click, redraws stay still (matches.js sets .mh-settled) */
+.mh-settled .mh-in, .mh-settled .mh-fx-row, .mh-settled .mh-tbl tbody tr { animation: none; }
 .mh-tbl td {
   padding: .7rem .65rem;
   background:

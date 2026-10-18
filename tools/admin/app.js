@@ -997,8 +997,10 @@
   main.addEventListener("keydown", settle, true);
   dlg.addEventListener("pointerdown", settle, true);
 
+  let arrived = false;
   function route() {
-    main.classList.add("is-entering");
+    // the page rises in once, when the dashboard first opens: never on a section switch
+    if (!arrived) { main.classList.add("is-entering"); arrived = true; }
     const [name, arg] = location.hash.replace(/^#\/?/, "").split("/");
     const page = ROUTES[name] ? name : "";
     $$("[data-route]").forEach((a) => (a.dataset.route === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));

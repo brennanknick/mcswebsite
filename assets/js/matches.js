@@ -29,6 +29,13 @@
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Things rise in when the page first loads, and only then: after the visitor's first click
+  // or key, every redraw (a tab, a match, a page) stays still. Brenn: animations replaying on
+  // each click felt like the page resetting.
+  let settled = reduceMotion;
+  const settle = () => { settled = true; document.documentElement.classList.add("mh-settled"); };
+  document.addEventListener("pointerdown", settle, { capture: true, once: true });
+  document.addEventListener("keydown", settle, { capture: true, once: true });
 
   const view = $("[data-mh-view]");
   const head = $("[data-mh-head]");
@@ -684,9 +691,9 @@
     view.replaceChildren(...nodes.filter(Boolean));
     view.removeAttribute("aria-busy");
     view.classList.remove("is-loading");
-    // stagger the top-level blocks in, but only on a real change of view:
-    // a new filter or page shouldn't make everything bounce again
-    if (!quiet) {
+    // stagger the top-level blocks in, but only on the first view: a click
+    // (a new tab, match, filter or page) shouldn't make everything bounce again
+    if (!quiet && !settled) {
       [...view.children].forEach((el, i) => {
         el.classList.add("mh-in");
         el.style.setProperty("--i", Math.min(i, 8));
