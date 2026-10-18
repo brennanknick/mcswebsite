@@ -162,7 +162,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ── a page's head ───────────────────────────────────────────────── */
 
-.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .8rem 1.5rem; margin: 0 0 1.4rem; animation: rise .45s var(--ease) both; }
+.head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .8rem 1.5rem; margin: 0 0 1.4rem; }
 .kicker { display: flex; align-items: center; gap: .55rem; margin: 0 0 .35rem; font-size: 12px; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
 .kicker::before { content: ""; width: 8px; height: 8px; background: var(--grad-2); clip-path: var(--px-dot); }
 .head h1 { font-size: 34px; font-weight: 800; }
@@ -177,9 +177,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: linear-gradient(180deg, var(--panel-a), var(--panel-b));
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, .06), inset 0 -2px 0 rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .05);
   clip-path: var(--notch-lg);
-  animation: rise .45s var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 50ms);
 }
+/* a page rises in when you open it, and only then: redraws after a button
+   press (main loses .is-entering at the first click or key) stay still */
+.is-entering .head { animation: rise .45s var(--ease) both; }
+.is-entering .panel { animation: rise .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 50ms); }
 .panel + .panel { margin-top: .9rem; }
 .panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; margin: 0 0 .8rem; }
 .panel-head h2 { font-size: 17px; font-weight: 800; }

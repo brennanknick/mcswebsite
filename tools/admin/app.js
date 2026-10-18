@@ -878,7 +878,15 @@
 
   const ROUTES = { "": home, fixtures, matches, reports, tiers, players, bows, activity };
 
+  // A page rises in when it's opened. The first click or key inside it ends that, so
+  // the redraws a button causes (a tab, a save, a move) don't replay the animation.
+  const settle = () => main.classList.remove("is-entering");
+  main.addEventListener("pointerdown", settle, true);
+  main.addEventListener("keydown", settle, true);
+  dlg.addEventListener("pointerdown", settle, true);
+
   function route() {
+    main.classList.add("is-entering");
     const [name, arg] = location.hash.replace(/^#\/?/, "").split("/");
     const page = ROUTES[name] ? name : "";
     $$("[data-route]").forEach((a) => (a.dataset.route === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
