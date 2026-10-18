@@ -72,7 +72,7 @@
   }
   html.dataset.storeOpen = CFG.storeOpen === true ? "1" : "0";
   if (IS_DEMO) html.dataset.storeDemo = "1";
-  // the VIP / VIP+ ranks stay hidden until ranksOpen; ?ranks=1 previews
+  // the VIP / MVP ranks stay hidden until ranksOpen; ?ranks=1 previews
   // them on localhost only, like the overrides above
   html.dataset.ranks = CFG.ranksOpen === true || override("ranks", "pn-ranks") === "1" ? "on" : "off";
 

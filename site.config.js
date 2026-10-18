@@ -48,7 +48,7 @@ window.MCS = {
   // Opened 2026-10-02, after PayNow accepted the store.
   storeOpen: true,
 
-  // The VIP and VIP+ ranks on /store/ (the perk table). false: hidden.
+  // The VIP and MVP ranks on /store/ (the perk table). false: hidden.
   // true: shown. Leave false until the rank products are released on
   // PayNow and in game.
   ranksOpen: false,

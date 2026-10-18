@@ -758,27 +758,28 @@ html[data-store="off"] .st-stage .st-pool { opacity: .25; }
   }
 }
 
-/* ── ranks: VIP and VIP+, perk by perk ──────────────────────────────
+/* ── ranks: VIP and MVP, perk by perk ───────────────────────────────
    Not released yet: store.js sets html[data-ranks] from ranksOpen (or
    ?ranks=1 on localhost), and the section only shows when it's "on".
    Each rank column is lit in its own badge's colours, taken straight
-   from the rank art: VIP's orange, VIP+'s gold. VIP+ stands raised.
+   from the rank art: VIP's gold, MVP's deeper red-orange. MVP, the
+   30-day rank on top of VIP, stands raised.
    The lights sit under the table, and --rk-perk / --rk-rank keep them
    on their columns at every width. */
 
 :root {
-  --vip:        #ff9800;   /* the VIP badge: orange over red */
-  --vip-shade:  #8f2a00;
-  --plus:       #ffc107;   /* the VIP+ badge: gold over orange */
-  --plus-hi:    #ffeb3b;
-  --plus-shade: #8a5800;
+  --vip:        #ffc107;   /* the VIP badge: gold over orange */
+  --vip-shade:  #8a5800;
+  --mvp:        #ff5722;   /* the MVP badge: red-orange over red */
+  --mvp-hi:     #ff9800;
+  --mvp-shade:  #8f1500;
 }
 
 html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 
-/* gold gradient text, cut from the VIP+ badge */
+/* warm gradient text, from VIP's gold to MVP's red-orange */
 .st-gold {
-  background: radial-gradient(ellipse 70% 95% at 42% 40%, #fffbe8 0%, #ffef8a 30%, var(--plus) 62%, var(--vip) 100%);
+  background: radial-gradient(ellipse 70% 95% at 42% 40%, #fffbe8 0%, #ffe27a 28%, var(--vip) 52%, var(--mvp-hi) 76%, var(--mvp) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -814,7 +815,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   left: 0;
   width: 8px;
   height: 8px;
-  background: var(--plus);
+  background: var(--vip);
   clip-path: var(--px-star);
 }
 .st-rk-notes b { font-weight: 750; color: #fff; }
@@ -823,7 +824,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   --rk-perk: 46%;
   --rk-rank: 27%;
   position: relative;
-  margin: 16px 0;   /* room for the raised VIP+ column */
+  margin: 16px 0;   /* room for the raised MVP column */
 }
 .st-rk-card {
   position: absolute;
@@ -842,16 +843,16 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   left: var(--rk-perk);
   background: radial-gradient(100% 230px at 50% 0%, color-mix(in srgb, var(--vip) 13%, transparent), transparent 80%);
 }
-.st-rk-col.is-plus {
+.st-rk-col.is-mvp {
   left: calc(var(--rk-perk) + var(--rk-rank));
   top: -16px;
   bottom: -16px;
   background:
-    radial-gradient(110% 270px at 50% 0%, color-mix(in srgb, var(--plus) 20%, transparent), transparent 80%),
-    linear-gradient(180deg, #211e10, #151811 45%, #111712);
+    radial-gradient(110% 270px at 50% 0%, color-mix(in srgb, var(--mvp) 21%, transparent), transparent 80%),
+    linear-gradient(180deg, #26140e, #181410 45%, #111712);
   box-shadow:
-    inset 0 3px 0 color-mix(in srgb, var(--plus-hi) 75%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--plus) 36%, transparent),
+    inset 0 3px 0 color-mix(in srgb, var(--mvp-hi) 85%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--mvp) 40%, transparent),
     inset 0 -3px 0 rgba(0, 0, 0, .5);
   clip-path: var(--notch-lg);
 }
@@ -871,7 +872,6 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 
 .st-rk-table thead th { position: relative; padding: 2.3rem .5rem 1.15rem; text-align: center; }
 .st .st-rk-badge { display: block; width: 111px; height: 33px; max-width: none; margin: 0 auto; }
-.st .is-plus .st-rk-badge { width: 129px; }
 /* a tab on the raised column's top edge */
 .st-rk-req {
   position: absolute;
@@ -885,8 +885,8 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   letter-spacing: .14em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: #241703;
-  background: var(--plus);
+  color: #2b0900;
+  background: var(--mvp);
   clip-path: var(--notch);
 }
 
@@ -931,7 +931,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 .st-rk-yes { width: 20px; height: 14px; }
 .st-rk-no { width: 16px; height: 14px; fill: rgba(255, 255, 255, .2); }
 .is-vip .st-rk-yes { fill: var(--vip); filter: drop-shadow(0 2px 0 var(--vip-shade)); }
-.is-plus .st-rk-yes { fill: var(--plus); filter: drop-shadow(0 2px 0 var(--plus-shade)); }
+.is-mvp .st-rk-yes { fill: var(--mvp); filter: drop-shadow(0 2px 0 var(--mvp-shade)); }
 
 /* the reveal: the raised column rises, then the rows, one after another */
 .reveal-on .st-rk tr {
@@ -940,13 +940,13 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   transition: opacity .35s ease, transform .5s var(--ease-spring);
   transition-delay: calc(var(--r, 0) * 40ms + 80ms);
 }
-.reveal-on .st-rk .st-rk-col.is-plus {
+.reveal-on .st-rk .st-rk-col.is-mvp {
   opacity: 0;
   transform: translateY(28px);
   transition: opacity .4s ease, transform .65s var(--ease-spring);
 }
 .reveal-on .st-rk.is-in tr,
-.reveal-on .st-rk.is-in .st-rk-col.is-plus { opacity: 1; transform: none; }
+.reveal-on .st-rk.is-in .st-rk-col.is-mvp { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .reveal-on .st-rk tr, .reveal-on .st-rk .st-rk-col { opacity: 1 !important; transform: none !important; }
 }
@@ -1327,7 +1327,6 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   .st-rk-table tbody th { padding-left: .95rem; }
   .st-rk-group th { padding: 1.3rem .95rem .45rem; font-size: 11px; letter-spacing: .16em; }
   .st .st-rk-badge { width: 74px; height: 22px; }
-  .st .is-plus .st-rk-badge { width: 86px; }
   .st-rk-req { top: -25px; padding-inline: .45rem; font-size: 10px; letter-spacing: .1em; }
   .st-rk-price td b { font-size: 24px; }
   .st-grid { gap: .6rem; }
