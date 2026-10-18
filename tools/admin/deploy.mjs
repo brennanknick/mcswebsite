@@ -5,8 +5,8 @@
 // Reads, and never prints:
 //   C:\Users\brenn\soccer\.cloudflare-token       a token from the "Edit Cloudflare Workers" template
 //   C:\Users\brenn\soccer\.discord-oauth-secret   the MCS Discord app's OAuth2 client secret
-//   C:\Users\brenn\soccer\.plugin-admin-token     (optional) the game server's admin token
-//   the Discord bot's .env                        CLIENT_ID, GUILD_ID, DISCORD_TOKEN, SOCCER_API_TOKEN
+//   C:\Users\brenn\soccer\.plugin-admin-token     the game server's admin secret: it signs every request
+//   the Discord bot's .env                        CLIENT_ID, GUILD_ID, and DISCORD_TOKEN (to look up the role ids)
 // Everything it makes is idempotent: the KV namespace and the custom domain are reused.
 import fs from "node:fs";
 import path from "node:path";
@@ -29,10 +29,11 @@ const env = Object.fromEntries(read(BOT_ENV).split(/\r?\n/).filter((l) => /^[A-Z
   const i = l.indexOf("=");
   return [l.slice(0, i), l.slice(i + 1).trim().replace(/^["']|["']$/g, "")];
 }));
-for (const k of ["CLIENT_ID", "GUILD_ID", "DISCORD_TOKEN", "SOCCER_API_TOKEN"]) if (!env[k]) throw new Error(`the bot's .env has no ${k}`);
+for (const k of ["CLIENT_ID", "GUILD_ID", "DISCORD_TOKEN"]) if (!env[k]) throw new Error(`the bot's .env has no ${k}`);
 const oauthSecret = read(path.join(SECRETS, ".discord-oauth-secret"));
 const adminTokenFile = path.join(SECRETS, ".plugin-admin-token");
-const adminToken = fs.existsSync(adminTokenFile) ? read(adminTokenFile) : "";
+const adminToken = read(adminTokenFile);
+if (!/^[A-Za-z0-9_-]{32,256}$/.test(adminToken)) throw new Error("the admin secret file should hold 32-256 letters, digits, - or _");
 
 async function cf(method, p, body, headers = {}) {
   const res = await fetch("https://api.cloudflare.com/client/v4" + p, {
@@ -70,7 +71,7 @@ console.log(`roles: Owner (${owner.id}), Admin (${admin.id})`);
 const domains = await cf("GET", `/accounts/${account}/workers/domains`);
 const domain = domains.find((d) => d.hostname === HOSTNAME);
 console.log(`custom domain ${HOSTNAME}: ${domain ? `on "${domain.service}"` : "will be added"}`);
-console.log(`plugin admin secret: ${adminToken ? "present (it signs every request; it never travels)" : "not yet (the bot token opens /discord/* until then)"}`);
+console.log("plugin admin secret: present (it signs every request and never travels; the bot token isn't used)");
 
 const files = ["worker.js", "app.html", "app.css", "app.js"].map((f) => [f, fs.readFileSync(path.join(HERE, f), "utf8")]);
 for (const [f, text] of files) console.log(`  ${f.padEnd(10)} ${(text.length / 1024).toFixed(1)} KB`);
@@ -87,9 +88,9 @@ const bindings = [
   { type: "plain_text", name: "ADMIN_ROLE_ID", text: admin.id },
   { type: "plain_text", name: "ORIGIN", text: ORIGIN },
   { type: "secret_text", name: "DISCORD_CLIENT_SECRET", text: oauthSecret },
-  { type: "secret_text", name: "PLUGIN_TOKEN", text: env.SOCCER_API_TOKEN },
+  // signed requests open every route the dashboard uses, so the bot's token stays with the bot
+  { type: "secret_text", name: "PLUGIN_ADMIN_TOKEN", text: adminToken },
 ];
-if (adminToken) bindings.push({ type: "secret_text", name: "PLUGIN_ADMIN_TOKEN", text: adminToken });
 
 const form = new FormData();
 form.append("metadata", new Blob([JSON.stringify({ main_module: "worker.js", compatibility_date: COMPAT, bindings })], { type: "application/json" }));
