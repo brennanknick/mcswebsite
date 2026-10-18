@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MCS Admin</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="theme-color" content="#070c0a" />
+<link rel="icon" href="https://mcsoccer.net/favicon.ico" sizes="32x32" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css" />
+<script src="/app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <a class="side-brand" href="#/">
+      <img src="https://mcsoccer.net/assets/img/logo.png" width="44" height="44" alt="" />
+      <span><b>MCS</b><small>Admin</small></span>
+    </a>
+    <nav class="side-nav" aria-label="Dashboard" data-nav>
+      <a href="#/" data-route=""><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z"/></svg>Overview</a>
+      <a href="#/fixtures" data-route="fixtures"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h12v12H2zM4 6h8v6H4zM4 1h2v3H4zM10 1h2v3h-2z" fill-rule="evenodd"/></svg>Fixtures</a>
+      <a href="#/matches" data-route="matches"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h6v2h2v2h2v6h-2v2h-2v2H5v-2H3v-2H1V5h2V3h2zM6 5v2H4v2h2v2h4V9h2V7h-2V5z" fill-rule="evenodd"/></svg>Matches</a>
+      <a href="#/reports" data-route="reports"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 1h2v14H2zM4 2h9l-2 3 2 3H4z"/></svg>Reports<span class="pill" data-count-reports hidden></span></a>
+      <a href="#/tiers" data-route="tiers"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2h14v3H1zM1 7h10v3H1zM1 12h6v3H1z"/></svg>Tier list</a>
+      <a href="#/players" data-route="players"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 1h6v6H5zM2 9h12v6H2z"/></svg>Players<span class="soon" data-soon="players">soon</span></a>
+      <a href="#/bows" data-route="bows"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1h3v2h2v2h2v2h2v2h2v3h-3v-2H9V8H7V6H5V4H3zM12 1h3v3h-3z"/></svg>Bow skins<span class="soon" data-soon="bows">soon</span></a>
+      <a href="#/activity" data-route="activity"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1h14v2H1zM1 6h14v2H1zM1 11h9v2H1z"/></svg>Activity</a>
+    </nav>
+    <div class="side-me" data-me hidden>
+      <img data-me-avatar alt="" width="36" height="36" />
+      <div><b data-me-name></b><small data-me-role></small></div>
+      <button class="link" type="button" data-signout>Sign out</button>
+    </div>
+  </aside>
+
+  <main class="main" data-main tabindex="-1">
+    <div class="loading">Loading&hellip;</div>
+  </main>
+</div>
+
+<dialog class="dlg" data-dlg aria-labelledby="dlg-title"></dialog>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+</body>
+</html>

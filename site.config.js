@@ -21,11 +21,11 @@ window.MCS = {
   // player data live, so it is always current.
   tierListUrl: "/tiers/",
 
-  // Where the tier list's players come from: its data.js, which declares
+  // Where the tier list's players come from: a data.js that declares
   // TIER_DATA. The /tiers/ page and the home page's "Top of the tier
-  // list" both read it. Until the admin dashboard keeps the tier list,
-  // it stays on the old tier list site, which staff still edit.
-  tierData: "https://tiers.mcsoccer.net/data.js",
+  // list" both read it. Owners and admins edit it in the admin dashboard
+  // (admin.mcsoccer.net, Tier list), which serves it here.
+  tierData: "https://admin.mcsoccer.net/tiers.js",
 
   // Hero background video. Record 20-40s of a match, run
   // tools/make-hero.sh on it, and set these two. Until then the hero
