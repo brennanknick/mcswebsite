@@ -79,8 +79,8 @@ const KNOBS = {
     { key: "stands", label: "Stands", group: "Pitch & Watching", type: "text", value: "set", level: "admin", inWorld: true },
   ],
   server: [
-    { key: "teams.red.colour", label: "Red team colour", group: "Team colours", type: "colour", value: "red", options: ["red", "dark_red", "gold", "yellow", "blue", "aqua", "green", "white"], level: "owner" },
-    { key: "teams.blue.colour", label: "Blue team colour", group: "Team colours", type: "colour", value: "blue", options: ["red", "dark_red", "gold", "yellow", "blue", "aqua", "green", "white"], level: "owner" },
+    { key: "teams.red.colour", label: "Red team colour", group: "Team colours", type: "colour", value: "RED", options: ["RED", "DARK_RED", "GOLD", "YELLOW", "BLUE", "AQUA", "GREEN", "WHITE"], level: "owner" },
+    { key: "teams.blue.colour", label: "Blue team colour", group: "Team colours", type: "colour", value: "BLUE", options: ["RED", "DARK_RED", "GOLD", "YELLOW", "BLUE", "AQUA", "GREEN", "WHITE"], level: "owner" },
     { key: "commands.restrict", label: "Only allowed commands", group: "Commands", type: "bool", value: true, level: "owner" },
     { key: "commands.allowed", label: "Allowed commands", group: "Commands", type: "list", value: ["link", "unlink", "stats", "rules", "party", "warp", "vote", "cosmetics", "spectate", "leave"], level: "owner" },
   ],
@@ -114,7 +114,10 @@ const serverSample = () => ({
 const AUDIT = { lines: [
   { at: Date.now() - 86400e3, kind: "grant", uuid: SAMPLE_PLAYER.uuid, name: "DuckyWins", amount: 1050, delta: 1050, line: "L123", order: "O987", pretty: "MCS-1042", reason: "PayNow", by: "paynow" },
   { at: Date.now() - 3600e3, kind: "spend", uuid: SAMPLE_PLAYER.uuid, name: "DuckyWins", amount: 300, delta: -300, line: "L123", order: "", pretty: "", reason: "Stadium Crate", by: "DuckyWins" }],
-  grant: { uuid: SAMPLE_PLAYER.uuid, amount: 1050, at: Date.now() - 86400e3, starter: false, reversed: false } };
+  // live shape (03bc200): grants and tombstones by line id, and "grant" only when there's exactly one
+  grants: { L123: { uuid: SAMPLE_PLAYER.uuid, amount: 1050, at: Date.now() - 86400e3, starter: false, reversed: false },
+    L124: { uuid: SAMPLE_PLAYER.uuid, amount: 600, at: Date.now() - 86400e3, starter: true, reversed: true, reverseKind: "refund", reversedAt: Date.now() - 7200e3, reversedPaid: 600 } },
+  tombstones: { L125: "chargeback" } };
 
 async function pluginBench(req, url) {
   const p = url.pathname.replace(/^\/__plugin/, "");

@@ -928,7 +928,8 @@
     red: "#ff5555", light_purple: "#ff55ff", yellow: "#ffff55", white: "#ffffff" };
   const swatchOf = (v) => { const c = String(v || "").trim(); return /^#[0-9a-f]{6}$/i.test(c) ? c : MC_COLOURS[c.toLowerCase().replace(/[\s-]+/g, "_")] || null; };
   const optionOf = (o) => (o && typeof o === "object" ? { value: String(o.value), label: String(o.label ?? o.value) } : { value: String(o), label: String(o) });
-  const nice = (t) => String(t).replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  // "DARK_BLUE" or "dark_blue" -> "Dark blue"
+  const nice = (t) => String(t).replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase());
 
   /** A datetime-local value as an ISO time with this browser's offset ("2026-10-24T22:00:00-04:00"); "" when empty. */
   function isoLocal(v) {
@@ -1154,8 +1155,8 @@
   async function restartServer(st) {
     const r = await formDialog({
       title: "Restart the server?", okLabel: "Restart", bad: true,
-      text: st.busy ? h("p", { class: "note" }, "Something is on right now: a match, players on a pitch or a countdown. Tick the box to restart anyway.")
-        : "Everyone online is told and sees the countdown.",
+      text: st.busy ? h("p", { class: "note" }, "Something is on right now: a match, players on a pitch, a countdown, a ranked booking or a tournament match. Tick the box to restart anyway.")
+        : "Everyone online sees a countdown. If a match starts meanwhile, the restart waits for it a minute at a time (three times at most), then calls itself off.",
       fields: [
         { name: "delay", type: "select", label: "When", value: "60", options: [["10", "In 10 seconds"], ["30", "In 30 seconds"], ["60", "In 1 minute"], ["120", "In 2 minutes"], ["300", "In 5 minutes"], ["600", "In 10 minutes"]].map(([value, label]) => ({ value, label })) },
         st.busy ? { name: "force", type: "checkbox", label: "Restart even though something's on", value: false } : null,
@@ -1211,20 +1212,21 @@
       if (r.httpStatus === 404 && !r.lines) return out.replaceChildren(needsUpdate("The wallet tools"));
       if (!r.ok) return out.replaceChildren(errorBox(r.error));
       const lines = Array.isArray(r.lines) ? r.lines : [];
-      const g = r.grant || null;
-      const lineId = (lines.find((l) => l.line) || {}).line || term;
-      const who = g && (lines.find((l) => l.uuid === g.uuid && l.name) || {}).name;
-      if (!lines.length && !g && !r.tombstone) return out.replaceChildren(empty(`Nothing in the wallet's books for "${term}".`));
+      // each store line's grant and tombstone, by line id: an order or pretty id can cover several
+      const grants = r.grants && typeof r.grants === "object" ? Object.entries(r.grants) : r.grant ? [[(lines.find((l) => l.line) || {}).line || term, r.grant]] : [];
+      const tombs = r.tombstones && typeof r.tombstones === "object" ? Object.entries(r.tombstones) : r.tombstone ? [[term, r.tombstone]] : [];
+      const nameOf = (uuid) => (lines.find((l) => l.uuid === uuid && l.name) || {}).name || uuid;
+      if (!lines.length && !grants.length && !tombs.length) return out.replaceChildren(empty(`Nothing in the wallet's books for "${term}".`));
       out.replaceChildren(h("div", { style: "margin-top:.9rem" },
-        g ? h("div", { class: "row" },
+        grants.map(([line, g]) => h("div", { class: "row" },
           h("div", { class: "row-main" },
-            h("div", { class: "row-title" }, h("span", { class: "score" }, `+${Number(g.amount || 0).toLocaleString()}`), who || g.uuid,
+            h("div", { class: "row-title" }, h("span", { class: "score" }, `+${Number(g.amount || 0).toLocaleString()}`), nameOf(g.uuid),
               g.starter ? h("span", { class: "tag" }, "Starter pack") : null,
               g.reversed ? h("span", { class: "tag is-bad" }, `Taken back: ${g.reverseKind || "?"}`) : h("span", { class: "tag is-good" }, "In their wallet")),
-            h("div", { class: "row-sub" }, g.at ? h("span", null, `Arrived ${fmtWhen(g.at)}`) : null,
+            h("div", { class: "row-sub" }, h("span", null, `Line ${line}`), g.at ? h("span", null, `Arrived ${fmtWhen(g.at)}`) : null,
               g.reversed && g.reversedAt ? h("span", null, `Taken back ${fmtWhen(g.reversedAt)}${g.reversedPaid != null ? ` (${Number(g.reversedPaid).toLocaleString()} came off)` : ""}`) : null)),
-          h("div", { class: "row-actions" }, g.reversed ? null : h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => storeReverse(lineId, look) }, "Take it back"))) : null,
-        r.tombstone ? h("p", { class: "note", style: "margin:.6rem 0" }, `Taken back before it arrived, so it can't arrive later: ${r.tombstone}`) : null,
+          h("div", { class: "row-actions" }, g.reversed ? null : h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => storeReverse(line, look) }, "Take it back")))),
+        tombs.map(([line, t]) => h("p", { class: "note", style: "margin:.6rem 0" }, `Line ${line} was taken back before it arrived, so it can't arrive later${t ? ` (${t})` : ""}.`)),
         lines.length ? h("div", { class: "rows" }, lines.map((l) => {
           const d = Number(l.delta ?? l.amount ?? 0);
           return h("div", { class: "row" },
