@@ -641,121 +641,220 @@
 
   /* ── Players & Sapphires ──────────────────────────────────────── */
 
-  const needsUpdate = (what) => panel(null, [h("p", { class: "note" }, `${what} needs the game server's admin update, which is being built now. This page works as soon as it's live.`)]);
+  const needsUpdate = (what) => panel(null, [h("p", { class: "note" }, `${what} needs the game server's admin update. This page works as soon as it's on the server.`)]);
+  const RANK_NAMES = { owner: "Owner", admin: "Admin", developer: "Developer", mod: "Mod", helper: "Helper", media: "Media", affiliate: "Affiliate", vipplus: "MVP", mvp: "MVP", vip: "VIP", donator: "Donator", player: "Player" };
+  const rankName = (id) => RANK_NAMES[String(id || "player").toLowerCase()] || String(id);
+  const ownerOnly = () => ME && ME.role !== "owner" ? h("p", { class: "note" }, "Only owners can change ranks. The game server will refuse it from an admin.") : null;
 
   async function players() {
-    const input = h("input", { class: "input", type: "search", placeholder: "Find a player", maxlength: 16, autocomplete: "off" });
+    const input = h("input", { class: "input", type: "search", placeholder: "Name or UUID", maxlength: 36, autocomplete: "off", spellcheck: "false" });
     const results = h("div");
     const form = h("form", { class: "search", onsubmit: async (e) => { e.preventDefault(); find(); } }, input, h("button", { class: "btn", type: "submit" }, "Find"));
     main.replaceChildren(pageHead("Players", "Players", "Look anyone up: their link, rank, Sapphires and cosmetics. Give or take Sapphires, ranks and cosmetics, always with a reason."), panel(null, [form, results]));
     input.focus();
+    let timer = 0;
+    input.addEventListener("input", () => { clearTimeout(timer); if (input.value.trim().length >= 2) timer = setTimeout(find, 300); });
     async function find() {
       const q = input.value.trim();
       if (!q) return;
       results.replaceChildren(h("div", { class: "loading" }, "Looking…"));
       const r = await call("GET", `/players?q=${encodeURIComponent(q)}`);
-      if (r.httpStatus === 404) return results.replaceChildren(needsUpdate("Finding players"));
+      if (q !== input.value.trim()) return;   // a newer search is on its way
+      if (r.httpStatus === 404 && !r.items) return results.replaceChildren(needsUpdate("Finding players"));
       if (!r.ok) return results.replaceChildren(errorBox(r.error));
-      if (!r.items.length) return results.replaceChildren(empty(`Nobody called "${q}".`));
+      if (!r.items.length) return results.replaceChildren(empty(`Nobody called "${q}" has played on MCS.`));
       results.replaceChildren(h("div", { class: "rows", style: "margin-top:.8rem" }, r.items.map((p) => h("div", { class: "row" },
         h("div", { class: "row-main" }, h("div", { class: "row-title" }, head(p.name, 24), p.name, p.online ? h("span", { class: "tag is-good" }, "Online") : null)),
-        h("div", { class: "row-actions" }, h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => profile(p.uuid) }, "Open"))))));
+        h("div", { class: "row-actions" }, h("a", { class: "btn btn-dark btn-sm", href: `#/players/${encodeURIComponent(p.uuid)}` }, "Open"))))));
     }
   }
 
   async function profile(id) {
     main.replaceChildren(pageHead("Players", "Player", null, h("a", { class: "btn btn-dark", href: "#/players" }, "Back")), h("div", { class: "loading" }, "Loading…"));
     const r = await call("GET", `/player?id=${encodeURIComponent(id)}`);
-    if (r.httpStatus === 404 && !r.player) return main.replaceChildren(main.firstChild, needsUpdate("Player pages"));
+    if (r.httpStatus === 404 && !r.player && /update/.test(r.error || "")) return main.replaceChildren(main.firstChild, needsUpdate("Player pages"));
     if (!r.ok) return main.replaceChildren(main.firstChild, errorBox(r.error));
     const p = r.player;
     const w = p.wallet || {};
-    const ranks = p.ranks || {};
-    main.replaceChildren(pageHead("Player", h("span", { class: "club" }, head(p.name, 40), p.name), p.online ? "Online now" : p.lastSeen ? `Last seen ${fmtWhen(p.lastSeen)}` : null,
-      h("a", { class: "btn btn-dark", href: "#/players" }, "Back")),
+    const rk = p.ranks || {};
+    const seen = p.online ? "Online now" : p.lastSeen ? `Last seen ${fmtWhen(p.lastSeen)}` : "";
+    main.replaceChildren(
+      pageHead("Player", h("span", { class: "club" }, head(p.name, 40), p.name), seen, h("a", { class: "btn btn-dark", href: "#/players" }, "Back")),
       h("div", { class: "grid" },
         panel("Sapphires", [
           h("div", { class: "form-row" },
             h("div", { class: "stat" }, h("b", null, Number(w.balance || 0).toLocaleString()), h("span", null, "balance")),
             h("div", { class: "stat" }, h("b", null, Number(w.paid || 0).toLocaleString()), h("span", null, "bought")),
             h("div", { class: "stat" }, h("b", null, Number(w.earned || 0).toLocaleString()), h("span", null, "earned"))),
+          w.crates ? h("p", { style: "margin:.6rem 0 0" }, `${w.crates} crate${w.crates === 1 ? "" : "s"} waiting`) : null,
           h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:1rem" },
             h("button", { class: "btn btn-sm", type: "button", onclick: () => sapphires(p, "give") }, "Give Sapphires"),
             h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => sapphires(p, "take") }, "Take Sapphires")),
         ], { i: 0 }),
         panel("Rank", [
-          h("p", null, `Shows as: ${ranks.shown || "Player"}`),
-          ranks.staff ? h("p", null, `Staff rank: ${ranks.staff}`) : null,
-          ranks.mvpUntil ? h("p", null, `MVP until ${fmtDay(ranks.mvpUntil)}`) : null,
+          h("p", null, "Shows as ", h("b", { style: "color:#fff" }, rankName(rk.shown))),
+          rk.staff ? h("p", null, `Staff rank: ${rankName(rk.staff)}`) : null,
+          rk.vip ? h("p", null, "Has VIP") : null,
+          rk.mvpUntil ? h("p", null, `MVP until ${fmtDay(rk.mvpUntil)}`) : null,
+          rk.hidden ? h("p", null, "Hidden from the supporters wall") : null,
+          rk.display === false ? h("p", { class: "row-sub" }, "Ranks aren't switched on for players yet, so nobody sees these.") : null,
           h("div", { class: "dlg-foot", style: "justify-content:flex-start" },
             h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => rank(p) }, "Change rank")),
         ], { i: 1 }),
         panel("Account", [
-          h("p", null, `Discord: ${p.discord ? "linked" : "not linked"}`),
+          h("p", null, p.discord ? `Discord: linked${p.discordTag ? ` as ${p.discordTag}` : ""}` : "Discord: not linked"),
           p.firstSeen ? h("p", null, `First joined ${fmtDay(p.firstSeen)}`) : null,
-          h("p", null, `${(p.cosmetics || []).length} cosmetics owned`),
+          h("p", null, `${(p.cosmetics || []).length} cosmetic${(p.cosmetics || []).length === 1 ? "" : "s"} owned`),
+          h("p", { class: "row-sub" }, p.uuid),
           h("div", { class: "dlg-foot", style: "justify-content:flex-start" },
             h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => cosmetic(p) }, "Give or take a cosmetic")),
         ], { i: 2 })),
       panel("Sapphire history", (p.ledger || []).length ? h("div", { class: "rows" }, p.ledger.map((l) => h("div", { class: "row" },
-        h("div", { class: "row-main" }, h("div", { class: "row-title" }, `${l.amount > 0 ? "+" : ""}${Number(l.amount).toLocaleString()}`, h("span", { class: "tag" }, l.kind || "")),
-          h("div", { class: "row-sub" }, h("span", null, l.at ? fmtWhen(l.at) : ""), l.reason ? h("span", null, l.reason) : null, l.by ? h("span", null, l.by) : null)), h("span")))) : empty("No Sapphire history."), { i: 3 }));
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, h("span", { class: "score" }, `${l.amount > 0 ? "+" : ""}${Number(l.amount).toLocaleString()}`), h("span", { class: "tag" }, l.kind || "")),
+          h("div", { class: "row-sub" }, h("span", null, l.at ? fmtWhen(l.at) : ""), l.reason ? h("span", null, l.reason) : null, l.by ? h("span", null, l.by) : null)),
+        h("span", { class: "row-sub" }, l.paidAfter != null ? `${Number(l.paidAfter + l.earnedAfter).toLocaleString()} after` : "")))) : empty("No Sapphire history yet."), { i: 3 }));
   }
 
   async function sapphires(p, op) {
-    const key = keyId();
+    const key = keyId();   // one per click: a re-send changes nothing
     const r = await formDialog({
       title: op === "take" ? `Take Sapphires from ${p.name}` : `Give Sapphires to ${p.name}`, okLabel: op === "take" ? "Take" : "Give", bad: op === "take",
+      text: op === "give" ? "They go into the earned part of the wallet. The player is told in game." : "A take never goes below zero.",
       fields: [
-        { name: "amount", type: "number", label: "Amount", min: 1, required: true },
-        { name: "reason", label: "Reason", maxlength: 200, required: true, placeholder: op === "take" ? "Refunded order 1234" : "Giveaway winner" },
+        { name: "amount", type: "number", label: "Amount", min: 1, max: 100000, required: true },
+        { name: "reason", label: "Reason", maxlength: 120, required: true, placeholder: op === "take" ? "Refunded order 1234" : "Giveaway winner" },
       ],
-      submit: (v) => call("POST", "/sapphires", { id: p.uuid, op, amount: Number(v.amount), reason: v.reason, key }),
+      submit: (v) => call("POST", "/sapphires", { id: p.uuid, name: p.name, op, amount: Number(v.amount), reason: v.reason, key }),
     });
-    if (r) { toast(`Done. Balance: ${Number(r.balance || 0).toLocaleString()}`); profile(p.uuid); }
+    if (r) { toast(r.repeat ? "Already done. Nothing changed." : `Done. Balance: ${Number(r.balance || 0).toLocaleString()}`); location.hash = `#/players/${encodeURIComponent(p.uuid)}`; profile(p.uuid); }
   }
 
   async function rank(p) {
     const r = await formDialog({
       title: `Change ${p.name}'s rank`, okLabel: "Change",
+      text: ownerOnly(),
       fields: [
         { name: "what", type: "select", label: "Change", options: [
           { value: "give:vip", label: "Give VIP" }, { value: "take:vip", label: "Take VIP" },
-          { value: "give:mvp", label: "Give MVP (30 days)" }, { value: "take:mvp", label: "Take MVP" },
-          { value: "set:admin", label: "Staff rank: Admin (owners only)" }, { value: "set:mod", label: "Staff rank: Mod (owners only)" },
-          { value: "set:helper", label: "Staff rank: Helper (owners only)" }, { value: "set:none", label: "No staff rank (owners only)" }] },
-        { name: "reason", label: "Reason", maxlength: 200, required: true },
+          { value: "give:mvp", label: "Give MVP (needs VIP)" }, { value: "take:mvp", label: "Take MVP" },
+          { value: "set:owner", label: "Staff rank: Owner" }, { value: "set:admin", label: "Staff rank: Admin" },
+          { value: "set:developer", label: "Staff rank: Developer" }, { value: "set:mod", label: "Staff rank: Mod" },
+          { value: "set:helper", label: "Staff rank: Helper" }, { value: "set:media", label: "Staff rank: Media" },
+          { value: "set:affiliate", label: "Staff rank: Affiliate" }, { value: "set:none", label: "No staff rank" }],
+          onchange: null },
+        { name: "days", type: "number", label: "MVP days (when giving MVP)", value: "30", min: 1, max: 3650 },
+        { name: "reason", label: "Reason", maxlength: 120, required: true },
       ],
-      submit: (v) => { const [op, rk] = v.what.split(":"); return call("POST", "/rank", { id: p.uuid, op, rank: rk, days: rk === "mvp" && op === "give" ? 30 : undefined, reason: v.reason }); },
+      submit: (v) => { const [op, rk] = v.what.split(":"); return call("POST", "/rank", { id: p.uuid, name: p.name, op, rank: rk, days: op === "give" && rk === "mvp" ? Number(v.days) || 30 : undefined, reason: v.reason }); },
     });
-    if (r) { toast("Rank changed."); profile(p.uuid); }
+    if (r) { toast(r.message || "Rank changed."); location.hash = `#/players/${encodeURIComponent(p.uuid)}`; profile(p.uuid); }
   }
 
   async function cosmetic(p) {
     const cat = await call("GET", "/cosmetics/catalog");
     if (!cat.ok) return toast(cat.error, true);
+    const owned = new Set(p.cosmetics || []);
+    const TYPES = { trail: "Trails", celebration: "Celebrations", bow: "Bow skins" };
+    const sorted = cat.items.slice().sort((a, b) => String(a.type).localeCompare(String(b.type)) || String(a.name).localeCompare(String(b.name)));
+    const options = sorted.map((c) => ({ value: c.id, label: `${TYPES[c.type] ? TYPES[c.type].slice(0, -1) : c.type}: ${c.name}${c.rarity ? ` (${c.rarity})` : ""}${owned.has(c.id) ? " · owned" : ""}` }));
     const r = await formDialog({
       title: `Cosmetics for ${p.name}`, okLabel: "Do it",
       fields: [
         { name: "op", type: "select", label: "Give or take", options: [{ value: "give", label: "Give" }, { value: "take", label: "Take" }] },
-        { name: "cosmetic", type: "select", label: "Cosmetic", options: cat.items.map((c) => ({ value: c.id, label: `${c.name}${c.rarity ? ` (${c.rarity})` : ""}` })) },
-        { name: "reason", label: "Reason", maxlength: 200, required: true },
+        { name: "cosmetic", type: "select", label: "Cosmetic", options },
+        { name: "reason", label: "Reason", maxlength: 120, required: true },
       ],
-      submit: (v) => call("POST", "/cosmetics", { id: p.uuid, op: v.op, cosmetic: v.cosmetic, reason: v.reason }),
+      submit: (v) => call("POST", "/cosmetics", { id: p.uuid, name: p.name, op: v.op, cosmetic: v.cosmetic, reason: v.reason }),
     });
-    if (r) { toast("Done."); profile(p.uuid); }
+    if (r) { toast(r.changed === false ? (r.message || "Nothing to change.") : (r.message || "Done.")); location.hash = `#/players/${encodeURIComponent(p.uuid)}`; profile(p.uuid); }
   }
 
   /* ── Bow skins ────────────────────────────────────────────────── */
 
   async function bows() {
-    main.replaceChildren(pageHead("Cosmetics", "Bow skins", "The custom bow skins players can unlock: add new ones, rename them and take them down."), h("div", { class: "loading" }, "Loading…"));
+    main.replaceChildren(pageHead("Cosmetics", "Bow skins", "The custom bow skins: add new ones, upload their four frames, rename them, take them down. The resource pack rebuilds by itself.",
+      h("button", { class: "btn", type: "button", onclick: newBow }, "New bow skin")), h("div", { class: "loading" }, "Loading…"));
     const r = await call("GET", "/bows");
-    if (r.httpStatus === 404) return main.replaceChildren(main.firstChild, needsUpdate("Managing bow skins here"));
+    if (r.httpStatus === 404 && !r.bows) return main.replaceChildren(main.firstChild, needsUpdate("Managing bow skins here"));
     if (!r.ok) return main.replaceChildren(main.firstChild, errorBox(r.error));
-    const items = r.bows || r.items || [];
-    main.replaceChildren(main.firstChild, panel(null, items.length ? h("div", { class: "rows" }, items.map((b) => h("div", { class: "row" },
-      h("div", { class: "row-main" }, h("div", { class: "row-title" }, b.name || b.slug || b.id), h("div", { class: "row-sub" }, h("span", null, b.slug || b.id || ""))), h("span")))) : empty("No bow skins yet.")));
+    const items = r.bows || [];
+    const warnings = (r.warnings || []).filter(Boolean);
+    main.replaceChildren(...[main.firstChild,
+      warnings.length ? panel(null, warnings.map((w) => h("p", { class: "note", style: "margin:.2rem 0" }, String(w)))) : null,
+      panel(null, items.length ? h("div", { class: "rows" }, items.map((b) => h("div", { class: "row" },
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, b.name || b.slug, h("span", { class: "tag" }, b.slug)),
+          h("div", { class: "row-sub", style: "margin-top:.5rem;gap:.4rem" }, [0, 1, 2, 3].map((n) => (b.frames && b.frames[n])
+            ? h("img", { src: `/api/bows/tex/${encodeURIComponent(b.slug)}/${n}.png?v=${encodeURIComponent(b.stamp || "")}`, width: 48, height: 48, alt: `Frame ${n + 1}`, style: "background:#0a110d;padding:4px" })
+            : h("span", { class: "tag", style: "width:48px;height:48px;justify-content:center" }, `${n + 1}?`)))),
+        h("div", { class: "row-actions" },
+          h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => uploadFrames(b) }, "Upload frames"),
+          h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => renameBow(b) }, "Rename"),
+          h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => deleteBow(b) }, "Delete"))))) : empty("No bow skins yet."))].filter(Boolean));
+  }
+
+  async function newBow() {
+    const r = await formDialog({
+      title: "New bow skin", okLabel: "Make it",
+      text: "Make it, then upload its four frames (the bow from resting to fully drawn).",
+      fields: [
+        { name: "slug", label: "Folder name", maxlength: 40, required: true, placeholder: "golden_boot", hint: "Letters, numbers, - and _. It can't change later." },
+        { name: "name", label: "Name players see", maxlength: 60, placeholder: "Golden Boot" },
+        { name: "reason", label: "Reason", maxlength: 120, required: true, placeholder: "Halloween winner's bow" },
+      ],
+      submit: (v) => /^[a-z0-9_-]{1,40}$/i.test(v.slug) ? call("POST", "/bows/create", { slug: v.slug.toLowerCase(), name: v.name, reason: v.reason }) : { ok: false, error: "The folder name takes only letters, numbers, - and _." },
+    });
+    if (r) { toast("Made. Now upload its frames."); bows(); }
+  }
+
+  async function renameBow(b) {
+    const r = await formDialog({
+      title: `Rename ${b.name || b.slug}`, okLabel: "Rename",
+      fields: [
+        { name: "name", label: "Name players see", value: b.name || "", maxlength: 60, required: true },
+        { name: "reason", label: "Reason", maxlength: 120, required: true },
+      ],
+      submit: (v) => call("POST", "/bows/name", { slug: b.slug, name: v.name, reason: v.reason }),
+    });
+    if (r) { toast("Renamed."); bows(); }
+  }
+
+  async function deleteBow(b) {
+    const r = await formDialog({
+      title: `Delete ${b.name || b.slug}?`, okLabel: "Delete", bad: true,
+      text: "Its images are removed and it comes out of the resource pack.",
+      fields: [{ name: "reason", label: "Reason", maxlength: 120, required: true }],
+      submit: (v) => call("POST", "/bows/delete", { slug: b.slug, reason: v.reason }),
+    });
+    if (r) { toast("Deleted."); bows(); }
+  }
+
+  async function uploadFrames(b) {
+    const fileFields = [1, 2, 3, 4].map((n) => ({ name: `f${n}`, type: "file", label: `Frame ${n}${n === 1 ? " (resting)" : n === 4 ? " (fully drawn)" : ""}` }));
+    const r = await formDialog({
+      title: `Frames for ${b.name || b.slug}`, okLabel: "Upload",
+      text: "PNG images. Pick only the frames you're changing.",
+      fields: [...fileFields, { name: "reason", label: "Reason", maxlength: 120, required: true }],
+      submit: async (v, inputs) => {
+        let sent = 0;
+        for (const n of [1, 2, 3, 4]) {
+          const file = inputs[`f${n}`].files && inputs[`f${n}`].files[0];
+          if (!file) continue;
+          if (file.size > 256 * 1024) return { ok: false, error: `Frame ${n} is too big (256 KB at most).` };
+          let res;
+          try {
+            res = await fetch(`/api/bows/upload?slug=${encodeURIComponent(b.slug)}&frame=${n}&reason=${encodeURIComponent(v.reason)}`, {
+              method: "POST", credentials: "same-origin", headers: { "X-MCS-Admin": "1", "Content-Type": "image/png" }, body: file });
+          } catch { return { ok: false, error: "The dashboard can't be reached." }; }
+          const out = await res.json().catch(() => ({ ok: false, error: `The dashboard answered ${res.status}.` }));
+          if (!out.ok) return { ok: false, error: `Frame ${n}: ${out.error}` };
+          sent++;
+        }
+        return sent ? { ok: true, sent } : { ok: false, error: "Pick at least one frame." };
+      },
+    });
+    if (r) { toast(`Uploaded ${r.sent} frame${r.sent === 1 ? "" : "s"}. The pack rebuilds by itself.`); bows(); }
   }
 
   /* ── Activity ─────────────────────────────────────────────────── */
@@ -780,11 +879,13 @@
   const ROUTES = { "": home, fixtures, matches, reports, tiers, players, bows, activity };
 
   function route() {
-    const name = location.hash.replace(/^#\/?/, "").split("/")[0];
+    const [name, arg] = location.hash.replace(/^#\/?/, "").split("/");
     const page = ROUTES[name] ? name : "";
     $$("[data-route]").forEach((a) => (a.dataset.route === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
     if (tierState && tierState.dirty && page !== "tiers") toast("Your tier list changes aren't saved yet: they're still there in Tier list.");
-    ROUTES[page]();
+    // #/players/<uuid or name> is a player's page
+    if (page === "players" && arg) profile(decodeURIComponent(arg));
+    else ROUTES[page]();
     main.focus({ preventScroll: true });
     window.scrollTo(0, 0);
   }
@@ -796,5 +897,8 @@
     await loadMe();
     route();
     refreshReportCount();
+    // "soon" comes off Players and Bow skins once the dashboard holds the game server's admin token
+    const st = await call("GET", "/status");
+    if (st.ok && st.admin) $$("[data-soon]").forEach((el) => el.remove());
   })();
 })();

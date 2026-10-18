@@ -231,27 +231,36 @@ async function log(env, who, action, detail, ok) {
  * One call to the plugin's token API (/discord/*). Params go in the query string, as the
  * plugin reads them. Resolves { ok, status, body } and never throws.
  */
-async function plugin(env, method, path, params = {}, timeoutMs = PLUGIN_TIMEOUT_MS) {
+async function plugin(env, method, path, params = {}, timeoutMs = PLUGIN_TIMEOUT_MS, send = null) {
   const u = new URL(env.ORIGIN.replace(/\/+$/, "") + path);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") u.searchParams.set(k, String(v));
-  const headers = { "X-Soccer-Token": env.PLUGIN_TOKEN || "" };
-  if (env.PLUGIN_ADMIN_TOKEN) headers["X-Soccer-Admin-Token"] = env.PLUGIN_ADMIN_TOKEN;
+  // both: the game server tries the admin token first and falls back to the bot's, so the
+  // bot routes keep working while a new admin token is still on its way to the server
+  const headers = authHeaders(env);
+  if (send) headers["Content-Type"] = send.type;
   let r;
   try {
-    r = await fetch(u.href, { method, headers, signal: AbortSignal.timeout(timeoutMs) });
+    r = await fetch(u.href, { method, headers, body: send ? send.body : undefined, signal: AbortSignal.timeout(timeoutMs) });
   } catch {
     return { ok: false, status: 0, body: { error: "The game server isn't answering right now." } };
   }
-  const body = await r.json().catch(() => null);
-  if (r.ok) return { ok: true, status: r.status, body };
-  let error = body && typeof body.error === "string" && body.error.trim() ? body.error.trim().slice(0, 300) : null;
+  // JSON almost everywhere; the bow panel answers its errors in plain text
+  const text = await r.text().catch(() => "");
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch {}
+  if (r.ok && (!body || body.ok !== false)) return { ok: true, status: r.status, body };
+  let error = body && typeof body.error === "string" && body.error.trim() ? body.error.trim()
+    : !body && text && text.length < 300 && !/^\s*</.test(text) ? text.trim() : null;
+  if (error === "not allowed") error = "The game server says your account isn't allowed to do that. It needs your Minecraft account linked and set as owner or admin in game (/rank set).";
+  else if (error === "reason required") error = "Give a reason.";
   if (!error) {
     error = r.status === 401 || r.status === 403 ? "The game server refused the dashboard's token."
       : r.status === 404 ? "The game server doesn't have that yet (it needs a plugin update)."
-      : r.status === 503 ? "That part of the game server is switched off or still loading."
+      : r.status === 429 ? "That's a lot of changes at once: wait a minute and try again."
+      : r.status === 503 ? "The game server is busy or still loading. Check before trying again."
       : `The game server answered ${r.status}.`;
   }
-  return { ok: false, status: r.status, body: { error } };
+  return { ok: false, status: r.status, body: { error: error.slice(0, 300) } };
 }
 
 /** The plugin's public API (/api/v1/*), no token. */
@@ -268,6 +277,13 @@ async function publicApi(env, path, params = {}) {
 }
 
 const by = (s) => `dashboard:${clean(s.name, 32)} (${s.id})`;
+
+/** The bot's token always, and the dashboard's admin token once it has one. */
+function authHeaders(env) {
+  const h = { "X-Soccer-Token": env.PLUGIN_TOKEN || "" };
+  if (env.PLUGIN_ADMIN_TOKEN) h["X-Soccer-Admin-Token"] = env.PLUGIN_ADMIN_TOKEN;
+  return h;
+}
 
 /* ── the tier list ─────────────────────────────────────────────────── */
 
@@ -540,33 +556,90 @@ async function api(request, env, s, path) {
       return r.ok ? json({ ok: true, player: r.body }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
     }
     case "POST /sapphires": {
-      const p = { id: clean(input.id, 40), op: input.op === "take" ? "take" : "give", amount: Math.round(Number(input.amount) || 0), reason: clean(input.reason, 200), key: clean(input.key, 64), by: by(s) };
-      if (!p.id || !(p.amount > 0) || !p.reason || !p.key) return fail(400, "Give a player, an amount and a reason.");
+      const p = { id: clean(input.id, 40), op: input.op === "take" ? "take" : "give", amount: Math.round(Number(input.amount) || 0), reason: clean(input.reason, 120), key: clean(input.key, 64), by: by(s) };
+      if (!p.id || !(p.amount > 0) || !p.reason) return fail(400, "Give a player, an amount and a reason.");
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(p.key)) return fail(400, "Reload the page and try again.");
       const r = await plugin(env, "POST", "/discord/admin/sapphires", p);
-      return done(r, p.op === "take" ? "took Sapphires" : "gave Sapphires", `${p.amount} ${p.op === "take" ? "from" : "to"} ${p.id}: ${p.reason}`);
+      return done(r, p.op === "take" ? "took Sapphires" : "gave Sapphires", `${p.amount} ${p.op === "take" ? "from" : "to"} ${input.name ? clean(input.name, 16) : p.id}: ${p.reason}`);
     }
     case "POST /rank": {
-      const p = { id: clean(input.id, 40), op: ["give", "take", "set"].includes(input.op) ? input.op : null, rank: clean(input.rank, 20), days: input.days ? Math.round(Number(input.days)) : undefined, reason: clean(input.reason, 200), by: by(s) };
-      if (!p.id || !p.op || !p.rank || !p.reason) return fail(400, "Give a player, a rank and a reason.");
+      const op = ["give", "take", "set"].includes(input.op) ? input.op : null;
+      const rank = clean(input.rank, 20).toLowerCase();
+      const ranks = op === "set" ? ["owner", "admin", "developer", "mod", "helper", "media", "affiliate", "none"] : ["vip", "mvp"];
+      const p = { id: clean(input.id, 40), op, rank, reason: clean(input.reason, 120), by: by(s) };
+      if (op === "give" && rank === "mvp" && input.days) p.days = Math.max(1, Math.min(3650, Math.round(Number(input.days) || 30)));
+      if (!p.id || !op || !ranks.includes(rank) || !p.reason) return fail(400, "Give a player, a rank and a reason.");
       const r = await plugin(env, "POST", "/discord/admin/rank", p);
-      return done(r, `rank ${p.op}`, `${p.rank} for ${p.id}: ${p.reason}`);
+      return done(r, op === "set" ? "set a staff rank" : op === "give" ? "gave a rank" : "took a rank", `${rank.toUpperCase()}${p.days ? ` (${p.days} days)` : ""} ${op === "take" ? "from" : "for"} ${input.name ? clean(input.name, 16) : p.id}: ${p.reason}`);
     }
     case "GET /cosmetics/catalog": {
       const r = await plugin(env, "GET", "/discord/admin/cosmetics/catalog");
       return r.ok ? json({ ok: true, items: (r.body && r.body.items) || [] }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
     }
     case "POST /cosmetics": {
-      const p = { id: clean(input.id, 40), op: input.op === "take" ? "take" : "give", cosmetic: clean(input.cosmetic, 64), reason: clean(input.reason, 200), by: by(s) };
+      const p = { id: clean(input.id, 40), op: input.op === "take" ? "take" : "give", cosmetic: clean(input.cosmetic, 64), reason: clean(input.reason, 120), by: by(s) };
       if (!p.id || !p.cosmetic || !p.reason) return fail(400, "Give a player, a cosmetic and a reason.");
       const r = await plugin(env, "POST", "/discord/admin/cosmetics", p);
-      return done(r, p.op === "take" ? "took a cosmetic" : "gave a cosmetic", `${p.cosmetic} ${p.op === "take" ? "from" : "to"} ${p.id}: ${p.reason}`);
+      return done(r, p.op === "take" ? "took a cosmetic" : "gave a cosmetic", `${p.cosmetic} ${p.op === "take" ? "from" : "to"} ${input.name ? clean(input.name, 16) : p.id}: ${p.reason}`);
     }
+
+    /* bow skins: the game server's bow panel, through its admin routes */
     case "GET /bows": {
       const r = await plugin(env, "GET", "/discord/admin/bows");
       return r.ok ? json({ ok: true, ...(r.body || {}) }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
     }
+    case "POST /bows/create":
+    case "POST /bows/name": {
+      const slug = clean(input.slug, 40).toLowerCase();
+      const name = clean(input.name, 60);
+      const reason = clean(input.reason, 120);
+      if (!/^[a-z0-9_-]{1,40}$/.test(slug)) return fail(400, "The folder name takes only letters, numbers, - and _.");
+      if (path === "/bows/name" && !name) return fail(400, "A bow skin needs a name.");
+      if (!reason) return fail(400, "Give a reason.");
+      const what = path === "/bows/create" ? "create" : "name";
+      const r = await plugin(env, "POST", `/discord/admin/bows/${what}`, { slug, reason, by: by(s) }, PLUGIN_TIMEOUT_MS, { type: "text/plain; charset=utf-8", body: name });
+      return done(r, what === "create" ? "made a bow skin" : "renamed a bow skin", `${slug}${name ? ` "${name}"` : ""}: ${reason}`);
+    }
+    case "POST /bows/delete": {
+      const slug = clean(input.slug, 40).toLowerCase();
+      const reason = clean(input.reason, 120);
+      if (!/^[a-z0-9_-]{1,40}$/.test(slug) || !reason) return fail(400, "Which bow skin, and why?");
+      const r = await plugin(env, "POST", "/discord/admin/bows/delete", { slug, reason, by: by(s) });
+      return done(r, "deleted a bow skin", `${slug}: ${reason}`);
+    }
   }
   return fail(404, "Not a dashboard route.");
+}
+
+/** A bow skin frame (an image): POST /api/bows/upload?slug=&frame=1..4&reason= with the PNG as the body. */
+async function bowUpload(request, env, s) {
+  const q = new URL(request.url).searchParams;
+  const slug = clean(q.get("slug"), 40).toLowerCase();
+  const frame = Number(q.get("frame"));
+  const reason = clean(q.get("reason"), 120);
+  if (!/^[a-z0-9_-]{1,40}$/.test(slug) || !(frame >= 1 && frame <= 4) || !reason) return fail(400, "Which bow skin and frame, and why?");
+  const png = new Uint8Array(await request.arrayBuffer());
+  const MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (png.length < 8 || MAGIC.some((b, i) => png[i] !== b)) return fail(400, "That isn't a PNG.");
+  if (png.length > 256 * 1024) return fail(400, "That image is too big (256 KB at most).");
+  const r = await plugin(env, "POST", "/discord/admin/bows/upload", { slug, frame, reason, by: by(s) }, PLUGIN_TIMEOUT_MS, { type: "image/png", body: png });
+  await log(env, { id: s.id, name: s.name }, "uploaded a bow skin frame", `${slug} frame ${frame}: ${reason}${r.ok ? "" : ` (refused: ${r.body.error})`}`, r.ok);
+  return json(r.ok ? { ok: true } : { ok: false, error: r.body.error }, r.ok ? 200 : 400);
+}
+
+/** A bow skin frame's image, for the dashboard's previews (signed-in only). */
+async function bowTexture(env, path) {
+  const m = path.match(/^\/bows\/tex\/([a-z0-9_-]{1,40})\/([0-3])\.png$/);
+  if (!m) return respond("no such frame", 404);
+  const u = env.ORIGIN.replace(/\/+$/, "") + `/discord/admin/bows/tex/${m[1]}/${m[2]}.png`;
+  const headers = authHeaders(env);
+  try {
+    const r = await fetch(u, { headers, signal: AbortSignal.timeout(PLUGIN_TIMEOUT_MS) });
+    if (!r.ok || !(r.headers.get("Content-Type") || "").startsWith("image/png")) return respond("no such frame", 404);
+    return respond(r.body, 200, { "Content-Type": "image/png", "Cache-Control": "private, max-age=60" });
+  } catch {
+    return respond("the game server isn't answering", 502);
+  }
 }
 
 /* ── the Worker ────────────────────────────────────────────────────── */
@@ -598,7 +671,15 @@ export default {
       if (path.startsWith("/api/")) {
         const s = await sessionOf(request, env);
         if (!s) return fail(401, "Signed out.");
-        return api(request, env, s, path.slice(4));
+        const sub = path.slice(4);
+        // two that aren't JSON: a bow frame's image, and a bow frame's upload
+        if (method === "GET" && sub.startsWith("/bows/tex/")) return bowTexture(env, sub);
+        if (method === "POST" && sub === "/bows/upload") {
+          const origin = request.headers.get("Origin");
+          if (request.headers.get("X-MCS-Admin") !== "1" || (origin && origin !== HOST)) return fail(403, "Refused.");
+          return bowUpload(request, env, s);
+        }
+        return api(request, env, s, sub);
       }
 
       if (path === "/" && method === "GET") {

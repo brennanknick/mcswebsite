@@ -46,12 +46,37 @@ const KV = {
 const ORIGIN = `http://localhost:${PORT}/__plugin`;
 const env = { KV, ORIGIN, PLUGIN_TOKEN: "bench", DISCORD_CLIENT_ID: "0", GUILD_ID: "0", OWNER_ROLE_ID: "1", ADMIN_ROLE_ID: "2", DISCORD_CLIENT_SECRET: "x" };
 
+// samples in the shape of docs/admin-api.md, for when the real server doesn't have the admin routes yet
+const SAMPLE_PLAYER = { uuid: "a1b2c3d4-0000-4000-8000-000000000001", name: "DuckyWins", online: true, firstSeen: Date.now() - 40 * 864e5, lastSeen: Date.now(),
+  discord: "123", discordTag: "duckyonlywins",
+  ranks: { shown: "vipplus", held: ["vipplus", "vip"], staff: "admin", vip: true, mvpUntil: Date.now() + 20 * 864e5, hidden: false, flight: true, display: false },
+  wallet: { balance: 1250, paid: 1050, earned: 200, crates: 1 },
+  ledger: [{ at: Date.now() - 3600e3, kind: "give", amount: 200, paidAfter: 1050, earnedAfter: 200, reason: "Giveaway winner", by: "dashboard:karlazuz (1)", ref: "k1" },
+    { at: Date.now() - 86400e3, kind: "grant", amount: 1050, paidAfter: 1050, earnedAfter: 0, reason: "PayNow order", by: "paynow", ref: "o1" }],
+  cosmetics: ["trail:flame", "bow:vip_bow"] };
+const SAMPLE = {
+  "/discord/admin/players": { items: [{ uuid: SAMPLE_PLAYER.uuid, name: "DuckyWins", online: true }, { uuid: "a1b2c3d4-0000-4000-8000-000000000002", name: "duckudertruck", online: false }] },
+  "/discord/admin/player": SAMPLE_PLAYER,
+  "/discord/admin/cosmetics/catalog": { items: [{ id: "trail:flame", name: "Flame", type: "trail", rarity: "rare", crate: "Stadium Crate", perk: null },
+    { id: "celebration:supernova", name: "Supernova", type: "celebration", rarity: "legendary", crate: "Stadium Crate", perk: null },
+    { id: "bow:vip_bow", name: "VIP Bow", type: "bow", rarity: "epic", crate: null, perk: "vip" }] },
+  "/discord/admin/bows": { pack: "abcd1234", warnings: [], bows: [{ slug: "golden_boot", name: "Golden Boot", id: 7, stamp: "s1", own: [true, true, true, true], frames: [true, true, true, false] }] },
+};
+const SAMPLE_PNG = fs.readFileSync("C:/Users/brenn/soccer/rank-art/mcs/tags/vip_tag.png");
+
 async function pluginBench(req, url) {
   const p = url.pathname.replace(/^\/__plugin/, "");
   if (req.method === "GET") {
     const r = await fetch(REAL + p + url.search, { headers: p.startsWith("/discord/") ? { "X-Soccer-Token": TOKEN } : {} });
+    if (r.status === 404 && p.startsWith("/discord/admin/")) {
+      if (p.startsWith("/discord/admin/bows/tex/")) return { status: 200, body: SAMPLE_PNG, type: "image/png" };
+      if (SAMPLE[p]) return { status: 200, body: JSON.stringify(SAMPLE[p]) };
+    }
     return { status: r.status, body: await r.text() };
   }
+  if (p === "/discord/admin/sapphires") return { status: 200, body: JSON.stringify({ ok: true, repeat: false, balance: 1250 + (url.searchParams.get("op") === "take" ? -1 : 1) * Number(url.searchParams.get("amount") || 0) }) };
+  if (p === "/discord/admin/rank") return { status: 200, body: JSON.stringify({ ok: true, message: `DuckyWins: ${url.searchParams.get("op")} ${url.searchParams.get("rank")} (bench).` }) };
+  if (p === "/discord/admin/cosmetics") return { status: 200, body: JSON.stringify({ ok: true, changed: true, message: "DuckyWins now owns it (bench)." }) };
   console.log(`  (bench) pretend ${req.method} ${p}${url.search}`);
   if (p === "/discord/matches/wipe" && url.searchParams.get("dry")) return { status: 200, body: JSON.stringify({ ok: true, players: 6, fixture: false }) };
   return { status: 200, body: JSON.stringify({ ok: true }) };
@@ -61,8 +86,9 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   try {
     if (url.pathname.startsWith("/__plugin/")) {
+      if (req.method !== "GET") await new Promise((ok) => { req.resume(); req.on("end", ok); });
       const r = await pluginBench(req, url);
-      res.writeHead(r.status, { "Content-Type": "application/json" });
+      res.writeHead(r.status, { "Content-Type": r.type || "application/json" });
       return res.end(r.body);
     }
     if (url.pathname === "/__login") {
