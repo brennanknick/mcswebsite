@@ -687,9 +687,11 @@
             h("div", { class: "stat" }, h("b", null, Number(w.paid || 0).toLocaleString()), h("span", null, "bought")),
             h("div", { class: "stat" }, h("b", null, Number(w.earned || 0).toLocaleString()), h("span", null, "earned"))),
           w.crates ? h("p", { style: "margin:.6rem 0 0" }, `${w.crates} crate${w.crates === 1 ? "" : "s"} waiting`) : null,
-          h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:1rem" },
-            h("button", { class: "btn btn-sm", type: "button", onclick: () => sapphires(p, "give") }, "Give Sapphires"),
-            h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => sapphires(p, "take") }, "Take Sapphires")),
+          ME && ME.role === "owner"
+            ? h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:1rem" },
+              h("button", { class: "btn btn-sm", type: "button", onclick: () => sapphires(p, "give") }, "Give Sapphires"),
+              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => sapphires(p, "take") }, "Take Sapphires"))
+            : h("p", { class: "row-sub", style: "margin-top:.8rem" }, "Only owners can give or take Sapphires."),
         ], { i: 0 }),
         panel("Rank", [
           h("p", null, "Shows as ", h("b", { style: "color:#fff" }, rankName(rk.shown))),

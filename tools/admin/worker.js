@@ -575,6 +575,8 @@ async function api(request, env, s, path) {
       return r.ok ? json({ ok: true, player: r.body }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
     }
     case "POST /sapphires": {
+      // owners only (Brenn, 2026-10-18; the game server checks it too)
+      if (s.role !== "owner") return fail(403, "Only owners can give or take Sapphires.");
       const p = { id: clean(input.id, 40), op: input.op === "take" ? "take" : "give", amount: Math.round(Number(input.amount) || 0), reason: clean(input.reason, 120), key: clean(input.key, 64), by: by(s) };
       if (!p.id || !(p.amount > 0) || !p.reason) return fail(400, "Give a player, an amount and a reason.");
       if (!/^[A-Za-z0-9_-]{8,64}$/.test(p.key)) return fail(400, "Reload the page and try again.");
