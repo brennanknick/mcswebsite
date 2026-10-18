@@ -698,16 +698,20 @@
           rk.mvpUntil ? h("p", null, `MVP until ${fmtDay(rk.mvpUntil)}`) : null,
           rk.hidden ? h("p", null, "Hidden from the supporters wall") : null,
           rk.display === false ? h("p", { class: "row-sub" }, "Ranks aren't switched on for players yet, so nobody sees these.") : null,
-          h("div", { class: "dlg-foot", style: "justify-content:flex-start" },
-            h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => rank(p) }, "Change rank")),
+          ME && ME.role === "owner"
+            ? h("div", { class: "dlg-foot", style: "justify-content:flex-start" },
+              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => rank(p) }, "Change rank"))
+            : h("p", { class: "row-sub" }, "Only owners can change ranks."),
         ], { i: 1 }),
         panel("Account", [
           h("p", null, p.discord ? `Discord: linked${p.discordTag ? ` as ${p.discordTag}` : ""}` : "Discord: not linked"),
           p.firstSeen ? h("p", null, `First joined ${fmtDay(p.firstSeen)}`) : null,
           h("p", null, `${(p.cosmetics || []).length} cosmetic${(p.cosmetics || []).length === 1 ? "" : "s"} owned`),
           h("p", { class: "row-sub" }, p.uuid),
-          h("div", { class: "dlg-foot", style: "justify-content:flex-start" },
-            h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => cosmetic(p) }, "Give or take a cosmetic")),
+          ME && ME.role === "owner"
+            ? h("div", { class: "dlg-foot", style: "justify-content:flex-start" },
+              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => cosmetic(p) }, "Give or take a cosmetic"))
+            : h("p", { class: "row-sub" }, "Only owners can give or take cosmetics."),
         ], { i: 2 })),
       panel("Sapphire history", (p.ledger || []).length ? h("div", { class: "rows" }, p.ledger.map((l) => h("div", { class: "row" },
         h("div", { class: "row-main" },

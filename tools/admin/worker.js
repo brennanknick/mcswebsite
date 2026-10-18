@@ -61,6 +61,7 @@ const SECURITY = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "Strict-Transport-Security": "max-age=31536000",
+  "X-Robots-Tag": "noindex, nofollow",
 };
 
 /* ── small helpers ─────────────────────────────────────────────────── */
@@ -563,6 +564,8 @@ async function api(request, env, s, path) {
       return done(r, p.op === "take" ? "took Sapphires" : "gave Sapphires", `${p.amount} ${p.op === "take" ? "from" : "to"} ${input.name ? clean(input.name, 16) : p.id}: ${p.reason}`);
     }
     case "POST /rank": {
+      // owners only (the game server checks it too)
+      if (s.role !== "owner") return fail(403, "Only owners can change ranks.");
       const op = ["give", "take", "set"].includes(input.op) ? input.op : null;
       const rank = clean(input.rank, 20).toLowerCase();
       const ranks = op === "set" ? ["owner", "admin", "developer", "mod", "helper", "media", "affiliate", "none"] : ["vip", "mvp"];
@@ -577,6 +580,8 @@ async function api(request, env, s, path) {
       return r.ok ? json({ ok: true, items: (r.body && r.body.items) || [] }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
     }
     case "POST /cosmetics": {
+      // owners only (Brenn, 2026-10-18: admins don't hand out cosmetics)
+      if (s.role !== "owner") return fail(403, "Only owners can give or take cosmetics.");
       const p = { id: clean(input.id, 40), op: input.op === "take" ? "take" : "give", cosmetic: clean(input.cosmetic, 64), reason: clean(input.reason, 120), by: by(s) };
       if (!p.id || !p.cosmetic || !p.reason) return fail(400, "Give a player, a cosmetic and a reason.");
       const r = await plugin(env, "POST", "/discord/admin/cosmetics", p);
