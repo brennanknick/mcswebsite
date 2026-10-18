@@ -864,6 +864,111 @@
     if (r) { toast(`Uploaded ${r.sent} frame${r.sent === 1 ? "" : "s"}. The pack rebuilds by itself.`); bows(); }
   }
 
+  /* ── Settings: the staff menus' knobs ─────────────────────────── */
+
+  const SCOPES = [["pitch", "Pitches"], ["server", "Server"], ["ranks", "Ranks release"], ["crates", "Crates"], ["cosmetics", "Cosmetics"]];
+  let knobScope = "pitch";
+  let knobPitch = "";
+
+  async function settings(arg) {
+    if (arg) {
+      const [sc, pid] = decodeURIComponent(arg).split(":");
+      if (SCOPES.some(([k]) => k === sc)) knobScope = sc;
+      if (sc === "pitch" && pid) knobPitch = pid;
+    }
+    const tabs = h("div", { class: "tabs" }, SCOPES.map(([k, label]) =>
+      h("button", { type: "button", "aria-pressed": String(knobScope === k), onclick: () => { knobScope = k; location.hash = `#/settings/${k}`; } }, label)));
+    main.replaceChildren(pageHead("Settings", "Settings", "The same settings as the staff menus in game: change them here or there. Owner-only ones are locked for admins."),
+      panel(null, [h("div", { class: "panel-head" }, tabs)]), h("div", { class: "loading" }, "Loading…"));
+    let scope = knobScope;
+    const extra = [];
+    if (knobScope === "pitch") {
+      const ps = await pitches();
+      if (!ps.length) return main.replaceChildren(main.children[0], main.children[1], errorBox("The game server's pitches couldn't be loaded."));
+      if (!ps.some((p) => p.id === knobPitch)) knobPitch = ps[0].id;
+      scope = `pitch:${knobPitch}`;
+      const pick = h("select", { class: "input", style: "max-width:320px", onchange: (e) => { knobPitch = e.target.value; location.hash = `#/settings/pitch:${encodeURIComponent(knobPitch)}`; } },
+        ps.map((p) => h("option", { value: p.id, selected: p.id === knobPitch || null }, p.name || p.id)));
+      extra.push(h("label", { class: "field", style: "margin-top:.8rem" }, h("span", null, "Pitch"), pick));
+      main.children[1].append(...extra);
+    }
+    const r = await call("GET", `/knobs?scope=${encodeURIComponent(scope)}`);
+    const head = main.children[0], bar = main.children[1];
+    if (r.httpStatus === 404 && !r.knobs) return main.replaceChildren(head, bar, needsUpdate("Changing settings here"));
+    if (!r.ok) return main.replaceChildren(head, bar, errorBox(r.error));
+    drawKnobs(head, bar, scope, r.knobs || []);
+  }
+
+  function knobInput(k, locked) {
+    const v = k.value;
+    const dis = locked || k.inWorld || null;
+    if (k.type === "bool") {
+      const i = h("input", { type: "checkbox", checked: v === true || v === "true" || null, disabled: dis });
+      return { el: h("label", { class: "check" }, i, h("span", null, v === true || v === "true" ? "On" : "Off")), get: () => i.checked, on: (fn) => i.addEventListener("change", () => { i.nextSibling.textContent = i.checked ? "On" : "Off"; fn(); }) };
+    }
+    if (k.type === "enum") {
+      const sel = h("select", { class: "input", disabled: dis }, (k.options || []).map((o) => {
+        const val = typeof o === "object" ? o.value : o, label = typeof o === "object" ? o.label : o;
+        return h("option", { value: val, selected: String(val) === String(v) || null }, label);
+      }));
+      return { el: sel, get: () => sel.value, on: (fn) => sel.addEventListener("change", fn) };
+    }
+    const type = k.type === "int" ? "number" : k.type === "colour" ? "color" : k.type === "time" ? "datetime-local" : "text";
+    let val = v == null ? "" : v;
+    if (k.type === "time" && v) { const d = new Date(Number(v) || v); if (!isNaN(d)) val = localInput(d.getTime()); }
+    const i = h("input", { class: "input", type, value: val, min: k.min ?? null, max: k.max ?? null, disabled: dis, style: k.type === "colour" ? "padding:2px;height:42px" : null });
+    const get = () => k.type === "int" ? Number(i.value) : k.type === "time" ? (i.value ? new Date(i.value).getTime() : "") : i.value;
+    return { el: i, get, on: (fn) => i.addEventListener("input", fn) };
+  }
+
+  function drawKnobs(head, bar, scope, knobs) {
+    const owner = ME && ME.role === "owner";
+    const changed = new Map();
+    const groups = new Map();
+    for (const k of knobs) {
+      const g = k.group || "Settings";
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(k);
+    }
+    const saveBar = h("div", { class: "tbar" }, h("span", null, "No changes"), h("div", { class: "head-actions" },
+      h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => settings() }, "Discard"),
+      h("button", { class: "btn btn-sm", type: "button", disabled: true, onclick: save }, "Save")));
+    const mark = () => {
+      saveBar.classList.toggle("is-dirty", changed.size > 0);
+      saveBar.firstChild.textContent = changed.size ? `${changed.size} unsaved change${changed.size === 1 ? "" : "s"}` : "No changes";
+      saveBar.querySelector(".btn:not(.btn-dark)").disabled = !changed.size;
+    };
+    let i = 0;
+    const panels = [...groups].map(([g, list]) => panel(g, h("div", { class: "rows" }, list.map((k) => {
+      const locked = k.level === "owner" && !owner;
+      const input = knobInput(k, locked);
+      input.on(() => { changed.set(k.key, { k, value: input.get() }); mark(); });
+      const notes = [k.help || null, k.needsReload ? "Takes effect after a reload." : null, k.inWorld ? "Set in game (it needs someone standing there)." : null, locked ? "Owners only." : null].filter(Boolean);
+      return h("div", { class: "row" },
+        h("div", { class: "row-main" }, h("div", { class: "row-title" }, k.label || k.key, k.level === "owner" ? h("span", { class: "tag is-warn" }, "Owner") : null),
+          notes.length ? h("div", { class: "row-sub" }, notes.map((n) => h("span", null, n))) : null),
+        h("div", { class: "row-actions", style: "min-width:200px" }, input.el));
+    })), { i: i++ }));
+    main.replaceChildren(head, bar, ...(panels.length ? panels : [panel(null, empty("Nothing to set here."))]), saveBar);
+
+    async function save() {
+      const r = await formDialog({
+        title: "Save these settings?", okLabel: "Save",
+        text: h("div", null, [...changed.values()].map(({ k, value }) => h("p", { class: "row-sub" }, `${k.label || k.key}: ${typeof value === "boolean" ? (value ? "On" : "Off") : value}`))),
+        fields: [{ name: "reason", label: "Reason", maxlength: 120, required: true, placeholder: "Longer halves for the league" }],
+        submit: async (v) => {
+          for (const { k, value } of changed.values()) {
+            const res = await call("POST", "/knobs", { scope, key: k.key, value, reason: v.reason });
+            if (!res.ok) return { ok: false, error: `${k.label || k.key}: ${res.error}` };
+            changed.delete(k.key);
+          }
+          return { ok: true };
+        },
+      });
+      if (r) { toast("Saved."); settings(); } else mark();
+    }
+  }
+
   /* ── Activity ─────────────────────────────────────────────────── */
 
   function activityRow(a) {
@@ -883,7 +988,7 @@
 
   /* ── the router ───────────────────────────────────────────────── */
 
-  const ROUTES = { "": home, fixtures, matches, reports, tiers, players, bows, activity };
+  const ROUTES = { "": home, fixtures, matches, reports, tiers, players, bows, settings, activity };
 
   // A page rises in when it's opened. The first click or key inside it ends that, so
   // the redraws a button causes (a tab, a save, a move) don't replay the animation.
@@ -900,6 +1005,7 @@
     if (tierState && tierState.dirty && page !== "tiers") toast("Your tier list changes aren't saved yet: they're still there in Tier list.");
     // #/players/<uuid or name> is a player's page
     if (page === "players" && arg) profile(decodeURIComponent(arg));
+    else if (page === "settings") settings(arg);
     else ROUTES[page]();
     main.focus({ preventScroll: true });
     window.scrollTo(0, 0);

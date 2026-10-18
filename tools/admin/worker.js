@@ -613,6 +613,23 @@ async function api(request, env, s, path) {
     }
 
     /* bow skins: the game server's bow panel, through its admin routes */
+    /* settings: the staff menus' knobs, for a pitch, the server, ranks, crates or cosmetics */
+    case "GET /knobs": {
+      const scope = clean(q.get("scope"), 80);
+      if (!/^(pitch:[A-Za-z0-9_-]{1,64}|server|ranks|crates|cosmetics)$/.test(scope)) return fail(400, "Which settings?");
+      const r = await plugin(env, "GET", "/discord/admin/knobs", { scope });
+      return r.ok ? json({ ok: true, ...(r.body || {}) }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
+    }
+    case "POST /knobs": {
+      const scope = clean(input.scope, 80);
+      const key = clean(input.key, 80);
+      const value = input.value == null ? "" : String(input.value).slice(0, 500);
+      const reason = clean(input.reason, 120);
+      if (!/^(pitch:[A-Za-z0-9_-]{1,64}|server|ranks|crates|cosmetics)$/.test(scope) || !/^[A-Za-z0-9_.:-]{1,80}$/.test(key) || !reason) return fail(400, "Which setting, and why?");
+      const r = await plugin(env, "POST", "/discord/admin/knobs", { scope, key, value, reason, by: by(s) });
+      return done(r, "changed a setting", `${scope} ${key} = ${value.slice(0, 60)}: ${reason}`);
+    }
+
     case "GET /bows": {
       const r = await plugin(env, "GET", "/discord/admin/bows");
       return r.ok ? json({ ok: true, ...(r.body || {}) }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);

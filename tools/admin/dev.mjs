@@ -68,8 +68,25 @@ async function pluginBench(req, url) {
   const p = url.pathname.replace(/^\/__plugin/, "");
   if (req.method === "GET") {
     const r = await fetch(REAL + p + url.search, { headers: p.startsWith("/discord/") ? { "X-Soccer-Token": TOKEN } : {} });
-    if (r.status === 404 && p.startsWith("/discord/admin/")) {
+    // the bench has no admin secret, so the real server answers 401 (or 404 for a route it lacks): use samples
+    if ((r.status === 404 || r.status === 401) && p.startsWith("/discord/admin/")) {
       if (p.startsWith("/discord/admin/bows/tex/")) return { status: 200, body: SAMPLE_PNG, type: "image/png" };
+      if (p === "/discord/admin/knobs") {
+        const scope = url.searchParams.get("scope") || "";
+        const knobs = scope.startsWith("pitch:") ? [
+          { key: "halves", label: "Halves", group: "Match", type: "int", value: 2, min: 1, max: 4, level: "admin", help: "How many halves a match has." },
+          { key: "halfMinutes", label: "Half length (minutes)", group: "Match", type: "int", value: 10, min: 1, max: 30, level: "admin" },
+          { key: "knockout", label: "Knockout by default", group: "Match", type: "bool", value: false, level: "admin" },
+          { key: "boxRule", label: "Box rule", group: "Rules", type: "enum", value: "defenders", options: [{ value: "off", label: "Off" }, { value: "defenders", label: "Defenders only" }, { value: "all", label: "Everyone" }], level: "admin" },
+          { key: "teamSize", label: "Players per side", group: "Ready zone", type: "int", value: 4, min: 1, max: 6, level: "admin" },
+          { key: "stands", label: "Stands", group: "Watching", type: "text", value: "set", level: "admin", inWorld: true },
+          { key: "delete", label: "Pitch enabled", group: "Danger", type: "bool", value: true, level: "owner", help: "Turning it off takes the pitch out of play.", needsReload: true },
+        ] : [
+          { key: "teamColourRed", label: "Red team colour", group: "Teams", type: "colour", value: "#ff5555", level: "owner" },
+          { key: "launchAt", label: "Launch time", group: "Release", type: "time", value: Date.now() + 864e5, level: "owner" },
+        ];
+        return { status: 200, body: JSON.stringify({ scope, knobs }) };
+      }
       if (SAMPLE[p]) return { status: 200, body: JSON.stringify(SAMPLE[p]) };
     }
     return { status: r.status, body: await r.text() };
