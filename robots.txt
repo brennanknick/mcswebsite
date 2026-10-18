@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /store/thanks/
+
+Sitemap: https://mcsoccer.net/sitemap.xml
