@@ -3,10 +3,12 @@
 
    Reads the tier list's data (data.js, which declares TIER_DATA: tiers
    1 to 7, each with a colour and its High and Low players in order) and
-   draws one panel per tier. Search, High / Low, and a card per player.
-   ?p=<name> opens that player's card, so a card can be linked. Where
-   the data lives is site.config.js's tierData (the old tier list site
-   until the admin dashboard takes it over).
+   draws it the way the old tier list did: seven columns side by side,
+   High over Low, one row per player. Search lights up the matches and
+   dims the rest, so the board keeps its shape; High / Low hides the
+   other band. A row opens that player's card; ?p=<name> opens it from a
+   link. Where the data lives is site.config.js's tierData (the old tier
+   list site until the admin dashboard takes it over).
    ================================================================== */
 
 (function () {
@@ -65,7 +67,6 @@
   let players = [];
 
   function load() {
-    board.setAttribute("aria-busy", "true");
     const s = document.createElement("script");
     s.src = SRC;
     s.async = true;
@@ -90,7 +91,9 @@
     say("The tier list couldn't be reached.");
   }
 
-  /* ── draw ─────────────────────────────────────────────────────── */
+  /* ── draw: one column per tier ────────────────────────────────── */
+
+  let cols = null;
 
   function render(data) {
     players = [];
@@ -99,34 +102,34 @@
       .slice()
       .sort((a, b) => Number(a.tier) - Number(b.tier));
 
-    const panels = tiers.map((t, i) => {
+    const columns = tiers.map((t, i) => {
       const tier = Number(t.tier);
       const color = /^#[0-9a-f]{3,8}$/i.test(String(t.color || "")) ? t.color : null;
-      const lanes = ["high", "low"].map((band) => {
+      let count = 0;
+      const bands = ["high", "low"].map((band) => {
         const names = (Array.isArray(t[band]) ? t[band] : []).map(String).filter((n) => n.trim());
-        const items = names.map((name, k) => {
+        count += names.length;
+        const rows = names.map((name, k) => {
           const p = { name, tier, band, pos: k + 1, of: names.length, color };
           players.push(p);
-          const btn = el("button", { class: "tl-p", type: "button", "data-p": players.length - 1, "aria-label": `${name}, ${bandWord(band)} Tier ${tier}` },
+          p.row = el("button", { class: "tl-row", type: "button", "data-p": players.length - 1, title: name, "aria-label": `${name}, ${bandWord(band)} Tier ${tier}` },
             head(name, 64, 32), el("span", null, name));
-          p.li = el("li", null, btn);
-          return p.li;
+          return el("li", null, p.row);
         });
-        return el("section", { class: "tl-lane", "data-band": band, "aria-label": `${bandWord(band)} Tier ${tier}` },
-          el("h3", { class: "tl-lane-tag" }, el("img", { src: badge(tier, band), width: 22, height: 22, alt: "" }), bandWord(band)),
-          el("ul", { class: "tl-players" }, items.length ? items : el("li", { class: "tl-none" }, "Nobody yet")));
+        return el("section", { class: `tl-band is-${band}`, "aria-label": `${bandWord(band)} Tier ${tier}` },
+          el("h3", { class: "tl-band-tag" }, el("img", { src: badge(tier, band), width: 22, height: 22, alt: "" }), short(tier, band)),
+          rows.length ? el("ul", { class: "tl-rows" }, rows) : el("p", { class: "tl-none" }, "—"));
       });
-      const count = lanes.reduce((n, l) => n + $$(".tl-p", l).length, 0);
-      const panel = el("article", { class: "tl-tier", style: `--i:${i}${color ? `;--tc:${color}` : ""}`, "data-tier": tier, "aria-labelledby": `tl-t${tier}` },
-        el("header", { class: "tl-plate" },
-          el("img", { src: badge(tier, "high"), width: 44, height: 44, alt: "" }),
+      return el("section", { class: "tl-col", style: `--i:${i}${color ? `;--tc:${color}` : ""}`, "data-tier": tier, "aria-labelledby": `tl-t${tier}` },
+        el("header", { class: "tl-col-head" },
+          el("img", { src: badge(tier, "high"), width: 33, height: 33, alt: "" }),
           el("h2", { id: `tl-t${tier}` }, `Tier ${tier}`),
-          el("small", null, count === 1 ? "1 player" : `${count} players`)),
-        el("div", { class: "tl-lanes" }, lanes));
-      return panel;
+          el("small", null, String(count))),
+        el("div", { class: "tl-col-body" }, bands));
     });
 
-    board.replaceChildren(...panels);
+    cols = el("div", { class: "tl-cols", style: `--n:${tiers.length}` }, columns);
+    board.replaceChildren(cols);
     board.removeAttribute("aria-busy");
 
     if (meta) {
@@ -145,7 +148,7 @@
 
     // ?q= fills the search, ?p= opens a card
     const q = new URLSearchParams(location.search);
-    if (q.get("q") && search) { search.value = q.get("q").slice(0, 16); filter(); }
+    if (q.get("q") && search) { search.value = q.get("q").slice(0, 16); filter(true); }
     const want = (q.get("p") || "").toLowerCase();
     const hit = want && players.find((p) => p.name.toLowerCase() === want);
     if (hit) open(hit, false);
@@ -156,41 +159,43 @@
   let band = "all";
   let emptyNote = null;
 
-  function filter() {
+  function filter(reveal) {
+    if (!cols) return;
     const q = (search ? search.value : "").trim().toLowerCase();
     board.dataset.band = band;
-    let shown = 0;
+    board.classList.toggle("is-searching", !!q);
+    let hits = 0;
+    let first = null;
     for (const p of players) {
-      const on = (!q || p.name.toLowerCase().includes(q)) && (band === "all" || band === p.band);
-      p.li.hidden = !on;
-      if (on) shown++;
+      const inBand = band === "all" || band === p.band;
+      const hit = !!q && inBand && p.name.toLowerCase().includes(q);
+      p.row.classList.toggle("is-hit", hit);
+      if (hit) { hits++; if (!first) first = p.row; }
     }
-    // a lane or tier with nobody left in it goes while you search
-    for (const lane of $$(".tl-lane", board)) {
-      const any = $$(".tl-p", lane).some((b) => !b.parentElement.hidden);
-      lane.hidden = !!q && !any;
-    }
-    for (const t of $$(".tl-tier", board)) {
-      const any = $$(".tl-lane", t).some((l) => !l.hidden && (band === "all" || l.dataset.band === band) && $$(".tl-p", l).some((b) => !b.parentElement.hidden));
-      t.hidden = (!!q || band !== "all") && !any;
-    }
+    // on a narrow screen the matching column may be off to the side
+    if (first && reveal !== false) first.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
 
     if (emptyNote) { emptyNote.remove(); emptyNote = null; }
-    if (q && !shown) {
+    if (q && !hits) {
       const name = search.value.trim();
       emptyNote = el("div", { class: "tl-state" },
         el("h2", null, `Nobody called "${name}" is on the tier list`),
         el("p", null, "They might not be tested yet. ",
           NAME.test(name) ? el("a", { href: `../matches/?tab=players&q=${encodeURIComponent(name)}` }, "Find them in match history") : null));
-      board.append(emptyNote);
+      board.prepend(emptyNote);
     }
-    if (players.length) say(q || band !== "all" ? (shown === 1 ? "1 player shown." : `${shown} players shown.`) : `${players.length} players in all.`);
+    if (players.length) say(q ? (hits === 1 ? "1 player found." : `${hits} players found.`) : band === "all" ? `${players.length} players in all.` : `${bandWord(band)} tiers only.`);
   }
 
   if (search) {
-    search.addEventListener("input", filter);
+    search.addEventListener("input", () => filter(true));
     search.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && search.value) { search.value = ""; filter(); e.stopPropagation(); }
+      if (e.key === "Escape" && search.value) { search.value = ""; filter(false); e.stopPropagation(); }
+      // Enter opens the first match
+      if (e.key === "Enter") {
+        const first = players.find((p) => p.row.classList.contains("is-hit"));
+        if (first) { e.preventDefault(); open(first, true); }
+      }
     });
     // "/" jumps to the search, as on the old tier list
     document.addEventListener("keydown", (e) => {
@@ -207,7 +212,7 @@
   $$("[data-tl-band]").forEach((b) => b.addEventListener("click", () => {
     band = b.dataset.tlBand;
     $$("[data-tl-band]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    filter();
+    filter(false);
   }));
 
   /* ── a player's card ──────────────────────────────────────────── */
@@ -246,7 +251,7 @@
   }
 
   board.addEventListener("click", (e) => {
-    const b = e.target.closest(".tl-p");
+    const b = e.target.closest(".tl-row");
     if (b) open(players[Number(b.dataset.p)], true);
   });
   if (dlg) {

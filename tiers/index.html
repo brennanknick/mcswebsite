@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=d6a7c521" />
-<link rel="stylesheet" href="../assets/css/tiers.css?v=96a298a7" />
+<link rel="stylesheet" href="../assets/css/tiers.css?v=3f8ef491" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -90,36 +90,29 @@
   <div class="tl-glow" aria-hidden="true"></div>
   <div class="container">
 
-    <header class="tl-head">
-      <div class="tl-card">
-        <div class="tl-text">
-          <p class="tl-kicker"><i aria-hidden="true"></i>Tier list</p>
-          <h1 class="tl-title">The tier <span class="grad">list</span></h1>
-          <p class="tl-sub">Every tested MCS player, tier by tier. Tier 1 is the very best.</p>
-          <p class="tl-meta" data-tl-meta hidden><span><b data-tl-count></b> players</span><span><b data-tl-tiers></b> tiers</span><span data-tl-updated-wrap hidden>Updated <b data-tl-updated></b></span></p>
+    <header class="tl-top">
+      <div class="tl-top-text">
+        <p class="tl-kicker"><i aria-hidden="true"></i>Tier list</p>
+        <h1 class="tl-title">The tier <span class="grad">list</span></h1>
+        <p class="tl-meta" data-tl-meta hidden><span><b data-tl-count></b> players</span><span><b data-tl-tiers></b> tiers</span><span data-tl-updated-wrap hidden>Updated <b data-tl-updated></b></span></p>
+      </div>
+      <div class="tl-bar">
+        <label class="tl-search">
+          <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 0h5v2H5zM3 2h2v2H3zM10 2h2v2h-2zM1 4h2v5H1zM12 4h2v5h-2zM3 9h2v2H3zM10 9h2v2h-2zM5 11h5v2H5zM12 11h2v2h-2zM14 13h2v3h-2zM12 13h2v1h-2z"/></svg>
+          <span class="visually-hidden">Find a player</span>
+          <input type="search" data-tl-search placeholder="Find a player" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" />
+          <kbd aria-hidden="true">/</kbd>
+        </label>
+        <div class="tl-seg" role="group" aria-label="Show">
+          <button type="button" data-tl-band="all" aria-pressed="true">All</button>
+          <button type="button" data-tl-band="high" aria-pressed="false">High</button>
+          <button type="button" data-tl-band="low" aria-pressed="false">Low</button>
         </div>
-        <!-- the seven High Tier badges as a staircase, tier 1 on the top
-             step: the same pixel badges as the Discord's tier roles -->
-        <div class="tl-art" aria-hidden="true"><img src="../assets/img/tiers/ht1.png" width="44" height="44" alt="" style="--s:0" /><img src="../assets/img/tiers/ht2.png" width="44" height="44" alt="" style="--s:1" /><img src="../assets/img/tiers/ht3.png" width="44" height="44" alt="" style="--s:2" /><img src="../assets/img/tiers/ht4.png" width="44" height="44" alt="" style="--s:3" /><img src="../assets/img/tiers/ht5.png" width="44" height="44" alt="" style="--s:4" /><img src="../assets/img/tiers/ht6.png" width="44" height="44" alt="" style="--s:5" /><img src="../assets/img/tiers/ht7.png" width="44" height="44" alt="" style="--s:6" /></div>
       </div>
     </header>
 
-    <div class="tl-bar">
-      <label class="tl-search">
-        <svg class="px" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 0h5v2H5zM3 2h2v2H3zM10 2h2v2h-2zM1 4h2v5H1zM12 4h2v5h-2zM3 9h2v2H3zM10 9h2v2h-2zM5 11h5v2H5zM12 11h2v2h-2zM14 13h2v3h-2zM12 13h2v1h-2z"/></svg>
-        <span class="visually-hidden">Find a player</span>
-        <input type="search" data-tl-search placeholder="Find a player" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" />
-        <kbd aria-hidden="true">/</kbd>
-      </label>
-      <div class="tl-seg" role="group" aria-label="Show">
-        <button type="button" data-tl-band="all" aria-pressed="true">All</button>
-        <button type="button" data-tl-band="high" aria-pressed="false">High</button>
-        <button type="button" data-tl-band="low" aria-pressed="false">Low</button>
-      </div>
-    </div>
-
     <p class="visually-hidden" role="status" data-tl-status></p>
-    <!-- tiers.js draws a panel per tier here -->
+    <!-- tiers.js draws the seven tier columns here -->
     <section class="tl-board" data-tl-board aria-label="Tiers" aria-busy="true">
       <div class="tl-state"><p>Loading the tier list&hellip;</p></div>
       <noscript><div class="tl-state"><h2>The tier list needs JavaScript</h2><p>Turn it on for this site to see the tiers.</p></div></noscript>
@@ -205,6 +198,6 @@
 
 <script src="../site.config.js?v=8e21440b"></script>
 <script src="../assets/js/site.js?v=6ce677ba"></script>
-<script src="../assets/js/tiers.js?v=76143eb0"></script>
+<script src="../assets/js/tiers.js?v=43a3f62a"></script>
 </body>
 </html>
