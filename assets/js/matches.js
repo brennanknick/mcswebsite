@@ -1730,6 +1730,8 @@
       ["Shots on target", "shotsOnTarget", rec.schema >= 2 ? "Goals and saved shots" : null],
       ["Attempts", "shots", rec.schema >= 2 ? "Real shots at goal: goals, and shots that were saved, blocked, hit the post or missed" : "Every time a player released the ball, apart from completed passes"],
       ["Passes", "passes"], ["Tackles", "tackles"], ["Steals", "steals"], ["Interceptions", "interceptions"],
+      // schema 3 counts turnovers; below it, none were counted (a rewritten record says 0)
+      ...(rec.schema >= 3 ? [["Turnovers", "turnovers", "Times the side gave the ball away in open play: tackled off them, or a pass the other side caught or picked up"]] : []),
       ["Saves", "saves"], ["Corners", "corners"], ["Free kicks", "freeKicks"], ["Penalties", "penalties", "Penalties awarded during play"],
       ["Pass-ins", "passIns"], ["Goal kicks", "goalKicks"], ["Own goals", "ownGoals"],
     ].filter(([, k], i) => i < 4 || num(a[k]) || num(b[k]));
@@ -1876,8 +1878,9 @@
     const detail = h("div", { class: "mh-lu-detail", id: pid, hidden: true },
       h("dl", { class: "mh-mini" },
         [["Attempts", s.shots], ["On target", s.shotsOnTarget], ["Passes", s.passes], ["Saves", s.saves],
-          ["Tackles", s.tackles], ["Steals", s.steals], ["Interceptions", s.interceptions],
-          ["On the ball", clockOf(s.possessionSeconds)], ["Time played", clockOf(p.secondsPlayed)]]
+          ["Tackles", s.tackles], ["Steals", s.steals], ["Interceptions", s.interceptions]]
+          .concat(rec.schema >= 3 ? [["Turnovers", s.turnovers]] : [])
+          .concat([["On the ball", clockOf(s.possessionSeconds)], ["Time played", clockOf(p.secondsPlayed)]])
           .concat(num(s.pkScored) + num(s.pkMissed) + num(s.pkSaved) ? [["Pens scored", s.pkScored], ["Pens missed", s.pkMissed], ["Pens saved", s.pkSaved]] : [])
           .map(([k, v]) => h("div", null, h("dt", null, k), h("dd", null, typeof v === "string" ? v : num(v))))),
       arr(p.positions).length > 1 ? h("p", { class: "mh-dim" }, "Positions: " + arr(p.positions).map((x) => POSITIONS[x] || x).join(" → ")) : null,
@@ -2179,7 +2182,9 @@
       h("div", { class: "mh-tot-grid" },
         group("Scoring", [["Goals", num(t.goals)], ["Assists", num(t.assists)], ["Goals + assists per match", per(num(t.goals) + num(t.assists))], ["On target", num(t.shotsOnTarget)], num(t.ownGoals) ? ["Own goals", num(t.ownGoals)] : null]),
         group("Defending", [["Tackles", num(t.tackles)], ["Steals", num(t.steals)], ["Interceptions", num(t.interceptions)], ["Saves", num(t.saves)], ["Clean sheets", num(t.cleanSheets)]]),
-        group("On the ball", [["Passes", num(t.passes)], ["Time on the ball", clockOf(t.possessionSeconds)], ["Time played", minutesText(t.secondsPlayed)], ["Player of the match", num(t.mvps)]]),
+        group("On the ball", [["Passes", num(t.passes)],
+          typeof t.turnovers === "number" ? [h("span", { title: "Times they gave the ball away in open play. Counted from October 18, 2026." }, "Turnovers ", h("small", { class: "mh-dim" }, "since Oct 18")), num(t.turnovers)] : null,
+          ["Time on the ball", clockOf(t.possessionSeconds)], ["Time played", minutesText(t.secondsPlayed)], ["Player of the match", num(t.mvps)]]),
         pk ? group("Shootouts", [["Scored", num(t.pkScored)], ["Missed", num(t.pkMissed)], ["Saved", num(t.pkSaved)]]) : null,
         positions.length ? h("div", { class: "mh-tot" },
           h("h3", null, "Positions"),
