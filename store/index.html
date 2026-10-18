@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=d6a7c521" />
-<link rel="stylesheet" href="../assets/css/store.css?v=f0579c54" />
+<link rel="stylesheet" href="../assets/css/store.css?v=f6b5624a" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -177,6 +177,8 @@
         <p class="st-kicker">Bundles</p>
         <h2 class="st-h2" id="bundles-title" tabindex="-1">Pick a <span class="st-grad">bundle</span></h2>
       </div>
+      <!-- the crate odds stay one click from where Sapphires are bought -->
+      <a class="more st-odds" href="../crates/">See the crate odds <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg></a>
     </div>
 
     <!-- store.js draws the bundles here, straight from PayNow -->
@@ -238,7 +240,7 @@
     <details class="acc">
       <summary>What are crates?</summary>
       <div class="acc-body">
-        <p>A crate opens into one random cosmetic. You buy crates in game with Sapphires, and you can also earn them by playing. They hold cosmetics only.</p>
+        <p>A crate opens into one random cosmetic. You buy crates in game with Sapphires. They hold cosmetics only.</p>
         <p>Every crate's contents and exact odds are on the <a href="../crates/">crate odds page</a>.</p>
       </div>
     </details>
@@ -266,50 +268,6 @@
         <p>About a purchase, <span data-support-line>ask us on <a href="../#discord">Discord</a></span>. Put your order ID in the message and we'll get back to you.</p>
       </div>
     </details>
-    </div>
-  </section>
-
-  <!-- ═══════════════ SPEND THEM IN GAME: cosmetics and crates ═══════════════
-       Shown whatever state the store is in: the odds page is linked from
-       here by rule (the crates contract). The icons are the server's own
-       cosmetic menu icons, 16x16 at 2x. -->
-  <section class="st-wrap st-spend" aria-labelledby="spend-title">
-    <h2 class="st-kicker" id="spend-title">Spend them in game</h2>
-    <div class="st-spend-grid">
-      <article class="st-spend-card st-in" style="--i:5">
-        <!-- a hotbar of real MCS cosmetics; hovering walks the selector along it -->
-        <div class="st-hotbar" aria-hidden="true">
-          <span><img src="../assets/img/store/cos-tidal-wave.png" width="32" height="32" alt="" /></span>
-          <span><img src="../assets/img/store/cos-prismatic.png" width="32" height="32" alt="" /></span>
-          <span><img src="../assets/img/store/cos-liftoff.png" width="32" height="32" alt="" /></span>
-          <span><img src="../assets/img/store/cos-copper-flame.png" width="32" height="32" alt="" /></span>
-          <span><img src="../assets/img/store/cos-phoenix.png" width="32" height="32" alt="" /></span>
-          <i class="st-hotbar-sel"></i>
-        </div>
-        <div class="st-spend-head"><h3>Cosmetics only</h3></div>
-        <p>Trails, celebrations, bow skins and more.</p>
-      </article>
-
-      <article class="st-spend-card is-crates st-in" style="--i:6">
-        <!-- crate > ? like a furnace recipe; hovering rolls the ? through cosmetics -->
-        <div class="st-recipe" aria-hidden="true">
-          <span class="st-recipe-slot"><svg class="px" viewBox="0 0 16 16"><path fill="#140c06" d="M2 2h12v1H2zM1 3h1v11H1zM14 3h1v11h-1zM2 14h12v1H2zM2 7h12v1H2z"/><path fill="#c4843f" d="M2 3h12v1H2zM2 8h12v1H2z"/><path fill="#9a622b" d="M2 4h12v2H2zM2 9h12v4H2z"/><path fill="#4d2d11" d="M2 13h12v1H2z"/><path fill="#6e421b" d="M2 6h12v1H2zM5 4h1v2H5zM10 4h1v2h-1zM5 8h1v5H5zM10 8h1v5h-1z"/><path fill="#8e9c95" d="M2 3h2v2H2zM12 3h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z"/><path fill="#c9d4ce" d="M2 3h1v1H2zM12 3h1v1h-1zM2 12h1v1H2zM12 12h1v1h-1z"/><path fill="#56635c" d="M3 4h1v1H3zM13 4h1v1h-1zM3 13h1v1H3zM13 13h1v1h-1z"/><path fill="#2a3ca6" d="M7 5h2v1H7z"/><path fill="#e2f6ff" d="M7 6h1v1H7z"/><path fill="#72c6ff" d="M8 6h1v1H8zM7 7h1v1H7z"/><path fill="#2f7ceb" d="M8 7h1v1H8zM7 8h1v1H7z"/><path fill="#1b2a8f" d="M8 8h1v1H8zM7 9h2v1H7z"/></svg></span>
-          <svg class="st-recipe-arrow px" viewBox="0 0 8 7"><path d="M4 0h1v1H4zM4 1h2v1H4zM0 2h7v1H0zM0 3h8v1H0zM0 4h7v1H0zM4 5h2v1H4zM4 6h1v1H4z"/></svg>
-          <span class="st-recipe-slot st-roll">
-            <svg class="st-roll-q px" viewBox="0 0 16 16"><path d="M4 1h8v2H4zM2 3h4v2H2zM10 3h4v2h-4zM10 5h4v2h-4zM8 7h4v2H8zM6 9h4v2H6zM6 13h4v2H6z"/></svg>
-            <img src="../assets/img/store/cos-tidal-wave.png" width="32" height="32" alt="" style="--n:0" />
-            <img src="../assets/img/store/cos-prismatic.png" width="32" height="32" alt="" style="--n:1" />
-            <img src="../assets/img/store/cos-liftoff.png" width="32" height="32" alt="" style="--n:2" />
-            <img src="../assets/img/store/cos-copper-flame.png" width="32" height="32" alt="" style="--n:3" />
-            <img src="../assets/img/store/cos-phoenix.png" width="32" height="32" alt="" style="--n:4" />
-          </span>
-        </div>
-        <div class="st-spend-head">
-          <h3>Crates</h3>
-          <a class="more" href="../crates/">See the odds <svg viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg></a>
-        </div>
-        <p>Each one opens into a random cosmetic.</p>
-      </article>
     </div>
   </section>
 
