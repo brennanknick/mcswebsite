@@ -897,6 +897,16 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 .st-rk-table .st-rk-group + tr > * { box-shadow: none; }
 .st-rk-table tbody tr:not(.st-rk-group):hover > * { background: rgba(255, 255, 255, .025); }
 
+/* the name colour each rank gets, shown in it: VIP's gold, MVP's gradient */
+.st-rk-name.is-vip { color: var(--vip); }
+.st-rk-name.is-mvp {
+  background: linear-gradient(90deg, #ff3b1a, var(--mvp) 40%, var(--mvp-hi));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
 /* a Sapphire amount: the number, then the gem's own 16x16 icon at 1x */
 .st-rk-sa { display: inline-flex; align-items: center; gap: .4rem; font-variant-numeric: tabular-nums; }
 .st .st-rk-sa img { width: 16px; height: 16px; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--sa-glow) 45%, transparent)); }
@@ -938,7 +948,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   opacity: 0;
   transform: translateY(12px);
   transition: opacity .35s ease, transform .5s var(--ease-spring);
-  transition-delay: calc(var(--r, 0) * 40ms + 80ms);
+  transition-delay: calc(var(--r, 0) * 32ms + 80ms);
 }
 .reveal-on .st-rk .st-rk-col.is-mvp {
   opacity: 0;
@@ -1387,7 +1397,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 
 @media (forced-colors: active) {
   .st-card, .st-starter, .st-fact, .st-spend-card, .st-state, .st-legal-card, .st-dlg-box, .st-notice { border: 1px solid CanvasText; }
-  .st-grad, .st-gold { -webkit-text-fill-color: currentColor; color: CanvasText; background: none; }
+  .st-grad, .st-gold, .st-rk-name.is-mvp { -webkit-text-fill-color: currentColor; color: CanvasText; background: none; }
   .st-rk-table { border: 1px solid CanvasText; }
 }
 
