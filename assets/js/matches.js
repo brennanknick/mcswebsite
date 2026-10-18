@@ -390,7 +390,7 @@
   let metaPromise = null;
   function getMeta(fresh) {
     if (fresh || !metaPromise) {
-      metaPromise = get("/meta", null, 30000).then((m) => { learnBadges(m); return m; }).catch((e) => { metaPromise = null; throw e; });
+      metaPromise = get("/meta", null, 30000).then((m) => { learnBadges(m); learnRanks(m); return m; }).catch((e) => { metaPromise = null; throw e; });
     }
     return metaPromise;
   }
@@ -410,6 +410,63 @@
   // the small gold star next to a name, and the chip on a player page
   const clMark = (uuid) => (isCL(uuid) ? h("span", { class: "mh-cl-mark", title: badgeName }, icon("star"), vh(", " + badgeName)) : null);
   const clChip = () => h("span", { class: "mh-tag mh-cl" }, icon("star"), badgeName);
+
+  // Ranks, also published on meta: each rank's name and colour (staff and Player for now; VIP
+  // and MVP once they're out). A staff rank shows the game's own 11 px icon, the same art as
+  // the prefix in game and the Discord role. This file's own URL finds the pictures.
+  const IMG = (() => {
+    const me = document.currentScript && document.currentScript.src;
+    try { return new URL("../img/", me || location.href).href; } catch { return "/assets/img/"; }
+  })();
+  const RANK_ICONS = new Set(["owner", "admin", "developer", "mod", "helper", "media", "affiliate"]);
+  const RANKS = new Map();   // id -> {name, color}
+  function learnRanks(meta) {
+    const r = obj(obj(meta).ranks);
+    if (!Object.keys(r).length) return;
+    RANKS.clear();
+    for (const [id, v] of Object.entries(r)) {
+      const c = str(obj(v).color);
+      RANKS.set(id.toLowerCase(), { name: str(obj(v).name), color: /^#[0-9a-f]{6}$/i.test(c) ? c : "" });
+    }
+  }
+  const RANK_LOOK = { owner: ["Owner", "#ff3b3b"], admin: ["Admin", "#ff5555"], developer: ["Developer", "#b388ff"], mod: ["Mod", "#4fc3f7"],
+    helper: ["Helper", "#66d36e"], media: ["Media", "#d16bff"], affiliate: ["Affiliate", "#ffb300"] };
+  function rankChip(rank) {
+    const id = str(rank).toLowerCase();
+    const known = RANKS.get(id) || {};
+    const look = RANK_LOOK[id];
+    if (!id || id === "player" || (!look && !known.name)) return null;
+    return h("span", { class: "mh-tag mh-rank", style: { "--rc": known.color || (look && look[1]) || "#c8c8c8" } },
+      RANK_ICONS.has(id) ? h("img", { src: `${IMG}ranks/${id}.png`, width: 11, height: 11, alt: "" }) : null,
+      known.name || look[0]);
+  }
+
+  // The tier list, from the dashboard's public feed (tierData's JSON twin): a player's badge on
+  // their page, linking to their card. Fetched once, and a failure just leaves the badge off.
+  const TIERS_JSON = (() => {
+    const t = str(CFG.tierData) || "https://admin.mcsoccer.net/tiers.js";
+    return /\.js(\?|$)/.test(t) ? t.replace(/\.js(\?|$)/, ".json$1") : "https://admin.mcsoccer.net/tiers.json";
+  })();
+  let tiersPromise = null;
+  const loadTiers = () => (tiersPromise = tiersPromise || fetch(TIERS_JSON).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+  function tierOf(data, names) {
+    const want = new Set(names.filter(Boolean).map((n) => str(n).toLowerCase()));
+    for (const t of arr(obj(data).tiers)) {
+      for (const band of ["high", "low"]) {
+        const hit = arr(t[band]).find((n) => want.has(str(n).toLowerCase()));
+        if (hit) return { tier: num(t.tier), band, color: str(t.color), name: str(hit) };
+      }
+    }
+    return null;
+  }
+  function tierChip(t) {
+    if (!t || !(t.tier >= 1 && t.tier <= 7)) return null;
+    const low = t.band === "low";
+    const page = str(CFG.tierListUrl) || "/tiers/";
+    return h("a", { class: "mh-tag mh-tier", href: `${page}?p=${encodeURIComponent(t.name)}`, style: /^#[0-9a-f]{6}$/i.test(t.color) ? { "--tc": t.color } : null,
+      title: `${low ? "Low" : "High"} Tier ${t.tier} on the tier list` },
+      h("img", { src: `${IMG}tiers/${low ? "lt" : "ht"}${t.tier}.png`, width: 11, height: 11, alt: "" }), `${low ? "LT" : "HT"}${t.tier}`);
+  }
 
   /* ── pictures of people and clubs ──────────────────────────────── */
 
@@ -1998,6 +2055,7 @@
 
   async function viewPlayer(r, token) {
     if (!UUID_RE.test(r.uuid)) throw new ApiError("notfound");
+    const tiersReady = loadTiers();
     const d = await get("/players/" + r.uuid, { page: r.page, size: 20 }, 30000);
     if (token !== S.token) return null;
     const rankedLines = rankedOf(d);
@@ -2015,6 +2073,8 @@
     const name = nameOf(me.name ? me : all || me);
     // the ladder can have a newer name than their newest record (doc 3)
     const ladderName = places.map((p) => p && p.name).find((n) => n && n !== name) || null;
+    const tier = tierOf(await tiersReady, [name, ladderName]);
+    if (token !== S.token) return null;
     const games = obj(d.games);
     setTitle(name);
 
@@ -2039,6 +2099,8 @@
           h("p", { class: "mh-eyebrow" }, "Player"),
           h("h1", { class: "mh-pl-name", id: "mh-pl-name" }, name),
           h("div", { class: "mh-pl-tags" },
+            rankChip(d.rank),
+            tierChip(tier),
             arr(d.badges).includes("champions_league") || isCL(r.uuid) ? clChip() : null,
             clubChip(club),
             src ? h("span", { class: "mh-dim" }, "Last played " + ago(num(src.lastPlayed))) : null,

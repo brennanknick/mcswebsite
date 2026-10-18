@@ -399,6 +399,12 @@
 /* the Champions League badge (a Discord role the server publishes): gold, a pixel star */
 .mh-tag.mh-cl { display: inline-flex; align-items: center; gap: .35rem; color: #ffcf6e; background: rgba(255, 190, 70, .12); box-shadow: inset 0 0 0 1px rgba(255, 207, 110, .45); }
 .mh-tag.mh-cl .mh-i { width: 11px; height: 11px; fill: currentColor; }
+/* a player's staff rank and tier: the game's own 11 px icons, kept to whole pixels */
+.mh-tag.mh-rank, .mh-tag.mh-tier { display: inline-flex; align-items: center; gap: .4rem; }
+.mh-tag.mh-rank { color: color-mix(in srgb, var(--rc) 82%, #fff); background: color-mix(in srgb, var(--rc) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 50%, transparent); }
+.mh-tag.mh-tier { --tc: #8b96a5; color: color-mix(in srgb, var(--tc) 72%, #fff); background: color-mix(in srgb, var(--tc) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 45%, transparent); text-decoration: none; transition: background .15s; }
+.mh-tag.mh-tier:hover, .mh-tag.mh-tier:focus-visible { background: color-mix(in srgb, var(--tc) 24%, transparent); }
+.mh-tag.mh-rank img, .mh-tag.mh-tier img { flex: 0 0 auto; width: 11px; height: 11px; image-rendering: pixelated; }
 .mh-cl-mark { display: inline-flex; align-items: center; margin-left: .35rem; vertical-align: -1px; }
 .mh-cl-mark .mh-i { width: 11px; height: 11px; fill: #ffcf6e; filter: drop-shadow(0 0 4px rgba(255, 207, 110, .5)); }
 .mh-cl-title-star { width: 18px; height: 18px; fill: #ffcf6e; margin-right: .45rem; vertical-align: -1px; }
