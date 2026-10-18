@@ -1,0 +1,438 @@
+/* ==================================================================
+   MCS — the tier list (/tiers/)
+   Loaded after site.css. Every tested player, tier by tier, in the
+   tier list's own colours (tier 1 gold down to tier 7 grey) and badged
+   with the same pixel icons as the Discord's tier roles, so a badge
+   means the same thing on the site, in Discord and in chat. Each tier
+   is a Minecraft panel lit from its colour edge; each player is a
+   notched chip with their head, which opens their card.
+   ================================================================== */
+
+:root {
+  --notch: polygon(
+    3px 0, calc(100% - 3px) 0, calc(100% - 3px) 3px, 100% 3px,
+    100% calc(100% - 3px), calc(100% - 3px) calc(100% - 3px), calc(100% - 3px) 100%,
+    3px 100%, 3px calc(100% - 3px), 0 calc(100% - 3px), 0 3px, 3px 3px);
+  --notch-lg: polygon(
+    6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px),
+    0 6px, 3px 6px, 3px 3px, 6px 3px);
+  --px-dot: polygon(25% 0, 75% 0, 75% 25%, 100% 25%, 100% 75%, 75% 75%, 75% 100%, 25% 100%, 25% 75%, 0 75%, 0 25%, 25% 25%);
+  /* the tier list's colours, tier 1 to 7 (its data.js) */
+  --t1: #ffcf4a; --t2: #ff9a3c; --t3: #ff5f6d; --t4: #c084fc; --t5: #5b9dff; --t6: #2dd4bf; --t7: #8b96a5;
+}
+
+.tl { padding-top: calc(var(--nav-h) + 3rem); overflow: clip; }
+.tl > .container { max-width: 1180px; }
+.tl img { image-rendering: pixelated; }
+
+/* floodlights over the pitch stripes, and a little of tier 1's gold */
+.tl-glow {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 900px;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 55% at 12% 0%, rgba(255, 244, 214, .07), transparent 70%),
+    radial-gradient(38% 55% at 88% 0%, rgba(255, 244, 214, .06), transparent 70%),
+    radial-gradient(34% 40% at 80% 14%, color-mix(in srgb, var(--t1) 7%, transparent), transparent 70%);
+}
+
+/* ── the head: a card with a rim in all seven tier colours ───────── */
+
+.tl-head { margin: .25rem 0 1.4rem; }
+.tl-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2rem;
+  padding: 2.4rem 2.5rem 2.5rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    radial-gradient(30% 110% at 84% 50%, color-mix(in srgb, var(--t1) 10%, transparent), transparent 70%),
+    radial-gradient(45% 80% at 6% 0%, color-mix(in srgb, var(--t4) 7%, transparent), transparent 70%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .018) 0 64px, transparent 64px 128px),
+    rgba(2, 6, 4, .5);
+  box-shadow: inset 0 0 0 1px var(--card-edge), 0 28px 60px -34px rgba(0, 0, 0, .85);
+  animation: tl-rise .6s cubic-bezier(.2, .8, .2, 1) both;
+}
+.tl-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg,
+    var(--t1) 0 14.29%, var(--t2) 14.29% 28.57%, var(--t3) 28.57% 42.86%, var(--t4) 42.86% 57.14%,
+    var(--t5) 57.14% 71.43%, var(--t6) 71.43% 85.71%, var(--t7) 85.71%);
+}
+.tl-text { min-width: 0; }
+.tl-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 0;
+  padding: .32rem .75rem;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #1f1702;
+  background: var(--t1);
+  clip-path: var(--notch);
+  animation: tl-rise .6s cubic-bezier(.2, .8, .2, 1) both .05s;
+}
+.tl-kicker i { width: 8px; height: 8px; background: currentColor; clip-path: var(--px-dot); }
+.tl-title {
+  margin: .9rem 0 .7rem;
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+  animation: tl-rise .6s cubic-bezier(.2, .8, .2, 1) both .12s;
+}
+.tl-sub { margin: 0; max-width: 34rem; font-size: 17px; color: var(--text); animation: tl-rise .6s cubic-bezier(.2, .8, .2, 1) both .2s; }
+.tl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1.1rem;
+  margin: 1.1rem 0 0;
+  font-size: 14px;
+  color: var(--text-faint);
+  animation: tl-rise .6s cubic-bezier(.2, .8, .2, 1) both .26s;
+}
+.tl-meta b { color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* the seven High Tier badges as a staircase, tier 1 on the top step */
+.tl-art { position: relative; width: 248px; height: 160px; margin-right: .5rem; }
+.tl-art::after {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: -12px;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--t1) 30%, transparent), transparent);
+  pointer-events: none;
+}
+.tl-art img {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--s) * 34px);
+  top: calc(var(--s) * 19px);
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .55));
+  animation: tl-step .55s cubic-bezier(.34, 1.4, .64, 1) both;
+  animation-delay: calc(.3s + var(--s) * 70ms);
+}
+@keyframes tl-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes tl-step { from { opacity: 0; transform: translateY(-18px); } }
+
+/* ── the bar: search and High / Low, stuck to the top while you scroll ── */
+
+.tl-bar {
+  position: sticky;
+  top: 10px;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem 1rem;
+  margin: 0 0 1rem;
+  padding: .6rem;
+  background: rgba(8, 14, 11, .86);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 0 0 1px var(--card-edge), 0 16px 30px -22px rgba(0, 0, 0, .9);
+  clip-path: var(--notch);
+}
+/* an inventory slot: dark edge top-left, light edge bottom-right */
+.tl-search {
+  flex: 1 1 280px;
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  height: 48px;
+  padding: 0 .9rem 0 .85rem;
+  background: #0a110d;
+  box-shadow: inset 3px 3px 0 #030605, inset -3px -3px 0 #26352d;
+  cursor: text;
+}
+.tl-search:focus-within { box-shadow: inset 3px 3px 0 #030605, inset -3px -3px 0 #26352d, 0 0 0 2px var(--grad-2); }
+.tl-search svg { flex: 0 0 auto; width: 16px; height: 16px; fill: var(--text-faint); }
+.tl-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  font: 600 16px/1 var(--font);
+  color: #fff;
+  background: none;
+  border: 0;
+  outline: none;
+}
+.tl-search input::placeholder { color: var(--text-faint); }
+.tl-search kbd {
+  flex: 0 0 auto;
+  padding: .12rem .45rem;
+  font: 700 12px/1.4 var(--font);
+  color: var(--text-faint);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+.tl-search:focus-within kbd { display: none; }
+
+.tl-seg { display: flex; gap: 6px; }
+.tl-seg button {
+  min-width: 70px;
+  height: 48px;
+  padding: 0 1rem;
+  font: 700 15px/1 var(--font);
+  color: var(--text);
+  background: var(--btn-dark);
+  border: 0;
+  border-top: 3px solid var(--btn-dark-hi);
+  border-bottom: 3px solid var(--btn-dark-lo);
+  cursor: pointer;
+  transition: background-color .2s var(--ease-ui), color .2s;
+}
+.tl-seg button:hover { color: #fff; background: var(--btn-dark-hover); }
+.tl-seg button[aria-pressed="true"] {
+  color: #fff;
+  text-shadow: 0 1.5px 0 var(--btn-shadow);
+  background: var(--btn);
+  border-top-color: var(--btn-hi);
+  border-bottom-color: var(--btn-lo);
+}
+.tl-seg button:focus-visible { outline: 2px solid var(--grad-2); outline-offset: 2px; }
+
+/* ── the board: one panel per tier ──────────────────────────────── */
+
+.tl-board { display: grid; gap: .8rem; }
+.tl-tier {
+  --tc: var(--t7);
+  position: relative;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  background:
+    radial-gradient(55% 160% at 0% 50%, color-mix(in srgb, var(--tc) 13%, transparent), transparent 72%),
+    linear-gradient(180deg, #131f19, #0d1612 75%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .06),
+    inset 0 -2px 0 rgba(0, 0, 0, .45),
+    inset 0 0 0 1px rgba(255, 255, 255, .05);
+  clip-path: var(--notch-lg);
+  animation: tl-rise .55s cubic-bezier(.34, 1.4, .64, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 80ms);
+}
+/* the tier's colour along its left edge, stepped like a pixel bar */
+.tl-tier::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  background: var(--tc);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--tc) 55%, transparent);
+}
+.tl-plate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: .2rem;
+  padding: 1.25rem 1.2rem 1.25rem 1.6rem;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, .06);
+}
+.tl-plate img { width: 44px; height: 44px; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--tc) 38%, transparent)); }
+.tl-plate h2 { margin: .55rem 0 0; font-size: 1.55rem; font-weight: 800; line-height: 1.15; color: #fff; }
+.tl-plate small { font-size: 13px; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+.tl-lanes { min-width: 0; padding: .55rem 1rem .55rem 1.1rem; }
+.tl-lane {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: start;
+  gap: .8rem;
+  padding: .55rem 0;
+}
+.tl-lane + .tl-lane { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); }
+.tl-lane-tag {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  padding-top: .45rem;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--tc) 72%, #fff);
+}
+.tl-lane-tag img { width: 22px; height: 22px; }
+.tl-players { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+.tl-players li[hidden] { display: none; }
+.tl-p {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  max-width: 100%;
+  padding: .3rem .8rem .3rem .3rem;
+  font: 650 15px/1.2 var(--font);
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, .035);
+  border: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+  clip-path: var(--notch);
+  cursor: pointer;
+  transition: transform .25s cubic-bezier(.34, 1.4, .64, 1), background-color .2s, box-shadow .2s, color .2s;
+}
+.tl-p img { flex: 0 0 auto; width: 32px; height: 32px; background: #0a110d; }
+.tl-p span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-p:hover, .tl-p:focus-visible {
+  transform: translateY(-2px);
+  color: #fff;
+  background: color-mix(in srgb, var(--tc) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 60%, transparent);
+  outline: none;
+}
+.tl-p:focus-visible { box-shadow: inset 0 0 0 2px var(--tc); }
+.tl-none { padding: .5rem 0; font-size: 14px; color: var(--text-faint); }
+
+/* High / Low: the other lane goes */
+.tl-board[data-band="high"] .tl-lane[data-band="low"],
+.tl-board[data-band="low"] .tl-lane[data-band="high"] { display: none; }
+.tl-board[data-band="high"] .tl-lane + .tl-lane,
+.tl-board[data-band="low"] .tl-lane + .tl-lane { box-shadow: none; }
+.tl-tier[hidden], .tl-lane[hidden] { display: none !important; }
+
+.tl-state {
+  display: grid;
+  justify-items: center;
+  gap: .8rem;
+  padding: 3.5rem 1rem;
+  text-align: center;
+  color: var(--text);
+  background: rgba(0, 0, 0, .22);
+  box-shadow: inset 0 0 0 1px var(--card-edge);
+  clip-path: var(--notch-lg);
+}
+.tl-state h2 { margin: 0; font-size: 1.35rem; color: #fff; }
+.tl-state p { margin: 0; }
+.tl-state a { color: var(--accent-soft); }
+
+/* ── a player's card ─────────────────────────────────────────────── */
+
+.tl-dlg {
+  --tc: var(--t1);
+  width: min(540px, calc(100% - 32px));
+  max-width: none;
+  padding: 0;
+  color: var(--text-strong);
+  background: transparent;
+  border: 0;
+  overflow: visible;
+}
+.tl-dlg::backdrop { background: rgba(3, 6, 5, .72); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.tl-dlg[open] .tl-dlg-box { animation: tl-pop .32s cubic-bezier(.34, 1.4, .64, 1) both; }
+@keyframes tl-pop { from { opacity: 0; transform: translateY(14px) scale(.97); } }
+.tl-dlg-box {
+  position: relative;
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  align-items: center;
+  gap: 1.6rem;
+  padding: 1.7rem 1.9rem 1.8rem 1.6rem;
+  background:
+    radial-gradient(70% 90% at 14% 40%, color-mix(in srgb, var(--tc) 24%, transparent), transparent 70%),
+    linear-gradient(180deg, #16241d, #0d1612);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tc) 40%, transparent), inset 0 3px 0 var(--tc);
+  clip-path: var(--notch-lg);
+}
+.tl-dlg-art { display: grid; place-items: end center; min-height: 230px; }
+.tl-dlg-art img { width: 112px; height: auto; max-width: none; filter: drop-shadow(0 16px 18px rgba(0, 0, 0, .6)); }
+.tl-dlg-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 0;
+  padding: .25rem .7rem .25rem .3rem;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #0b1210;
+  background: var(--tc);
+  clip-path: var(--notch);
+}
+.tl-dlg-tier img { width: 22px; height: 22px; }
+.tl-dlg h2 { margin: .75rem 0 .25rem; font-size: 34px; font-weight: 800; line-height: 1.1; color: #fff; overflow-wrap: anywhere; }
+.tl-dlg-sub { margin: 0 0 1.3rem; color: var(--text); }
+.tl-dlg-links { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem 1.4rem; }
+.tl-dlg-links .btn { padding: .5rem 1.2rem; gap: .7rem; font-size: 15px; }
+.tl-dlg-links .btn .arrow { width: 7px; height: 12px; flex-basis: 7px; }
+.tl-dlg-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.tl-dlg-x svg { width: 12px; height: 12px; fill: currentColor; }
+.tl-dlg-x:hover, .tl-dlg-x:focus-visible { color: #fff; outline: none; }
+
+/* ── narrow ───────────────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .tl { padding-top: calc(var(--nav-h) + 1.5rem); }
+  .tl-card { grid-template-columns: minmax(0, 1fr); padding: 1.9rem 1.4rem 2rem; }
+  .tl-art { display: none; }
+  .tl-title { font-size: min(2.75rem, 11.5vw); }
+  .tl-sub { font-size: 16px; }
+  .tl-bar { padding: .5rem; }
+  .tl-search { flex-basis: 100%; height: 46px; }
+  .tl-search kbd { display: none; }
+  .tl-seg { flex: 1 1 auto; }
+  .tl-seg button { flex: 1 1 0; height: 44px; }
+  .tl-tier { grid-template-columns: minmax(0, 1fr); }
+  .tl-plate {
+    flex-direction: row;
+    align-items: center;
+    gap: .75rem;
+    padding: 1rem 1rem .35rem 1.3rem;
+    box-shadow: none;
+  }
+  .tl-plate img { width: 33px; height: 33px; }
+  .tl-plate h2 { margin: 0; font-size: 1.3rem; }
+  .tl-plate small { margin-left: auto; }
+  .tl-lanes { padding: .2rem .9rem .7rem 1.3rem; }
+  .tl-lane { grid-template-columns: minmax(0, 1fr); gap: .45rem; }
+  .tl-lane-tag { padding-top: 0; }
+  .tl-p { font-size: 14px; }
+  .tl-dlg-box { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: .6rem; padding: 1.6rem 1.2rem 1.5rem; text-align: center; }
+  .tl-dlg-art { min-height: 0; }
+  .tl-dlg-art img { width: 84px; }
+  .tl-dlg h2 { font-size: 28px; }
+  .tl-dlg-links { justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-card, .tl-kicker, .tl-title, .tl-sub, .tl-meta, .tl-art img, .tl-tier, .tl-dlg[open] .tl-dlg-box { animation: none; }
+  .tl-p { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .tl-card, .tl-tier, .tl-bar, .tl-state, .tl-dlg-box, .tl-p { border: 1px solid CanvasText; }
+}

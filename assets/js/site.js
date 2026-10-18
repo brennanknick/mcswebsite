@@ -363,7 +363,7 @@
   /* ── top of the tier list, read live from the tier list site ───── */
 
   const tierBox = $("[data-tier-top]");
-  if (tierBox && !CFG.tierListUrl) {
+  if (tierBox && !CFG.tierData && !CFG.tierListUrl) {
     // no tier list configured (or config failed to load): don't leave a
     // "Loading…" box up forever
     tierBox.hidden = true;
@@ -377,13 +377,19 @@
       list.appendChild(li);
     };
 
+    // tierData names the data itself; without it, data.js sits beside
+    // the tier list page
     let dataUrl = null;
     try {
-      const base = new URL(CFG.tierListUrl, location.href);
-      base.search = "";
-      base.hash = "";
-      if (!base.pathname.endsWith("/")) base.pathname += "/";
-      dataUrl = new URL("data.js", base).href;
+      if (CFG.tierData) {
+        dataUrl = new URL(CFG.tierData, location.href).href;
+      } else {
+        const base = new URL(CFG.tierListUrl, location.href);
+        base.search = "";
+        base.hash = "";
+        if (!base.pathname.endsWith("/")) base.pathname += "/";
+        dataUrl = new URL("data.js", base).href;
+      }
     } catch {}
 
     if (!dataUrl) {
