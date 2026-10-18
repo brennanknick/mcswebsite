@@ -735,6 +735,7 @@
   }
 
   async function rank(p) {
+    const key = keyId();   // one per click: a re-send gives nothing twice
     const r = await formDialog({
       title: `Change ${p.name}'s rank`, okLabel: "Change",
       text: ownerOnly(),
@@ -750,7 +751,7 @@
         { name: "days", type: "number", label: "MVP days (when giving MVP)", value: "30", min: 1, max: 3650 },
         { name: "reason", label: "Reason", maxlength: 120, required: true },
       ],
-      submit: (v) => { const [op, rk] = v.what.split(":"); return call("POST", "/rank", { id: p.uuid, name: p.name, op, rank: rk, days: op === "give" && rk === "mvp" ? Number(v.days) || 30 : undefined, reason: v.reason }); },
+      submit: (v) => { const [op, rk] = v.what.split(":"); return call("POST", "/rank", { id: p.uuid, name: p.name, op, rank: rk, days: op === "give" && rk === "mvp" ? Number(v.days) || 30 : undefined, reason: v.reason, key }); },
     });
     if (r) { toast(r.message || "Rank changed."); location.hash = `#/players/${encodeURIComponent(p.uuid)}`; profile(p.uuid); }
   }

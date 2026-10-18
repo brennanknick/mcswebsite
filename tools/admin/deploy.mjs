@@ -70,7 +70,7 @@ console.log(`roles: Owner (${owner.id}), Admin (${admin.id})`);
 const domains = await cf("GET", `/accounts/${account}/workers/domains`);
 const domain = domains.find((d) => d.hostname === HOSTNAME);
 console.log(`custom domain ${HOSTNAME}: ${domain ? `on "${domain.service}"` : "will be added"}`);
-console.log(`plugin admin token: ${adminToken ? "present (sent as X-Soccer-Admin-Token)" : "not yet (the bot token opens /discord/* until then)"}`);
+console.log(`plugin admin secret: ${adminToken ? "present (it signs every request; it never travels)" : "not yet (the bot token opens /discord/* until then)"}`);
 
 const files = ["worker.js", "app.html", "app.css", "app.js"].map((f) => [f, fs.readFileSync(path.join(HERE, f), "utf8")]);
 for (const [f, text] of files) console.log(`  ${f.padEnd(10)} ${(text.length / 1024).toFixed(1)} KB`);

@@ -28,8 +28,8 @@
      KV                      sessions (s:), activity (log:), the tier list (tiers)
      DISCORD_CLIENT_ID, GUILD_ID, OWNER_ROLE_ID, ADMIN_ROLE_ID, ORIGIN
      DISCORD_CLIENT_SECRET, PLUGIN_TOKEN                     (secrets)
-     PLUGIN_ADMIN_TOKEN      (secret, optional) once the game server has
-                             its admin token: sent as X-Soccer-Admin-Token
+     PLUGIN_ADMIN_TOKEN      (secret) the game server's admin secret: it signs
+                             every request and never travels itself
    ================================================================== */
 
 import APP_HTML from "./app.html";
@@ -235,13 +235,13 @@ async function log(env, who, action, detail, ok) {
 async function plugin(env, method, path, params = {}, timeoutMs = PLUGIN_TIMEOUT_MS, send = null) {
   const u = new URL(env.ORIGIN.replace(/\/+$/, "") + path);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") u.searchParams.set(k, String(v));
-  // both: the game server tries the admin token first and falls back to the bot's, so the
-  // bot routes keep working while a new admin token is still on its way to the server
-  const headers = authHeaders(env);
+  // the body as the exact bytes sent, so its hash matches
+  const payload = send ? (typeof send.body === "string" ? enc.encode(send.body) : send.body) : null;
+  const headers = await authHeaders(env, method, u, payload);
   if (send) headers["Content-Type"] = send.type;
   let r;
   try {
-    r = await fetch(u.href, { method, headers, body: send ? send.body : undefined, signal: AbortSignal.timeout(timeoutMs) });
+    r = await fetch(u.href, { method, headers, body: payload || undefined, signal: AbortSignal.timeout(timeoutMs) });
   } catch {
     return { ok: false, status: 0, body: { error: "The game server isn't answering right now." } };
   }
@@ -279,10 +279,28 @@ async function publicApi(env, path, params = {}) {
 
 const by = (s) => `dashboard:${clean(s.name, 32)} (${s.id})`;
 
-/** The bot's token always, and the dashboard's admin token once it has one. */
-function authHeaders(env) {
-  const h = { "X-Soccer-Token": env.PLUGIN_TOKEN || "" };
-  if (env.PLUGIN_ADMIN_TOKEN) h["X-Soccer-Admin-Token"] = env.PLUGIN_ADMIN_TOKEN;
+const enc = new TextEncoder();
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
+ * How the game server knows it's us (docs/admin-api.md, "Signed requests"). The hop to it is
+ * plain HTTP, so the admin secret never travels: each request carries the time and an HMAC of
+ * method, raw path, raw query, that time and the body's SHA-256, keyed with the secret. Each
+ * signature works once and for two minutes, so every call (and every retry) signs afresh.
+ * The bot's token goes along only while PLUGIN_TOKEN is still set (the server falls back to it
+ * for the bot routes): drop that secret once signing is confirmed.
+ */
+async function authHeaders(env, method, u, body) {
+  const h = {};
+  if (env.PLUGIN_TOKEN) h["X-Soccer-Token"] = env.PLUGIN_TOKEN;
+  if (!env.PLUGIN_ADMIN_TOKEN) return h;
+  const ts = String(Date.now());
+  const bodyHash = body ? hex(await crypto.subtle.digest("SHA-256", body)) : "";
+  const msg = [method, u.pathname, u.search.slice(1), ts, bodyHash].join("\n");
+  const key = await crypto.subtle.importKey("raw", enc.encode(env.PLUGIN_ADMIN_TOKEN), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  h["X-Soccer-Ts"] = ts;
+  h["X-Soccer-Sig"] = hex(await crypto.subtle.sign("HMAC", key, enc.encode(msg)));
+  if (body) h["X-Soccer-Body-Sha256"] = bodyHash;
   return h;
 }
 
@@ -571,6 +589,10 @@ async function api(request, env, s, path) {
       const ranks = op === "set" ? ["owner", "admin", "developer", "mod", "helper", "media", "affiliate", "none"] : ["vip", "mvp"];
       const p = { id: clean(input.id, 40), op, rank, reason: clean(input.reason, 120), by: by(s) };
       if (op === "give" && rank === "mvp" && input.days) p.days = Math.max(1, Math.min(3650, Math.round(Number(input.days) || 30)));
+      if (op === "give") {
+        p.key = clean(input.key, 64);
+        if (!/^[A-Za-z0-9_-]{8,64}$/.test(p.key)) return fail(400, "Reload the page and try again.");
+      }
       if (!p.id || !op || !ranks.includes(rank) || !p.reason) return fail(400, "Give a player, a rank and a reason.");
       const r = await plugin(env, "POST", "/discord/admin/rank", p);
       return done(r, op === "set" ? "set a staff rank" : op === "give" ? "gave a rank" : "took a rank", `${rank.toUpperCase()}${p.days ? ` (${p.days} days)` : ""} ${op === "take" ? "from" : "for"} ${input.name ? clean(input.name, 16) : p.id}: ${p.reason}`);
@@ -636,10 +658,10 @@ async function bowUpload(request, env, s) {
 async function bowTexture(env, path) {
   const m = path.match(/^\/bows\/tex\/([a-z0-9_-]{1,40})\/([0-3])\.png$/);
   if (!m) return respond("no such frame", 404);
-  const u = env.ORIGIN.replace(/\/+$/, "") + `/discord/admin/bows/tex/${m[1]}/${m[2]}.png`;
-  const headers = authHeaders(env);
+  const u = new URL(env.ORIGIN.replace(/\/+$/, "") + `/discord/admin/bows/tex/${m[1]}/${m[2]}.png`);
+  const headers = await authHeaders(env, "GET", u, null);
   try {
-    const r = await fetch(u, { headers, signal: AbortSignal.timeout(PLUGIN_TIMEOUT_MS) });
+    const r = await fetch(u.href, { headers, signal: AbortSignal.timeout(PLUGIN_TIMEOUT_MS) });
     if (!r.ok || !(r.headers.get("Content-Type") || "").startsWith("image/png")) return respond("no such frame", 404);
     return respond(r.body, 200, { "Content-Type": "image/png", "Cache-Control": "private, max-age=60" });
   } catch {
