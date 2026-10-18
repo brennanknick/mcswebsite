@@ -1,4 +1,25 @@
+# mcsoccer.net: search engines and AI assistants are welcome to read the
+# whole site. A short summary for AI tools is at /llms.txt.
+
 User-agent: *
+Allow: /
+Disallow: /store/thanks/
+
+# AI crawlers, named so it's plain they're welcome too (a named crawler
+# follows only its own group, so the one page to skip is repeated here)
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Amazonbot
+User-agent: meta-externalagent
 Allow: /
 Disallow: /store/thanks/
 
