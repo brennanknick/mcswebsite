@@ -1,15 +1,16 @@
 /* ==================================================================
    MCS admin dashboard: the Cloudflare Worker behind admin.mcsoccer.net
 
-   One clean place for MCS owners and admins to run the server: fixtures,
+   One clean place for the MCS owners to run the server: fixtures,
    matches, reports, the tier list, and (as the game server's admin
    routes land) bow skins, players and Sapphires.
 
    Who gets in: Discord login only, and only members of the MCS Discord
-   who hold the Owner or Admin role (Brenn, 2026-10-18). The role is
-   checked at sign-in and again every few minutes, so taking the role
-   away takes the dashboard away. The game server checks every write a
-   second time (the actor must be linked and hold a staff rank).
+   who hold the Owner role: Brenn, cold and duck (Brenn, 2026-10-18: "the
+   dashboard is for me cold and duck"). The Admin role does NOT get in.
+   The role is checked at sign-in and again every few minutes, so taking
+   the role away takes the dashboard away. The game server checks every
+   write a second time (the actor must be linked and hold a staff rank).
 
    What it holds: the game server's token (PLUGIN_TOKEN, a secret) and
    Discord's client secret. Neither ever reaches a browser. Every write
@@ -26,7 +27,7 @@
 
    Bindings (tools/admin/deploy.mjs sets them all)
      KV                      sessions (s:), activity (log:), the tier list (tiers)
-     DISCORD_CLIENT_ID, GUILD_ID, OWNER_ROLE_ID, ADMIN_ROLE_ID, ORIGIN
+     DISCORD_CLIENT_ID, GUILD_ID, OWNER_ROLE_ID, ORIGIN
      DISCORD_CLIENT_SECRET, PLUGIN_TOKEN                     (secrets)
      PLUGIN_ADMIN_TOKEN      (secret) the game server's admin secret: it signs
                              every request and never travels itself
@@ -104,6 +105,8 @@ async function sessionOf(request, env) {
   if (!sid || !/^[A-Za-z0-9_-]{30,60}$/.test(sid)) return null;
   const s = await env.KV.get("s:" + sid, "json");
   if (!s) return null;
+  // owners only: a session from before that rule (an admin's) ends here
+  if (s.role !== "owner") { await env.KV.delete("s:" + sid); return null; }
   // the role, looked at again: losing it ends the session
   if (Date.now() - (s.checked || 0) > RECHECK_MS) {
     const role = await discordRole(env, s.token).catch(() => undefined);
@@ -116,16 +119,14 @@ async function sessionOf(request, env) {
   return { sid, ...s };
 }
 
-/** "owner", "admin", null (no access), or throws (Discord unreachable). */
+/** "owner", null (no access), or throws (Discord unreachable). Only the Owner role gets in. */
 async function discordRole(env, token) {
   const r = await fetch(`${DISCORD}/users/@me/guilds/${env.GUILD_ID}/member`, { headers: { Authorization: "Bearer " + token } });
   if (r.status === 401 || r.status === 403 || r.status === 404) return null;   // token gone, or not in the server
   if (!r.ok) throw new Error("discord " + r.status);
   const m = await r.json();
   const roles = Array.isArray(m.roles) ? m.roles : [];
-  if (roles.includes(env.OWNER_ROLE_ID)) return "owner";
-  if (roles.includes(env.ADMIN_ROLE_ID)) return "admin";
-  return null;
+  return roles.includes(env.OWNER_ROLE_ID) ? "owner" : null;
 }
 
 /* ── sign in with Discord ──────────────────────────────────────────── */
@@ -171,8 +172,8 @@ async function callback(request, env) {
   try { role = await discordRole(env, t.access_token); } catch { role = undefined; }
   if (role === undefined) return page("Discord isn't answering", "Your roles couldn't be checked. Try again in a moment.", true);
   if (!role) {
-    await log(env, { id: user.id, name: user.global_name || user.username }, "sign-in refused", "no Owner or Admin role", false);
-    return page("This dashboard is for MCS owners and admins", "Your Discord account doesn't have the Owner or Admin role in the MCS Discord.", false);
+    await log(env, { id: user.id, name: user.global_name || user.username }, "sign-in refused", "no Owner role", false);
+    return page("This dashboard is for the MCS owners", "Your Discord account doesn't have the Owner role in the MCS Discord.", false);
   }
 
   const sid = randomId(32);
@@ -252,7 +253,7 @@ async function plugin(env, method, path, params = {}, timeoutMs = PLUGIN_TIMEOUT
   if (r.ok && (!body || body.ok !== false)) return { ok: true, status: r.status, body };
   let error = body && typeof body.error === "string" && body.error.trim() ? body.error.trim()
     : !body && text && text.length < 300 && !/^\s*</.test(text) ? text.trim() : null;
-  if (error === "not allowed") error = "The game server says your account isn't allowed to do that. It needs your Minecraft account linked and set as owner or admin in game (/rank set).";
+  if (error === "not allowed") error = "The game server says your account isn't allowed to do that. It needs your Minecraft account linked and set as owner in game (/rank set).";
   else if (error === "reason required") error = "Give a reason.";
   if (!error) {
     error = r.status === 401 || r.status === 403 ? "The game server refused the dashboard's token."
@@ -731,7 +732,7 @@ export default {
       if (path === "/" && method === "GET") {
         const s = await sessionOf(request, env);
         if (!s) {
-          return page("MCS Admin", "Sign in with your Discord account. It's for MCS owners and admins.", true);
+          return page("MCS Admin", "Sign in with your Discord account. It's for the MCS owners.", true);
         }
         return respond(APP_HTML, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       }

@@ -63,10 +63,10 @@ let kv = spaces.find((n) => n.title === KV_TITLE);
 console.log(`KV "${KV_TITLE}": ${kv ? "exists" : "will be created"}`);
 
 const roles = await discord(`/guilds/${env.GUILD_ID}/roles`);
+// owners only (Brenn, 2026-10-18): the Admin role doesn't get in
 const owner = roles.find((r) => r.name === "Owner");
-const admin = roles.find((r) => r.name === "Admin");
-if (!owner || !admin) throw new Error("the Discord has no Owner or no Admin role");
-console.log(`roles: Owner (${owner.id}), Admin (${admin.id})`);
+if (!owner) throw new Error("the Discord has no Owner role");
+console.log(`role: Owner (${owner.id})`);
 
 const domains = await cf("GET", `/accounts/${account}/workers/domains`);
 const domain = domains.find((d) => d.hostname === HOSTNAME);
@@ -85,7 +85,6 @@ const bindings = [
   { type: "plain_text", name: "DISCORD_CLIENT_ID", text: env.CLIENT_ID },
   { type: "plain_text", name: "GUILD_ID", text: env.GUILD_ID },
   { type: "plain_text", name: "OWNER_ROLE_ID", text: owner.id },
-  { type: "plain_text", name: "ADMIN_ROLE_ID", text: admin.id },
   { type: "plain_text", name: "ORIGIN", text: ORIGIN },
   { type: "secret_text", name: "DISCORD_CLIENT_SECRET", text: oauthSecret },
   // signed requests open every route the dashboard uses, so the bot's token stays with the bot

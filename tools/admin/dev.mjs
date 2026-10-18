@@ -1,7 +1,7 @@
 // Local test bench for the admin dashboard (never deployed).
 //   node tools/admin/dev.mjs [--port=8799]
 // Runs worker.js in Node on http://localhost:<port> with an in-memory KV, and signs you in
-// as a TEST admin at /__login (local only: Discord's real sign-in can't come back to
+// as a TEST owner at /__login (local only: Discord's real sign-in can't come back to
 // localhost). Reads (GET) go to the real game server's API; writes (POST) are answered here
 // with { ok: true } and never reach the game server, so every button can be tried safely.
 import http from "node:http";
@@ -44,7 +44,7 @@ const KV = {
 
 // the game server, as the worker sees it: real reads, pretend writes
 const ORIGIN = `http://localhost:${PORT}/__plugin`;
-const env = { KV, ORIGIN, PLUGIN_TOKEN: "bench", DISCORD_CLIENT_ID: "0", GUILD_ID: "0", OWNER_ROLE_ID: "1", ADMIN_ROLE_ID: "2", DISCORD_CLIENT_SECRET: "x" };
+const env = { KV, ORIGIN, PLUGIN_TOKEN: "bench", DISCORD_CLIENT_ID: "0", GUILD_ID: "0", OWNER_ROLE_ID: "1", DISCORD_CLIENT_SECRET: "x" };
 
 // samples in the shape of docs/admin-api.md, for when the real server doesn't have the admin routes yet
 const SAMPLE_PLAYER = { uuid: "a1b2c3d4-0000-4000-8000-000000000001", name: "DuckyWins", online: true, firstSeen: Date.now() - 40 * 864e5, lastSeen: Date.now(),

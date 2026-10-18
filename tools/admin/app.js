@@ -878,7 +878,7 @@
     }
     const tabs = h("div", { class: "tabs" }, SCOPES.map(([k, label]) =>
       h("button", { type: "button", "aria-pressed": String(knobScope === k), onclick: () => { knobScope = k; location.hash = `#/settings/${k}`; } }, label)));
-    main.replaceChildren(pageHead("Settings", "Settings", "The same settings as the staff menus in game: change them here or there. Owner-only ones are locked for admins."),
+    main.replaceChildren(pageHead("Settings", "Settings", "The same settings as the staff menus in game: change them here or there."),
       panel(null, [h("div", { class: "panel-head" }, tabs)]), h("div", { class: "loading" }, "Loading…"));
     let scope = knobScope;
     const extra = [];
