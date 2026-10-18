@@ -897,6 +897,10 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 .st-rk-table .st-rk-group + tr > * { box-shadow: none; }
 .st-rk-table tbody tr:not(.st-rk-group):hover > * { background: rgba(255, 255, 255, .025); }
 
+/* a Sapphire amount: the number, then the gem's own 16x16 icon at 1x */
+.st-rk-sa { display: inline-flex; align-items: center; gap: .4rem; font-variant-numeric: tabular-nums; }
+.st .st-rk-sa img { width: 16px; height: 16px; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--sa-glow) 45%, transparent)); }
+
 .st-rk-price td b { font-size: 30px; font-weight: 800; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 
 /* a group's name, as the page's kickers */
