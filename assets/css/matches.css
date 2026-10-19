@@ -469,6 +469,9 @@
 .mh-b.is-mvp .mh-i { fill: #1c1400; }
 .mh-b.is-cs { color: var(--quick); }
 .mh-b.is-og { color: var(--loss); }
+/* subbed on (up) and off (down), as on a team sheet */
+.mh-b.is-sub-on .mh-i { fill: var(--win); transform: rotate(-90deg); }
+.mh-b.is-sub-off .mh-i { fill: var(--loss); transform: rotate(90deg); }
 
 /* ── filters ─────────────────────────────────────────────────────── */
 
@@ -970,6 +973,7 @@ span.mh-pg-arrow { opacity: .3; }
 .mh-ev.kind-move .mh-ev-body { font-size: 13px; color: var(--text-faint); }
 .mh-ev.kind-move .mh-ev-ic { color: var(--win); }
 .mh-ev.kind-move.is-out .mh-ev-ic { color: var(--loss); transform: scaleX(-1); }
+.mh-ev.kind-sub .mh-ev-ic { color: #f5b544; }
 .mh-ev.kind-pen.is-scored .mh-ev-ic { color: var(--win); }
 .mh-ev.kind-pen.is-saved .mh-ev-ic,
 .mh-ev.kind-pen.is-missed .mh-ev-ic,

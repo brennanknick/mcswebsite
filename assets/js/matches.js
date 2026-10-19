@@ -160,6 +160,7 @@
     dot: ["0 0 6 6", "M1 0h4v1h1v4H5v1H1V5H0V1h1z"],
     pencil: ["0 0 8 8", "M6 0h1v1h1v1H7v1H6v1H5v1H4v1H3v1H2v1H0V6h1V5h1V4h1V3h1V2h1V1h1z"],
     pause: ["0 0 6 7", "M0 0h2v7H0zM4 0h2v7H4z"],
+    swap: ["0 0 9 9", "M5 0h1v1H5zM5 1h2v1H5zM0 2h8v1H0zM5 3h2v1H5zM5 4h1v1H5zM3 4h1v1H3zM2 5h2v1H2zM1 6h8v1H1zM2 7h2v1H2zM3 8h1v1H3z"],
   };
   function icon(name, cls) {
     const d = ICONS[name];
@@ -1547,9 +1548,26 @@
     return ordinal(num(e.half)) + " half";
   }
 
-  const LEAVE = { quit: "disconnected", left: "left the match", spectate: "went to spectate", removed: "was taken off by the referee" };
+  const LEAVE = { quit: "disconnected", left: "left the match", spectate: "went to spectate", removed: "was taken off by the referee", sub: "was subbed off" };
   const KICK = { SCORED: "scored", SAVED: "saved", MISSED: "missed", SKIPPED: "skipped" };
-  const KEY_TYPES = new Set(["GOAL", "AWARDED_GOAL", "DISALLOWED", "NO_GOAL", "SET_PIECE", "HALF_END", "EXTRA_TIME", "SHOOTOUT", "PENALTY", "FULL_TIME", "SCORE_EDIT", "KICKOFF"]);
+  const KEY_TYPES = new Set(["GOAL", "AWARDED_GOAL", "DISALLOWED", "NO_GOAL", "SET_PIECE", "HALF_END", "EXTRA_TIME", "SHOOTOUT", "PENALTY", "FULL_TIME", "SCORE_EDIT", "KICKOFF", "SUB"]);
+
+  // A staff sub (doc 4.21) is written as the moves themselves, the going-off LEAVE (reason
+  // "sub") and the coming-on JOIN, plus a SUB in the same second. The SUB tells it in one
+  // line, so those two moves are left out: the indexes of the events a SUB stands for.
+  function subMoves(events) {
+    const paired = new Set();
+    events.forEach((e, i) => {
+      if (e.type !== "SUB") return;
+      const near = (x) => Math.abs(num(x.t) - num(e.t)) <= 1;
+      for (let j = Math.max(0, i - 6); j <= Math.min(events.length - 1, i + 6); j++) {
+        const x = events[j];
+        if (paired.has(j) || !near(x)) continue;
+        if ((x.type === "LEAVE" && x.reason === "sub" && e.off && x.player === e.off) || (x.type === "JOIN" && e.player && x.player === e.player)) paired.add(j);
+      }
+    });
+    return paired;
+  }
 
   function timelineCard(rec, events, sides, who) {
     const rows = [];
@@ -1557,8 +1575,10 @@
     const tname = (k) => (sides[k] ? sides[k].name : "");
     let pens = { RED: 0, BLUE: 0 };
     let kickoffs = 0, kickNo = 0;
+    const paired = subMoves(events);
 
     events.forEach((e, i) => {
+      if (paired.has(i)) return;
       const next = events[i + 1];
       const k = e.team;
       let side = sides[k] ? k : "";
@@ -1646,6 +1666,15 @@
           kind = "move"; ic = "arrow";
           text = [pLink(e.player, who), " switched to " + tname(k)];
           break;
+        case "SUB": {
+          // swap: one on in another's place; bringon: on into an empty place; takeoff: off only
+          kind = "sub"; ic = "swap";
+          const on = e.player ? [pLink(e.player, who), " on"] : null;
+          const off = e.off ? [pLink(e.off, who), " off"] : null;
+          text = [h("b", null, "Sub: "), on, on && off ? ", " : null, off,
+            ["swap", "bringon", "takeoff"].includes(e.reason) || !str(e.reason) ? null : h("span", { class: "mh-ev-sub" }, str(e.reason))];
+          break;
+        }
         case "SCORE_EDIT": {
           kind = "set"; ic = "pencil";
           const d = num(e.delta);
@@ -1847,7 +1876,7 @@
       h("div", { class: "mh-lu-cols" }, col(red), col(blue)));
   }
 
-  const LEFT = { quit: "Disconnected", left: "Left", spectate: "Went to spectate", removed: "Taken off by the referee" };
+  const LEFT = { quit: "Disconnected", left: "Left", spectate: "Went to spectate", removed: "Taken off by the referee", sub: "Subbed off" };
 
   function lineupRow(rec, p, side, moves, parties) {
     const s = obj(p.stats);
@@ -1859,13 +1888,16 @@
     if (num(s.ownGoals)) badges.push(h("span", { class: "mh-b is-og", title: "Own goal" }, "OG", s.ownGoals > 1 ? "×" + s.ownGoals : null));
     if (p.cleanSheet) badges.push(h("span", { class: "mh-b is-cs", title: "Clean sheet" }, icon("glove"), vh(" clean sheet")));
     if (p.mvp) badges.push(h("span", { class: "mh-b is-mvp", title: "Player of the match" }, icon("star"), "MVP"));
+    // staff subs in competitive games (doc 4.21): only ever true when present
+    if (p.subbedOn === true) badges.push(h("span", { class: "mh-b is-sub-on", title: "Subbed on" }, icon("arrow"), vh(" subbed on")));
+    if (p.subbedOff === true) badges.push(h("span", { class: "mh-b is-sub-off", title: "Subbed off" }, icon("arrow"), vh(" subbed off")));
 
     const notes = [];
     // (clockOf of the raw seconds is only a fallback: exact for scrims and
     // quick games, whose clock is real time)
     if (num(p.joinedAt) > 0) {
       const j = moves.join.get(p.uuid);
-      notes.push("On at " + (j ? evClock(j, rec) : clockOf(p.joinedAt)));
+      notes.push((p.subbedOn === true ? "Subbed on at " : "On at ") + (j ? evClock(j, rec) : clockOf(p.joinedAt)));
     }
     if (!p.present && p.leftAt != null) {
       const l = moves.leave.get(p.uuid), verb = LEFT[l && l.e.reason] || "Left";
