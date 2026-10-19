@@ -94,7 +94,7 @@
     ["steals", "Steals", "count", "Tackles that won the ball."],
     ["tackles", "Tackles", "count", "Hits on the player with the ball."],
     ["interceptions", "Interceptions", "count", "The other side's balls caught in the air, and their shots blocked."],
-    ["rating", "Rating", "rate", "Average match rating, from 3.0 to 10.0."],
+    ["rating", "Rating", "rate", "Average match rating, from 3.0 to 10.0. About 7 is a normal game and 8 or more a great one. Ratings got harsher on Oct 18, so averages with older matches run high."],
     ["games", "Matches", "count", "Matches played to a result."],
     ["possession", "On the ball", "time", "Total time holding the ball."],
   ];
@@ -523,10 +523,13 @@
     return h("span", { class: "mh-club", style: sideVars(side) }, shield(side, "xs"), h("span", null, club.name));
   }
 
-  function ratingBadge(r, big, labelled) {
+  // the bands match the server's scale (doc 4.9, harsher since 2026-10-18): under 6 poor,
+  // 6 to 6.9 average, 7 to 7.9 good, 8 and up excellent
+  const RATING_TIP = "Match rating, 3.0 to 10.0. About 7 is a normal game, 8 or more a great one.";
+  function ratingBadge(r, big, labelled, tip) {
     r = num(r);
     const tier = r >= 8 ? "top" : r >= 7 ? "good" : r >= 6 ? "ok" : "low";
-    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: "Match rating" }, labelled ? null : vh("Rating "), r.toFixed(1));
+    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: tip || RATING_TIP }, labelled ? null : vh("Rating "), r.toFixed(1));
   }
 
   // goals, assists: an icon, the count when it's more than one, and words
@@ -2157,7 +2160,8 @@
     ];
     return h("ul", { class: "mh-pl-head" },
       tiles.map(([k, v]) => h("li", null, h("b", null, v), h("span", { class: "mh-pl-k" }, k))),
-      h("li", { class: "is-rating" }, ratingBadge(t.rating, true, true), h("span", { class: "mh-pl-k" }, "Avg rating")));
+      h("li", { class: "is-rating" }, ratingBadge(t.rating, true, true,
+        "Their average match rating. Ratings got harsher on Oct 18, so matches before then pull it up for a while."), h("span", { class: "mh-pl-k" }, "Avg rating")));
   }
 
   function totalsGrid(t) {
