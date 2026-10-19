@@ -15,7 +15,7 @@ window.MCS = {
 
   // Your Discord invite, e.g. "https://discord.gg/abc123". While this is
   // empty, Discord buttons say "Invite coming soon" and don't link anywhere.
-  discordInvite: "https://discord.gg/RuAYjQfb7g",
+  discordInvite: "https://discord.gg/mcsoccer",
 
   // The tier list site. The "Top of the tier list" section reads its
   // player data live, so it is always current.
