@@ -1,12 +1,15 @@
 // Local test bench for the admin dashboard (never deployed).
-//   node tools/admin/dev.mjs [--port=8799]
-// Runs worker.js in Node on http://localhost:<port> with an in-memory KV, and signs you in
-// as a TEST owner at /__login (local only: Discord's real sign-in can't come back to
-// localhost). Reads (GET) go to the real game server's API; writes (POST) are answered here
-// with { ok: true } and never reach the game server, so every button can be tried safely.
+//   node tools/admin/dev.mjs [--port=8799] [--cup=running|signup|live] [--ranked=live|busy]
+// Runs worker.js in Node on http://localhost:<port> (this PC only) with an in-memory KV, and
+// signs you in as a TEST owner at /__login (Discord's real sign-in can't come back to
+// localhost). Reads (GET) go to the real game server, signed with its admin secret when that
+// file is on this PC; writes (POST) are answered here and never reach the game server, so every
+// button can be tried safely. --cup and --ranked serve made-up states live may not have right
+// now: an open cup mid-bracket (or taking sign-ups), and a busy ranked queue.
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +20,19 @@ const TOKEN = (() => {
   const m = env.match(/^SOCCER_API_TOKEN=(.*)$/m);
   return m ? m[1].trim() : "";
 })();
+const flag = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=")[1];
+const CUP_MODE = flag("cup", "running");
+const RANKED_MODE = flag("ranked", "live");
+
+// The admin secret signs the bench's reads of /discord/admin/* (docs/admin-api.md, "Signed
+// requests"), so pages show real data. It's read here and never printed or sent anywhere else.
+const ADMIN_SECRET = (() => { try { return fs.readFileSync("C:/Users/brenn/soccer/.plugin-admin-token", "utf8").trim(); } catch { return ""; } })();
+function signedGet(u) {
+  if (!ADMIN_SECRET) return {};
+  const ts = String(Date.now());
+  const sig = crypto.createHmac("sha256", ADMIN_SECRET).update(["GET", u.pathname, u.search.slice(1), ts, ""].join("\n")).digest("hex");
+  return { "X-Soccer-Ts": ts, "X-Soccer-Sig": sig };
+}
 
 // the worker, with its text imports inlined and its host set to this bench
 const read = (f) => fs.readFileSync(path.join(HERE, f), "utf8");
@@ -119,12 +135,217 @@ const AUDIT = { lines: [
     L124: { uuid: SAMPLE_PLAYER.uuid, amount: 600, at: Date.now() - 86400e3, starter: true, reversed: true, reverseKind: "refund", reversedAt: Date.now() - 7200e3, reversedPaid: 600 } },
   tombstones: { L125: "chargeback" } };
 
+// stage 3 samples (docs/admin-api.md "Cups" and "Ranked"), in the shapes live sends
+const T0 = Date.now();
+const who = (n, name, online = true, leader = false) => ({ uuid: `00000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`, name, online, leader });
+const CUP_LIMITS = { teamSize: { min: 2, max: 5 }, maxTeams: [4, 8, 16, 32], halves: { min: 1, max: 4 }, halfMinutes: { min: 1, max: 30 }, teamName: 16, cupName: 32 };
+const CUP_DEFAULTS = { name: "MCS Cup", teamSize: 3, maxTeams: 8, halves: 2, halfMinutes: 5, extraTime: false };
+const noMoves = () => ({ can: { start: false, win: { a: false, b: false }, void: false }, why: {}, needsForce: { win: false, void: false } });
+
+/** An open cup: taking sign-ups, or drawn with a bye, a result, a live match and one ready to call. */
+function sampleCup(mode, name = "MCS Halloween Cup") {
+  const signup = mode === "signup";
+  const team = (id, tname, color, seed, roster, extra = {}) => ({ id, name: tname, color, seed: signup ? undefined : seed, status: "IN", leader: roster[0].uuid, joinedAt: T0 - 3600e3,
+    online: roster.filter((m) => m.online).length, members: roster, can: { rename: true, remove: true, swap: true }, needsForce: { remove: !!extra.currentMatch }, ...extra });
+  const teams = [
+    team("t1", "Outduel", "#e4572e", 1, [who(1, "Outduel", true, true), who(2, "Lngr"), who(3, "Pyro", false)]),
+    team("t2", "Karl's Lot", "#29a3ff", 2, [who(4, "karlazuz", true, true), who(5, "duckudertruck"), who(6, "Akameq_")]),
+    team("t3", "Blue Lock", "#59cd90", 3, [who(7, "Isagi", true, true), who(8, "Bachira"), who(9, "Nagi", false)], signup ? {} : { currentMatch: "r1m3" }),
+  ];
+  if (!signup) teams.push(
+    team("t4", "Night Owls", "#f6ae2d", 4, [who(10, "Owlet", true, true), who(11, "Hoot", false), who(12, "Barn")]),
+    { ...team("t5", "Red Lions", "#d7263d", 5, [who(13, "Leo", false, true), who(14, "Simba", false), who(15, "Nala", false)]), status: "OUT", can: { rename: true, remove: false, swap: false } },
+    team("t6", "Late Kicks", "#a06cd5", 6, [who(16, "Tardy", true, true), who(17, "Snooze"), who(18, "Yawn")], { currentMatch: "r1m3" }));
+  const m = (id, round, index, label, rest) => ({ id, round, index, label, ...noMoves(), ...rest });
+  const rounds = signup ? [] : [
+    { round: 1, name: "Quarterfinals", matches: [
+      m("r1m1", 1, 0, "Quarterfinal 1", { a: "t1", state: "DONE", bye: true, winner: "t1", decidedBy: "bye", next: "r2m1" }),
+      m("r1m2", 1, 1, "Quarterfinal 2", { a: "t4", b: "t5", state: "DONE", score: { a: 3, b: 1 }, winner: "t4", decidedBy: "goals", matchId: "sample", fieldId: "field_3", pitch: "3v3 Field", next: "r2m1",
+        can: { start: false, win: { a: false, b: true }, void: false } }),
+      m("r1m3", 1, 2, "Quarterfinal 3", { a: "t3", b: "t6", state: "LIVE", score: { a: 1, b: 1 }, fieldId: "field_4", pitch: "4v4 Field #1", startedAt: T0 - 300e3, next: "r2m2",
+        can: { start: false, win: { a: true, b: true }, void: true }, needsForce: { win: true, void: true } }),
+      m("r1m4", 1, 3, "Quarterfinal 4", { a: "t2", state: "DONE", bye: true, winner: "t2", decidedBy: "bye", next: "r2m2" })] },
+    { round: 2, name: "Semifinals", matches: [
+      m("r2m1", 2, 0, "Semifinal 1", { a: "t1", b: "t4", state: "READY", next: "r3m1", lastCall: { text: "It didn't start: nobody from Night Owls was online.", at: T0 - 600e3 },
+        can: { start: true, win: { a: true, b: true }, void: false } }),
+      m("r2m2", 2, 1, "Semifinal 2", { a: "t2", state: "WAITING", next: "r3m1" })] },
+    { round: 3, name: "Final", matches: [m("r3m1", 3, 0, "Final", { state: "WAITING" })] }];
+  const events = [{ seq: 1, at: T0 - 7200e3, type: "OPENED", text: `Sign-ups are open for ${name}` },
+    ...teams.map((x, i) => ({ seq: 2 + i, at: T0 - 7000e3 + i * 60e3, type: "TEAM_JOINED", team: x.id, teamColor: x.color, text: `${x.name} signed up` }))];
+  if (!signup) events.push({ seq: 20, at: T0 - 3600e3, type: "DRAWN", text: "The bracket is drawn" },
+    { seq: 21, at: T0 - 1800e3, type: "MATCH_ENDED", team: "t4", teamColor: "#f6ae2d", match: "r1m2", text: "Night Owls beat Red Lions 3-1" },
+    { seq: 22, at: T0 - 300e3, type: "MATCH_STARTED", match: "r1m3", text: "Blue Lock v Late Kicks has kicked off" });
+  return { id: `cup-bench-${signup ? "s" : "r"}`, name, state: signup ? "SIGNUP" : "RUNNING", teamSize: 3, teamCount: teams.length, maxTeams: 8,
+    createdAt: T0 - 7200e3, startedAt: signup ? undefined : T0 - 3600e3, updatedAt: T0, version: 7, rules: { halves: 2, halfMinutes: 5, extraTime: false },
+    teams, rounds, events, createdBy: "dashboard:karl (594335716310515722)", open: true, editable: true, currentRound: signup ? 0 : 1, callSeconds: 5, forfeitSeconds: 60,
+    limits: CUP_LIMITS, defaults: CUP_DEFAULTS, minMaxTeams: teams.length,
+    can: signup ? { configure: true, teamSize: false, draw: true, redraw: false, cancel: true } : { configure: false, teamSize: false, draw: false, redraw: false, cancel: true },
+    why: {}, liveGames: signup ? 0 : 1,
+    freePitches: signup ? [] : [{ id: "field_3", name: "3v3 Field", reserved: false }, { id: "field_5", name: "4v4 Field #2", reserved: true }],
+    swapCandidates: [{ uuid: who(20, "Benchwarmer").uuid, name: "Benchwarmer" }] };
+}
+const PAST_CUP = (() => {
+  const t = sampleCup("running", "MCS Cup");
+  for (const rd of t.rounds) for (const x of rd.matches) Object.assign(x, noMoves(), x.state === "DONE" ? {} : { state: "DONE", score: { a: 2, b: 1 }, winner: x.a || "t1", decidedBy: "goals", b: x.b || "t3" });
+  return { ...t, id: "cup-bench-past", state: "FINISHED", open: false, editable: false, liveGames: 0, finishedAt: T0 - 86400e3, createdAt: T0 - 90000e3, champion: "t1",
+    can: { configure: false, teamSize: false, draw: false, redraw: false, cancel: false }, freePitches: [], swapCandidates: [], teams: t.teams.map((x) => ({ ...x, currentMatch: undefined, can: { rename: false, remove: false, swap: false } })) };
+})();
+let benchCup = CUP_MODE === "live" ? null : sampleCup(CUP_MODE);
+const isOpenCup = () => !!benchCup && (benchCup.state === "SIGNUP" || benchCup.state === "RUNNING");
+const cupSummary = (t) => ({ id: t.id, name: t.name, state: t.state, teamSize: t.teamSize, teamCount: t.teams.length, maxTeams: t.maxTeams, createdAt: t.createdAt, startedAt: t.startedAt, finishedAt: t.finishedAt,
+  champion: t.champion ? { id: t.champion, name: t.teams.find((x) => x.id === t.champion).name, color: t.teams.find((x) => x.id === t.champion).color } : undefined,
+  updatedAt: t.updatedAt, version: t.version, createdBy: t.createdBy, live: t.liveGames, ready: 1, teamsLeft: t.teams.filter((x) => x.status === "IN").length, editable: t.editable });
+
+/** A pretend cup write: the checks the game server makes first, then a small change to the bench's cup. */
+function benchCupWrite(op, q) {
+  const bad = (status, error) => ({ status, body: JSON.stringify({ ok: false, error }) });
+  const okCup = (message, extra = {}) => { benchCup.version++; benchCup.updatedAt = Date.now(); return { status: 200, body: JSON.stringify({ ok: true, message, ...extra, tournament: benchCup }) }; };
+  if (op === "create") {
+    if (isOpenCup()) return bad(409, `${benchCup.name} is still open`);
+    benchCup = sampleCup("signup", q.get("name") || "MCS Cup");
+    benchCup.teams = [];
+    benchCup.teamCount = 0;
+    benchCup.can.draw = false;
+    benchCup.why = { draw: "Need at least 2 teams" };
+    return okCup(`Sign-ups are open for ${benchCup.name}.`);
+  }
+  if (!q.get("cup")) return bad(400, "cup required (the cup's id)");
+  if (!isOpenCup()) return bad(409, "No cup is open");
+  if (q.get("cup") !== benchCup.id || Number(q.get("expectVersion")) !== benchCup.version) return bad(409, "The cup changed since you loaded it");
+  const t = benchCup;
+  const m = t.rounds.flatMap((rd) => rd.matches).find((x) => x.id === q.get("match"));
+  const team = t.teams.find((x) => x.id === q.get("team"));
+  const forced = q.get("force") === "true";
+  if (["start", "win", "void"].includes(op) && !m) return bad(404, `No match ${q.get("match")}`);
+  if (["rename", "swap", "remove"].includes(op) && !team) return bad(404, `No team ${q.get("team")}`);
+  switch (op) {
+    case "draw":
+    case "redraw": { const v = t.version; benchCup = sampleCup("running", t.name); benchCup.version = v; return okCup("The bracket is drawn."); }
+    case "configure":
+      for (const k of ["maxTeams", "teamSize"]) if (q.get(k)) t[k] = Number(q.get(k));
+      for (const k of ["halves", "halfMinutes"]) if (q.get(k)) t.rules[k] = Number(q.get(k));
+      if (q.get("extraTime")) t.rules.extraTime = q.get("extraTime") === "true";
+      return okCup("Saved.");
+    case "start": {
+      const pitch = t.freePitches.find((p) => p.id === q.get("pitch"));
+      if (!pitch) return bad(404, `No pitch called ${q.get("pitch")}`);
+      Object.assign(m, { calling: true, calledTo: { id: pitch.id, name: pitch.name }, can: { ...m.can, start: false } });
+      return okCup(`Calling ${m.label} to ${pitch.name}.`, { called: true, seconds: 5, match: m.id, pitch: { id: pitch.id, name: pitch.name } });
+    }
+    case "win": {
+      if (m.needsForce.win && !forced) return bad(409, `That would stop the live game on ${m.pitch}; send force=true`);
+      const side = q.get("side");
+      Object.assign(m, { state: "DONE", winner: side === "a" || side === "b" ? m[side] : side, decidedBy: "staff", calling: false }, noMoves());
+      if (m.id === "r1m3") t.liveGames = 0;
+      return okCup(`${t.teams.find((x) => x.id === m.winner).name} go through.`);
+    }
+    case "void":
+      if (m.needsForce.void && !forced) return bad(409, `That would stop the live game on ${m.pitch}; send force=true`);
+      Object.assign(m, { state: "READY", score: undefined, calling: false, calledTo: undefined }, noMoves(), { can: { start: true, win: { a: true, b: true }, void: false } });
+      if (m.id === "r1m3") t.liveGames = 0;
+      return okCup(`${m.label} was called off.`);
+    case "rename": team.name = q.get("name"); return okCup(`Renamed to ${team.name}.`);
+    case "swap": {
+      const out = team.members.find((x) => x.uuid === q.get("out"));
+      const inn = t.swapCandidates.find((x) => x.uuid === q.get("in"));
+      if (!out || !inn) return bad(404, "no such player");
+      Object.assign(out, { uuid: inn.uuid, name: inn.name, online: true });
+      t.swapCandidates = t.swapCandidates.filter((x) => x !== inn);
+      return okCup(`${inn.name} is in for ${q.get("out")}.`);
+    }
+    case "remove":
+      if (team.needsForce.remove && !forced) return bad(409, "That would stop the live game on 4v4 Field #1; send force=true");
+      if (t.state === "SIGNUP") t.teams = t.teams.filter((x) => x !== team); else Object.assign(team, { status: "WITHDRAWN", can: { rename: false, remove: false, swap: false } });
+      return okCup(`${team.name} ${t.state === "SIGNUP" ? "came off the sign-ups" : "were withdrawn"}.`);
+    case "cancel":
+      if (q.get("confirm") !== t.id) return bad(409, "Cancelling needs confirm=<the cup's id>");
+      if (t.liveGames && !forced) return bad(409, "That would stop the live game on 4v4 Field #1; send force=true");
+      Object.assign(t, { state: "CANCELLED", open: false, editable: false, finishedAt: Date.now(), liveGames: 0 });
+      return okCup(`${t.name} was cancelled.`);
+  }
+  return bad(404, "no such endpoint");
+}
+
+const rankedBusy = () => {
+  const p = (n, name, elo, extra = {}) => ({ uuid: who(n, name).uuid, name, elo, eloBefore: elo, party: null, left: false, ...extra });
+  return { ok: true, enabled: true, fileOk: true,
+    config: { startElo: 1000, placementGames: 10, kPlacement: 40, kSettled: 24, window: { start: 100, step: 50, everySeconds: 20, anyoneAfterSeconds: 120 }, draft: { enabled: true, pickSeconds: 15 },
+      matchFoundSeconds: 4, forfeitSeconds: 60, leaverCooldownMinutes: [2, 5, 15, 30], leaverResetHours: 24, ladderMinGames: 1, requireLink: true },
+    queues: [{ id: "3v3", size: 3, players: 2, entries: [{ leader: who(2, "Lngr").uuid, members: [p(2, "Lngr", 1080), p(3, "Pyro", 1010)], avgElo: 1045, since: Date.now() - 42000, waitedMs: 42000, rangeElo: 150, waitingForPitch: false }] },
+      { id: "4v4", size: 4, players: 1, entries: [{ leader: who(10, "Owlet").uuid, members: [p(10, "Owlet", 990)], avgElo: 990, since: Date.now() - 135000, waitedMs: 135000, rangeElo: null, waitingForPitch: true }] }],
+    found: [{ id: "1a2b3c4d", queue: "3v3", pitch: { id: "field_3", name: "3v3 Field" }, foundAt: Date.now() - 8000, drafting: true, teams: null,
+      draft: { turn: "red", secondsLeft: 12, picks: 2, sides: [{ team: "red", name: "Red", captain: { uuid: who(7, "Isagi").uuid, name: "Isagi" } }, { team: "blue", name: "Blue", captain: { uuid: who(8, "Bachira").uuid, name: "Bachira" } }],
+        units: [{ players: [p(7, "Isagi", 1240)], team: "red", order: 0 }, { players: [p(8, "Bachira", 1190)], team: "blue", order: 0 }, { players: [p(9, "Nagi", 1100)], team: null, order: null }] } }],
+    matches: [{ id: "9z8y7x6w", queue: "4v4", pitch: { id: "field_4", name: "4v4 Field #1" }, foundAt: Date.now() - 400000, running: true, score: { red: 2, blue: 1 }, halfSecondsLeft: 95,
+      teams: { red: { name: "Red", avgElo: 1120, players: [p(4, "karlazuz", 1150), p(5, "duckudertruck", 1100), p(6, "Akameq_", 1110), p(1, "Outduel", 1120)] },
+        blue: { name: "Blue", avgElo: 1105, players: [p(13, "Leo", 1090), p(14, "Simba", 1130), p(15, "Nala", 1100), p(16, "Tardy", 1100)] } }, left: [who(16, "Tardy").uuid] }],
+    pitches: [{ id: "field_4", name: "4v4 Field #1", queue: "4v4", state: "playing", why: "a match is on", problems: [], match: "9z8y7x6w" },
+      { id: "field_3", name: "3v3 Field", queue: "3v3", state: "busy", why: "a found ranked match holds it", problems: [], match: "1a2b3c4d" },
+      { id: "warsaw", name: "Warsaw Stadium", queue: null, state: "notReady", why: null, problems: ["no penalty spot for draws (Setup step 7)"], match: null },
+      { id: "field_5", name: "4v4 Field #2", queue: "4v4", state: "free", why: null, problems: [], match: null }],
+    ladders: [{ queue: "3v3", updatedAt: Date.now() - 600000, total: 3, items: [{ rank: 1, uuid: who(7, "Isagi").uuid, name: "Isagi", elo: 1240, games: 35, wins: 20, losses: 15, linked: true },
+      { rank: 2, uuid: who(8, "Bachira").uuid, name: "Bachira", elo: 1190, games: 28, wins: 16, losses: 12, linked: true }, { rank: 3, uuid: who(30, "x").uuid, name: null, elo: 1004, games: 1, wins: 1, losses: 0, linked: false }] },
+      { queue: "4v4", updatedAt: Date.now() - 600000, total: 0, items: [] }] };
+};
+
+/** Bench reads that stand in for live: an open cup, a busy ranked queue (see --cup and --ranked). */
+function stage3Read(p, url) {
+  const ok = (o) => ({ status: 200, body: JSON.stringify(o) });
+  if (CUP_MODE !== "live" && p === "/discord/admin/cups/list") return ok({ ok: true, current: isOpenCup() ? benchCup.id : null, items: [...(benchCup ? [cupSummary(benchCup)] : []), cupSummary(PAST_CUP)] });
+  if (CUP_MODE !== "live" && p === "/discord/admin/cups/show") {
+    const id = url.searchParams.get("id") || "current";
+    const t = id === "current" ? (isOpenCup() ? benchCup : PAST_CUP) : [benchCup, PAST_CUP].find((c) => c && c.id === id);
+    return t ? ok({ ok: true, tournament: t }) : { status: 404, body: JSON.stringify({ ok: false, error: "no such cup" }) };
+  }
+  if (RANKED_MODE === "busy" && p === "/discord/admin/ranked/status") return ok(rankedBusy());
+  return null;
+}
+
+/** Pretend answers for the clubs, ranked and maintenance writes, shaped like the game server's. */
+function stage3Write(p, q) {
+  const ok = (o) => ({ status: 200, body: JSON.stringify({ ok: true, ...o }) });
+  const bad = (status, error) => ({ status, body: JSON.stringify({ ok: false, error }) });
+  if (p.startsWith("/discord/admin/cups/")) return CUP_MODE === "live" ? ok({ message: "(bench) done." }) : benchCupWrite(p.split("/").pop(), q);
+  if (p.startsWith("/discord/admin/clubs/")) {
+    const op = p.split("/").pop();
+    const id = q.get("club") || (q.get("name") || "bench club").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    if (op === "delete" && q.get("confirm") !== q.get("club")) return bad(409, `Send confirm=${q.get("club")} to delete it. There's no undo.`);
+    if (op === "delete") return ok({ changed: true, message: `Deleted ${id}.`, before: { id }, club: null, deleted: id });
+    return ok({ changed: true, repeat: false, message: `(bench) ${op} done.`, before: {}, club: { id, name: q.get("name") || id } });
+  }
+  if (p === "/discord/admin/ranked/reset") return ok({ uuid: q.get("id"), name: "that player", queue: q.get("queue"), changed: true, before: {}, after: {}, message: `Reset that player's ${q.get("queue")} rating: 1000 Elo, 0 games.` });
+  const career = { name: "DuckyWins", games: 12, wins: 7, goals: 4, assists: 2, ownGoals: 0, shots: 9, shotsOnTarget: 6, passes: 40, saves: 1, steals: 3, tackleHits: 5, interceptions: 2, pkScored: 0, pkMissed: 0, pkSaved: 0, mvps: 1, cleanSheets: 0, possessionSeconds: 300 };
+  if (p === "/discord/admin/maint/statsreset") return q.get("dry")
+    ? ok({ dry: true, uuid: q.get("id"), name: "DuckyWins", career, message: "This wipes DuckyWins's career: 12 games, 4 goals, 2 assists. Match history stays." })
+    : ok({ dry: false, uuid: q.get("id"), name: "DuckyWins", career, cleared: true, backup: `stats.yml.before-statsreset-${Date.now()}`, message: "Cleared all stats for DuckyWins." });
+  if (p === "/discord/admin/maint/mergeplayer") {
+    if (!/^[0-9a-f-]{32,36}$/i.test(q.get("from") || "") || !/^[0-9a-f-]{32,36}$/i.test(q.get("into") || "")) return bad(400, "use a UUID for from and into");
+    const pair = { from: { uuid: q.get("from"), name: "OldAccount" }, into: { uuid: q.get("into"), name: "MainAccount" } };
+    return q.get("dry") || q.get("confirm") !== "true"
+      ? ok({ dry: true, ...pair, parts: { stats: "12 games, 4 goals, 2 assists", matches: "12 matches", ranked: "3v3 4 games", training: "best Targets 12", sapphires: "300 Sapphires (paid 0, earned 300)" },
+        message: "OldAccount → MainAccount, who keeps the name. Discord links stay as they are. It can't be undone." })
+      : ok({ dry: false, ...pair, parts: { stats: "12 games, 4 goals added", matches: "12 matches moved", ranked: "3v3 4 games", training: "not moved, see the console", sapphires: "300 Sapphires (paid 0, earned 300) moved" },
+        message: "Merged OldAccount into MainAccount. Its match history is rewritten in the background." });
+  }
+  if (p === "/discord/admin/maint/recountsmall") return q.get("confirm") === "true"
+    ? ok({ applied: true, scanned: 407, unreadable: 0, games: 3, players: 5, ids: ["a", "b", "c"], careers: 5, report: `small-recount-${Date.now()}.json`, message: "Marked 3 old games not counted and took them out of 5 players' career stats." })
+    : ok({ applied: false, scanned: 407, unreadable: 0, games: 3, players: 5, ids: ["a", "b", "c"], message: "3 old games had 2 or fewer on a side at kickoff. They count for 5 players." });
+  return null;
+}
+
 async function pluginBench(req, url) {
   const p = url.pathname.replace(/^\/__plugin/, "");
   if (req.method === "GET") {
-    const r = await fetch(REAL + p + url.search, { headers: p.startsWith("/discord/") ? { "X-Soccer-Token": TOKEN } : {} });
-    // the bench has no admin secret, so the real server answers 401 (or 404 for a route it lacks): use samples
-    if ((r.status === 404 || r.status === 401) && p.startsWith("/discord/admin/")) {
+    const made = stage3Read(p, url);
+    if (made) return made;
+    const real = new URL(REAL + p + url.search);
+    const admin = p.startsWith("/discord/admin/");
+    const r = await fetch(real.href, { headers: admin ? signedGet(real) : p.startsWith("/discord/") ? { "X-Soccer-Token": TOKEN } : {} });
+    // without the admin secret the real server answers 401 (or 404 for a route it lacks): use samples
+    if ((r.status === 404 || r.status === 401) && admin) {
+      if (p === "/discord/admin/clubs/show") return { status: 200, body: JSON.stringify({ ok: true, club: { id: url.searchParams.get("club"), name: "Bench Club", flag: null, flagCode: null, crest: null,
+        color: "gold", colorHex: "#ffaa00", gradient: [], shortName: "", code: "", codeShown: "BEN", logo: null, logoUrl: null, members: 0, inPlay: false, playingOn: null,
+        fixtures: { scheduled: 0, live: 0, finished: 0, cancelled: 0 }, memberList: [], suffix: "", fixtureList: [], standing: null } }) };
       if (p.startsWith("/discord/admin/bows/tex/")) return { status: 200, body: SAMPLE_PNG, type: "image/png" };
       if (p === "/discord/admin/knobs" && !url.searchParams.get("scope")) return { status: 200, body: JSON.stringify({ scopes: SCOPES }) };
       if (p === "/discord/admin/knobs" && KNOBS[(url.searchParams.get("scope") || "").split(":")[0]]) {
@@ -151,7 +372,14 @@ async function pluginBench(req, url) {
       if (p === "/discord/admin/wallet/audit") return url.searchParams.get("q") === "none" ? { status: 200, body: JSON.stringify({ lines: [] }) } : { status: 200, body: JSON.stringify(AUDIT) };
       if (SAMPLE[p]) return { status: 200, body: JSON.stringify(SAMPLE[p]) };
     }
-    return { status: r.status, body: await r.text() };
+    return { status: r.status, body: Buffer.from(await r.arrayBuffer()), type: r.headers.get("content-type") || "application/json" };
+  }
+  const made = stage3Write(p, url.searchParams);
+  if (made) {
+    console.log(`  (bench) pretend ${req.method} ${p}`);
+    // the recount takes a while on the real server: long enough here to see the dialog working
+    if (p === "/discord/admin/maint/recountsmall") await new Promise((ok) => setTimeout(ok, 1500));
+    return made;
   }
   if (p === "/discord/admin/sapphires") return { status: 200, body: JSON.stringify({ ok: true, repeat: false, balance: 1250 + (url.searchParams.get("op") === "take" ? -1 : 1) * Number(url.searchParams.get("amount") || 0) }) };
   if (p === "/discord/admin/rank") return { status: 200, body: JSON.stringify({ ok: true, message: `DuckyWins: ${url.searchParams.get("op")} ${url.searchParams.get("rank")} (bench).` }) };
@@ -169,9 +397,14 @@ async function pluginBench(req, url) {
   return { status: 200, body: JSON.stringify({ ok: true }) };
 }
 
-http.createServer(async (req, res) => {
+async function handle(req, res) {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   try {
+    // the app's own files, read fresh each time: a change to app.js or app.css needs only a reload
+    if (url.pathname === "/app.js" || url.pathname === "/app.css") {
+      res.writeHead(200, { "Content-Type": url.pathname.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/css; charset=utf-8", "Cache-Control": "no-cache" });
+      return res.end(read(url.pathname.slice(1)));
+    }
     if (url.pathname.startsWith("/__plugin/")) {
       if (req.method !== "GET") await new Promise((ok) => { req.resume(); req.on("end", ok); });
       const r = await pluginBench(req, url);
@@ -198,4 +431,9 @@ http.createServer(async (req, res) => {
     res.writeHead(500);
     res.end(String(e && e.stack || e));
   }
-}).listen(PORT, () => console.log(`admin bench on http://localhost:${PORT}/__login`));
+}
+
+// this PC only: the bench's reads are signed with the real admin secret, so it must never be
+// reachable from the network (both loopbacks, since "localhost" can mean either)
+http.createServer(handle).listen(PORT, "127.0.0.1", () => console.log(`admin bench on http://localhost:${PORT}/__login (cup: ${CUP_MODE}, ranked: ${RANKED_MODE}, reads ${ADMIN_SECRET ? "signed" : "unsigned: admin pages use samples"})`));
+http.createServer(handle).listen(PORT, "::1").on("error", () => {});

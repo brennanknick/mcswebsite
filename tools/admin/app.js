@@ -96,8 +96,9 @@
   /**
    * A dialog with a form. fields: [{ name, label, type, value, options, hint, required, min, max }]
    * submit(values) resolves { ok, error }: an error keeps the dialog open and shows it.
+   * onopen(inputs) runs once it's showing (a live preview); alone: one button, for a result.
    */
-  function formDialog({ title, text, fields = [], okLabel = "Save", bad = false, submit }) {
+  function formDialog({ title, text, fields = [], okLabel = "Save", bad = false, alone = false, onopen, submit }) {
     return new Promise((resolve) => {
       const inputs = {};
       const errEl = h("p", { class: "err", hidden: true });
@@ -109,10 +110,11 @@
         }),
         errEl,
         h("div", { class: "dlg-foot" },
-          h("button", { class: "btn btn-dark", type: "button", value: "cancel", onclick: () => dlg.close("cancel") }, "Cancel"),
+          alone ? null : h("button", { class: "btn btn-dark", type: "button", value: "cancel", onclick: () => dlg.close("cancel") }, "Cancel"),
           h("button", { class: bad ? "btn btn-bad" : "btn", type: "submit", "data-ok": true }, okLabel)));
       function field(f) {
         let input;
+        if (f.type === "player") return playerField(f, inputs);
         if (f.type === "select") {
           input = h("select", { class: "input", name: f.name, required: f.required || null },
             (f.options || []).map((o) => h("option", { value: o.value, selected: String(o.value) === String(f.value ?? "") || null }, o.label)));
@@ -139,21 +141,69 @@
         for (const [k, el] of Object.entries(inputs)) values[k] = el.type === "checkbox" ? el.checked : el.value.trim();
         const okBtn = $("[data-ok]", form);
         okBtn.disabled = true;
+        okBtn.textContent = "Working…";
         errEl.hidden = true;
         const r = submit ? await submit(values, inputs) : { ok: true };
         okBtn.disabled = false;
+        okBtn.textContent = okLabel;
         if (r && r.ok === false) { errEl.textContent = r.error || "That didn't work."; errEl.hidden = false; return; }
         dlg.close("ok");
         resolve(r || { ok: true });
       });
-      dlg.onclose = () => { if (dlg.returnValue !== "ok") resolve(null); };
+      // a close event arrives a moment after close(): when a dialog opens straight after another
+      // (a preview, then its "are you sure?"), the first one's event lands while this one is open
+      dlg.onclose = () => { if (!dlg.open && dlg.returnValue !== "ok") resolve(null); };
       dlg.returnValue = "";
       dlg.showModal();
+      if (onopen) onopen(inputs);
       const first = form.querySelector("input:not([type=checkbox]), select, textarea");
       if (first) first.focus();
     });
   }
   const confirmBox = (title, text, okLabel, bad = true) => formDialog({ title, text, okLabel, bad, submit: async () => ({ ok: true }) });
+
+  /**
+   * A player picker for formDialog: type a name, pick from everyone the game server has seen. Its
+   * value is "uuid|name" once one is picked, or just what was typed (resolvePlayer settles that).
+   */
+  function playerField(f, inputs) {
+    const box = h("input", { class: "input", type: "search", name: f.name, placeholder: f.placeholder || "Name or UUID", maxlength: 36, autocomplete: "off", spellcheck: "false", required: f.required || null, "aria-label": f.label });
+    const list = h("div", { class: "pick" });
+    const picked = { uuid: (f.value && f.value.uuid) || "", name: (f.value && f.value.name) || "" };
+    box.value = picked.name;
+    let timer = 0, asked = 0;
+    box.addEventListener("input", () => {
+      picked.uuid = "";
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const q = box.value.trim();
+        const mine = ++asked;
+        if (q.length < 2) return list.replaceChildren();
+        const r = await call("GET", `/players?q=${encodeURIComponent(q)}`);
+        if (mine !== asked) return;   // a newer search is on its way
+        list.replaceChildren(...(r.ok ? r.items : []).slice(0, 6).map((p) => h("button", { class: "pick-item", type: "button",
+          onclick: () => { picked.uuid = p.uuid; picked.name = p.name; box.value = p.name; list.replaceChildren(); } },
+          head(p.name, 20), h("span", null, p.name), p.online ? h("span", { class: "tag is-good" }, "Online") : null)));
+      }, 250);
+    });
+    inputs[f.name] = { type: "player", get value() { return picked.uuid ? `${picked.uuid}|${picked.name}` : box.value; } };
+    // a div, not a label: a click on a pick must stay on the pick
+    return h("div", { class: "field", "data-field": f.name }, h("span", null, f.label), box, list, f.hint ? h("small", null, f.hint) : null);
+  }
+
+  const isUuid = (s) => /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(String(s || "").trim());
+  /** A player field's value as { uuid, name }, looking a typed name up; or { error }. */
+  async function resolvePlayer(v) {
+    const [a, b] = String(v || "").split("|");
+    if (b && isUuid(a)) return { uuid: a, name: b };
+    const typed = a.trim();
+    if (!typed) return { error: "Pick a player." };
+    const r = await call("GET", `/players?q=${encodeURIComponent(typed)}`);
+    if (!r.ok) return { error: r.error };
+    const bare = (x) => String(x).replace(/-/g, "").toLowerCase();
+    const hit = (r.items || []).find((p) => (isUuid(typed) ? bare(p.uuid) === bare(typed) : p.name.toLowerCase() === typed.toLowerCase()));
+    return hit ? { uuid: hit.uuid, name: hit.name } : { error: `Nobody called "${typed}" has played on MCS. Pick them from the list.` };
+  }
 
   /* ── who's signed in ──────────────────────────────────────────── */
 
@@ -713,14 +763,36 @@
           h("p", { class: "row-sub" }, p.uuid),
           ME && ME.role === "owner"
             ? h("div", { class: "dlg-foot", style: "justify-content:flex-start" },
-              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => cosmetic(p) }, "Give or take a cosmetic"))
+              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => cosmetic(p) }, "Give or take a cosmetic"),
+              h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => mergeAccounts(p) }, "Merge accounts"),
+              h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => statsReset(p) }, "Wipe career"))
             : h("p", { class: "row-sub" }, "Only owners can give or take cosmetics."),
-        ], { i: 2 })),
+        ], { i: 2 }),
+        rankedPanel(p, 3)),
       panel("Sapphire history", (p.ledger || []).length ? h("div", { class: "rows" }, p.ledger.map((l) => h("div", { class: "row" },
         h("div", { class: "row-main" },
           h("div", { class: "row-title" }, h("span", { class: "score" }, `${l.amount > 0 ? "+" : ""}${Number(l.amount).toLocaleString()}`), h("span", { class: "tag" }, l.kind || "")),
           h("div", { class: "row-sub" }, h("span", null, l.at ? fmtWhen(l.at) : ""), l.reason ? h("span", null, l.reason) : null, l.by ? h("span", null, l.by) : null)),
-        h("span", { class: "row-sub" }, l.paidAfter != null ? `${Number(l.paidAfter + l.earnedAfter).toLocaleString()} after` : "")))) : empty("No Sapphire history yet."), { i: 3 }));
+        h("span", { class: "row-sub" }, l.paidAfter != null ? `${Number(l.paidAfter + l.earnedAfter).toLocaleString()} after` : "")))) : empty("No Sapphire history yet."), { i: 4 }));
+  }
+
+  /** The player's ranked lines (docs/admin-api.md: null while ranked isn't running). */
+  function rankedPanel(p, i) {
+    const rk = p.ranked;
+    if (rk === undefined) return null;   // a game server from before the ranked block
+    if (rk === null) return panel("Ranked", empty("Ranked isn't running."), { i });
+    const line = (q) => {
+      const x = rk[q];
+      return actionRow(q, x ? `${x.elo} Elo · ${plural(x.games, "game")} · ${x.wins} W ${x.losses} L${x.leaves ? ` · left ${plural(x.leaves, "time")}` : ""}` : "No games yet");
+    };
+    return panel("Ranked", [
+      h("div", { class: "rows" }, line("3v3"), line("4v4")),
+      rk.queued ? h("p", null, h("span", { class: "tag is-live" }, "In the queue now")) : null,
+      rk.cooldownUntil > Date.now() ? h("p", { class: "row-sub" }, `Leaver cooldown until ${fmtWhen(rk.cooldownUntil)}`) : null,
+      rk.blocked ? h("p", { class: "note" }, `A reset would be refused: ${rk.blocked}`) : null,
+      ME && ME.role === "owner" ? buttons(h("button", { class: "btn btn-dark btn-sm", type: "button", disabled: rk.blocked ? true : null,
+        onclick: async () => { if (await resetRating(p)) profile(p.uuid); } }, "Reset rating")) : null,
+    ], { i, aside: h("a", { href: "#/ranked" }, "Ladders") });
   }
 
   async function sapphires(p, op) {
@@ -877,6 +949,13 @@
   const reasonField = (placeholder) => ({ name: "reason", label: "Reason", maxlength: 120, required: true, placeholder: placeholder || null });
   // "dashboard:karl (5943...)" -> "karl"; anything else as it is
   const byName = (by) => { const m = /^dashboard:(.*) \(\d+\)$/.exec(String(by || "")); return m ? m[1] : String(by || ""); };
+  const stat = (big, label) => h("div", { class: "stat" }, h("b", null, String(big)), h("span", null, label));
+  const plural = (n, word, many) => `${Number(n).toLocaleString()} ${n === 1 ? word : many || word + "s"}`;
+  // a panel that explains one tool, with the button that opens it
+  const toolPanel = (title, text, label, cls, fn, i) => panel(title, [h("p", null, text),
+    h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:.9rem" }, h("button", { class: `btn btn-sm ${cls}`, type: "button", onclick: () => fn() }, label))], { i });
+  const buttons = (...kids) => h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:.9rem" }, kids);
+  const HEX = /^#[0-9a-f]{6}$/i;
 
   /* ── Settings: the staff menus' knobs ─────────────────────────── */
 
@@ -1192,15 +1271,13 @@
     const input = h("input", { class: "input", type: "search", placeholder: "Order, line or pretty id", maxlength: 80, autocomplete: "off", spellcheck: "false", "aria-label": "Order, line or pretty id" });
     const out = h("div");
     const form = h("form", { class: "search", onsubmit: (e) => { e.preventDefault(); look(); } }, input, h("button", { class: "btn", type: "submit" }, "Look up"));
-    const tool = (title, text, label, cls, fn, i) => panel(title, [h("p", null, text),
-      h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:.9rem" }, h("button", { class: `btn btn-sm ${cls}`, type: "button", onclick: () => fn() }, label))], { i });
     main.replaceChildren(
       pageHead("Sapphires", "Wallet tools", "Store orders and wallet repairs. Every change needs a reason, tells the player in game and goes in the Activity log."),
       panel("Look up a store order", [form, out], { i: 0 }),
       h("div", { class: "grid" },
-        tool("Add an order by hand", "For a PayNow order whose command never reached the game. Each line counts once: the same line again changes nothing.", "Add an order", "", () => storeGrant(), 1),
-        tool("Take an order back", "A refund, chargeback or revoke. Each line is taken back once, and a line that hasn't arrived yet is stopped from arriving later.", "Take one back", "btn-bad", () => storeReverse(), 2),
-        tool("Fix a wallet", "Bring a wallet that went below zero back to zero so its owner can spend again, or reset both parts to zero.", "Fix a wallet", "btn-dark", () => fixWallet(), 3)));
+        toolPanel("Add an order by hand", "For a PayNow order whose command never reached the game. Each line counts once: the same line again changes nothing.", "Add an order", "", () => storeGrant(), 1),
+        toolPanel("Take an order back", "A refund, chargeback or revoke. Each line is taken back once, and a line that hasn't arrived yet is stopped from arriving later.", "Take one back", "btn-bad", () => storeReverse(), 2),
+        toolPanel("Fix a wallet", "Bring a wallet that went below zero back to zero so its owner can spend again, or reset both parts to zero.", "Fix a wallet", "btn-dark", () => fixWallet(), 3)));
     input.focus();
 
     async function look() {
@@ -1289,6 +1366,724 @@
     if (r) { toast(r.repeat ? "Already done. Nothing changed." : (r.message || "Done.")); if (p) profile(p.uuid); }
   }
 
+  /* ── Clubs (owners): names, colours, crests, members ──────────── */
+
+  const CREST_IMG = (hex) => `https://api.mcsoccer.net/crest/${encodeURIComponent(hex)}.png`;
+  let clubMeta = null;    // clubs/list: the limits and the colour names
+  let crestList = null;   // clubs/crests, fetched the first time a crest is picked
+  const limit = (k, fallback) => (clubMeta && clubMeta.limits && clubMeta.limits[k]) || fallback;
+
+  // a colour as it reads on the dark panels: a very dark one (a navy) is lifted toward white
+  function legible(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const rgb = [n >> 16, (n >> 8) & 255, n & 255];
+    const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+    if (lum >= 0.28) return hex;
+    const k = Math.min(0.6, (0.28 - lum) * 1.6);
+    return "#" + rgb.map((v) => Math.round(v + (255 - v) * k).toString(16).padStart(2, "0")).join("");
+  }
+
+  // A crest: the pack's club and nation crests are images; a symbol (★ ⚑) is just its character,
+  // which has no image, and an image that fails falls back to the character too
+  function crestMark(hex, char, kind, size = 22) {
+    const text = () => (char ? h("span", { class: "cflag", style: `font-size:${Math.round(size * 0.8)}px` }, char) : "");
+    if (!hex || kind === "symbol") return text() || null;
+    const img = h("img", { src: CREST_IMG(hex), width: size, height: size, alt: "", loading: "lazy" });
+    img.addEventListener("error", () => img.replaceWith(text()), { once: true });
+    return img;
+  }
+
+  /** A club's name as the game shows it: its crest, then the name in its gradient or its colour. */
+  function clubLabel(c, size = 22) {
+    const grad = (c.gradient || []).filter((x) => HEX.test(x)).map(legible);
+    const style = grad.length >= 2 ? `background:linear-gradient(90deg,${grad.join(",")});-webkit-background-clip:text;background-clip:text;color:transparent`
+      : HEX.test(c.colorHex || "") ? `color:${legible(c.colorHex)}` : null;
+    return h("span", { class: "cname" }, crestMark(c.crest, c.flag, c.flagKind, size), h("b", { style }, c.name));
+  }
+  const gradBar = (grad) => h("i", { class: "grad-bar", style: `background:linear-gradient(90deg,${grad.join(",")})` });
+  const swatch = (hex) => h("i", { class: "swatch", style: `background:${HEX.test(hex || "") ? hex : "transparent"}` });
+  const inline = (...kids) => h("span", { class: "knob-in", style: "width:auto" }, kids);
+
+  async function clubAdmin(id) {
+    if (id) return clubPage(id);
+    const seq = pageSeq;
+    const top = pageHead("Clubs", "Clubs", "Every club's name, colours, crest and members. Changes show in game straight away.",
+      ME && ME.role === "owner" ? h("button", { class: "btn", type: "button", onclick: newClub }, "New club") : null);
+    main.replaceChildren(top, h("div", { class: "loading" }, "Loading clubs…"));
+    const r = await call("GET", "/clubs/list");
+    if (seq !== pageSeq) return;
+    if (!r.ok) return main.replaceChildren(top, errorBox(r.error));
+    clubMeta = r;
+    const items = r.clubs || [];
+    const rows = items.map((c) => {
+      const fx = c.fixtures || {};
+      const row = h("div", { class: "row" },
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, clubLabel(c), h("span", { class: "tag" }, c.codeShown || "?"),
+            c.inPlay ? h("span", { class: "tag is-live" }, c.playingOn ? `Playing on ${c.playingOn}` : "Playing") : null),
+          h("div", { class: "row-sub" }, h("span", null, plural(c.members || 0, "member")), c.shortName ? h("span", null, `Short name ${c.shortName}`) : null,
+            h("span", null, [fx.live && `${fx.live} live`, fx.scheduled && `${fx.scheduled} to play`, fx.finished && `${fx.finished} played`].filter(Boolean).join(" · ") || "No fixtures"))),
+        h("a", { class: "btn btn-dark btn-sm", href: `#/clubs/${encodeURIComponent(c.id)}` }, "Open"));
+      return { row, text: [c.name, c.id, c.shortName, c.codeShown].join(" ").toLowerCase() };
+    });
+    const find = h("input", { class: "input", type: "search", placeholder: `Find one of ${items.length} clubs`, autocomplete: "off", spellcheck: "false", "aria-label": "Find a club", style: "max-width:320px" });
+    find.addEventListener("input", () => { const w = find.value.trim().toLowerCase(); rows.forEach((x) => { x.row.hidden = !!w && !x.text.includes(w); }); });
+    main.replaceChildren(top, panel(null, [
+      h("div", { class: "panel-head" }, h("small", null, `${plural(items.length, "club")} · ${plural(r.memberTotal || 0, "player")} in them`), items.length > 8 ? find : null),
+      items.length ? h("div", { class: "rows" }, rows.map((x) => x.row)) : empty("No clubs yet.")]));
+  }
+
+  async function clubPage(id) {
+    const seq = pageSeq;
+    const back = h("a", { class: "btn btn-dark", href: "#/clubs" }, "All clubs");
+    main.replaceChildren(pageHead("Clubs", "Club", null, back), h("div", { class: "loading" }, "Loading…"));
+    const [r, meta] = await Promise.all([call("GET", `/clubs/show?club=${encodeURIComponent(id)}`), clubMeta || call("GET", "/clubs/list")]);
+    if (seq !== pageSeq) return;
+    if (meta && meta.ok) clubMeta = meta;
+    if (!r.ok) return main.replaceChildren(main.firstChild, errorBox(r.error));
+    const c = r.club;
+    const owner = ME && ME.role === "owner";
+    const edit = (label, fn) => (owner ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => fn(c) }, label) : null);
+    const grad = (c.gradient || []).filter((x) => HEX.test(x));
+    const members = (c.memberList || []).slice().sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
+    const ORDER = { LIVE: 0, SCHEDULED: 1, FINISHED: 2, CANCELLED: 3 };
+    const fixtures = (c.fixtureList || []).slice().sort((a, b) => (ORDER[a.state] ?? 4) - (ORDER[b.state] ?? 4) || (a.state === "SCHEDULED" ? a.kickoff - b.kickoff : b.kickoff - a.kickoff));
+    const st = c.standing;
+    main.replaceChildren(...[
+      pageHead("Club", clubLabel(c, 34), [plural(c.members || 0, "member"), c.inPlay ? `playing on ${c.playingOn || "a pitch"} now` : null].filter(Boolean).join(" · "), back),
+      c.inPlay ? h("p", { class: "note", style: "margin:0 0 .9rem" }, "They're playing right now: renaming, deleting and member changes wait until the match ends. Colours and crests change live.") : null,
+      h("div", { class: "grid" },
+        panel("Look", h("div", { class: "rows" },
+          actionRow("Name", c.name, edit("Rename", renameClub)),
+          actionRow("Colour", inline(swatch(c.colorHex), c.color ? nice(c.color) : "None"), edit("Change", colourClub)),
+          actionRow("Gradient", grad.length >= 2 ? inline(gradBar(grad), grad.join(" ")) : "Off", edit("Change", gradientClub)),
+          actionRow("Short name", c.shortName || "None, the full name is used", edit("Change", shortClub)),
+          actionRow("Code", `${c.codeShown || "?"}${c.code ? "" : ", made from the name"}`, edit("Change", codeClub)),
+          actionRow("Crest", c.flag ? inline(crestMark(c.crest, c.flag, c.flagKind), c.flagName || c.flagCode || "") : "None", edit("Change", crestClub)),
+          actionRow("Logo", c.logo ? inline(h("img", { src: `https://mc-heads.net/avatar/${encodeURIComponent(c.logo)}/44`, width: 22, height: 22, alt: "" }), "A player head") : "None", edit("Change", logoClub))), { i: 0 }),
+        panel(`Members (${members.length})`, [
+          members.length ? h("div", { class: "rows" }, members.map((m) => h("div", { class: "row" },
+            h("div", { class: "row-main" }, h("div", { class: "row-title" }, head(m.name, 24), m.name, m.online ? h("span", { class: "tag is-good" }, "Online") : null, m.pitch ? h("span", { class: "tag" }, m.pitch) : null)),
+            h("div", { class: "row-actions" },
+              h("a", { class: "btn btn-dark btn-sm", href: `#/players/${encodeURIComponent(m.uuid)}` }, "Player"),
+              owner ? h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => removeMember(c, m) }, "Remove") : null)))) : empty("Nobody's in this club yet."),
+          owner ? buttons(h("button", { class: "btn btn-sm", type: "button", onclick: () => addMember(c) }, "Add a member")) : null,
+        ], { i: 1 })),
+      h("div", { class: "grid" },
+        st ? panel(st.competition || "League", [
+          h("div", { class: "stats-2" }, stat(`#${st.position}`, "in the table"), stat(st.points, st.points === 1 ? "point" : "points"),
+            stat(`${st.won}-${st.drawn}-${st.lost}`, "won, drawn, lost"), stat(`${st.goalDifference > 0 ? "+" : ""}${st.goalDifference}`, "goal difference")),
+          (st.form || []).length ? h("p", { class: "fchips" }, h("span", { class: "row-sub" }, "Form"), st.form.map((x) => h("span", { class: `fchip is-${String(x).toLowerCase()}` }, x))) : null,
+        ], { i: 2, aside: h("a", { href: "https://mcsoccer.net/champions-league/", target: "_blank", rel: "noopener" }, "Table") }) : null,
+        panel("Fixtures", fixtures.length ? h("div", { class: "rows" }, fixtures.map((f) => fixtureRow(f, false))) : empty("No fixtures."), { i: 3, aside: h("a", { href: "#/fixtures" }, "All fixtures") })),
+      owner ? panel("Delete this club", [h("p", null, "It's gone for good: its members leave it, and fixtures it's booked in can't be played."),
+        buttons(h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => deleteClub(c) }, "Delete club"))], { i: 4 }) : null,
+    ].filter(Boolean));
+  }
+
+  /** One club edit: its fields and a reason, sent to clubs/<op>. The club page is drawn again after. */
+  async function clubEdit(c, op, { title, text, fields = [], okLabel = "Save", bad = false, onopen, params }) {
+    const r = await formDialog({ title, text, okLabel, bad, onopen, fields: [...fields, reasonField()],
+      submit: async (v) => {
+        const p = params ? await params(v) : {};
+        if (p && p.ok === false) return p;
+        return call("POST", `/clubs/${op}`, { club: c.id, clubName: c.name, ...p, reason: v.reason });
+      } });
+    if (!r) return null;
+    clubsCache = null;   // the fixtures page's list of clubs
+    toast(r.changed === false ? (r.message || "It was already like that. Nothing changed.") : (r.message || "Saved."));
+    if (op === "delete") location.hash = "#/clubs";
+    else clubPage(c.id);
+    return r;
+  }
+
+  const renameClub = (c) => clubEdit(c, "rename", { title: `Rename ${c.name}`, okLabel: "Rename",
+    text: "Its id stays the same, so fixtures and links keep working.",
+    fields: [{ name: "name", label: "Club name", value: c.name, maxlength: limit("name", 32), required: true }],
+    params: (v) => ({ name: v.name }) });
+
+  const colourClub = (c) => clubEdit(c, "color", { title: `${c.name}'s colour`,
+    fields: [{ name: "color", type: "select", label: "Colour", value: c.color || "none", options: ((clubMeta && clubMeta.colours) || ["none"]).map((x) => ({ value: x, label: nice(x) })) }],
+    params: (v) => ({ color: v.color }) });
+
+  function gradientClub(c) {
+    const preview = h("div", { class: "knob-in", style: "min-height:22px" });
+    const show = (val) => {
+      const cols = String(val).split(/[\s,]+/).filter((x) => HEX.test(x));
+      preview.replaceChildren(cols.length >= 2 ? gradBar(cols) : h("small", null, String(val).trim() ? "It needs 2 to 5 colours, like #004D98 #A50044." : "No gradient: the name shows in its colour."));
+    };
+    return clubEdit(c, "gradient", { title: `${c.name}'s gradient`, text: preview,
+      fields: [{ name: "gradient", label: "Colours", value: (c.gradient || []).join(" "), placeholder: "#004D98 #A50044", hint: "2 to 5 hex colours, left to right. Empty for none." }],
+      onopen: (inputs) => { show(inputs.gradient.value); inputs.gradient.addEventListener("input", () => show(inputs.gradient.value)); },
+      params: (v) => ({ gradient: v.gradient.replace(/,/g, " ").replace(/\s+/g, " ").trim() || "off" }) });
+  }
+
+  const shortClub = (c) => clubEdit(c, "short", { title: `${c.name}'s short name`,
+    text: "For places the full name doesn't fit. Empty takes it off.",
+    fields: [{ name: "short", label: "Short name", value: c.shortName || "", maxlength: limit("short", 8) }],
+    params: (v) => ({ short: v.short || "off" }) });
+
+  const codeClub = (c) => clubEdit(c, "code", { title: `${c.name}'s code`,
+    text: `The letters on the scorebug, ${c.codeShown || "?"} now. Empty makes one from the name.`,
+    fields: [{ name: "code", label: "Code", value: c.code || "", maxlength: limit("code", 4), placeholder: c.codeShown || "" }],
+    params: (v) => ({ code: v.code.toUpperCase() || "off" }) });
+
+  async function crestClub(c) {
+    if (!crestList) {
+      const r = await call("GET", "/clubs/crests");
+      if (!r.ok) return toast(r.error, true);
+      crestList = r.items || [];
+    }
+    let chosen = c.flagCode || (c.flag ? "" : "none");
+    const custom = h("input", { class: "input", maxlength: limit("flag", 8), value: c.flag && !c.flagCode ? c.flag : "", placeholder: "★ or FC", autocomplete: "off", "aria-label": "A character or short text" });
+    const KIND = { club: 0, nation: 1, symbol: 2 };   // club crests first: they're what clubs pick
+    const sorted = crestList.slice().sort((a, b) => (KIND[a.kind] ?? 3) - (KIND[b.kind] ?? 3));
+    const tiles = [{ code: "none", display: "None" }, ...sorted].map((x) => {
+      const b = h("button", { class: "crest-tile", type: "button", title: x.display || x.name, "aria-pressed": String(chosen === x.code),
+        onclick: () => { chosen = x.code; custom.value = ""; tiles.forEach((t) => t.b.setAttribute("aria-pressed", String(t.x.code === chosen))); } },
+        x.code === "none" ? h("span", { class: "crest-none" }, "×") : crestMark(x.crest, x.character, x.kind, 28) || h("span", { class: "crest-none" }, "?"),
+        h("small", null, x.display || x.name));
+      return { b, x, text: [x.name, x.display, x.kind, ...(x.aliases || [])].join(" ").toLowerCase() };
+    });
+    custom.addEventListener("input", () => { if (custom.value.trim()) { chosen = ""; tiles.forEach((t) => t.b.setAttribute("aria-pressed", "false")); } });
+    const find = h("input", { class: "input", type: "search", placeholder: `Find one of ${crestList.length} crests`, autocomplete: "off", spellcheck: "false", "aria-label": "Find a crest" });
+    find.addEventListener("input", () => { const w = find.value.trim().toLowerCase(); tiles.forEach((t) => { t.b.hidden = !!w && !t.text.includes(w); }); });
+    find.addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });   // Enter finds, it doesn't save
+    const body = h("div", { class: "form" }, find, h("div", { class: "crest-grid" }, tiles.map((t) => t.b)),
+      h("label", { class: "field" }, h("span", null, "Or a character or short text"), custom, h("small", null, `Up to ${limit("flag", 8)} characters. A crest counts as one.`)));
+    return clubEdit(c, "flag", { title: `${c.name}'s crest`, text: body,
+      params: () => (custom.value.trim() || chosen ? { flag: custom.value.trim() || chosen } : { ok: false, error: "Pick a crest, or type a character." }) });
+  }
+
+  const logoClub = (c) => clubEdit(c, "logo", { title: `${c.name}'s logo`,
+    text: "A player head for the club. Paste a textures.minecraft.net link, a head site's Value, or the texture's hash. Type none to take it off.",
+    fields: [{ name: "logo", type: "textarea", label: "Head", max: 4000, required: true }],
+    params: (v) => ({ logo: v.logo }) });
+
+  const addMember = (c) => clubEdit(c, "add", { title: `Add someone to ${c.name}`, okLabel: "Add",
+    text: "Someone in another club moves over. If they're online, they're told in game.",
+    fields: [{ name: "who", type: "player", label: "Player", required: true }],
+    params: async (v) => { const p = await resolvePlayer(v.who); return p.error ? { ok: false, error: p.error } : { id: p.uuid, name: p.name }; } });
+
+  const removeMember = (c, m) => clubEdit(c, "remove", { title: `Take ${m.name} out of ${c.name}?`, okLabel: "Take them out", bad: true,
+    text: "If they're online, they're told in game.",
+    params: () => ({ id: m.uuid, name: m.name }) });
+
+  function deleteClub(c) {
+    const booked = (c.fixtures && c.fixtures.scheduled) || 0;
+    return clubEdit(c, "delete", { title: `Delete ${c.name}?`, okLabel: "Delete club", bad: true,
+      text: `There's no undo.${booked ? ` It's booked in ${plural(booked, "fixture")}, which can't be played without it.` : ""}`,
+      fields: [{ name: "confirm", label: `Type ${c.id} to confirm`, required: true },
+        booked ? { name: "force", type: "checkbox", label: `Delete it anyway, with ${plural(booked, "fixture")} booked`, value: false } : null].filter(Boolean),
+      params: (v) => (v.confirm !== c.id ? { ok: false, error: `Type ${c.id} exactly.` }
+        : booked && !v.force ? { ok: false, error: "Tick the box to delete it with fixtures booked." }
+        : { confirm: c.id, force: booked ? true : undefined }) });
+  }
+
+  async function newClub() {
+    const r = await formDialog({ title: "New club", okLabel: "Make it",
+      text: "Then set its colours, crest and members on its page.",
+      fields: [{ name: "name", label: "Club name", maxlength: limit("name", 32), required: true, placeholder: "Red Lions" }, reasonField("New league club")],
+      submit: (v) => call("POST", "/clubs/create", { name: v.name, reason: v.reason }) });
+    if (!r) return;
+    clubsCache = null;
+    toast(r.repeat ? "That club was made already." : (r.message || "Made."));
+    if (r.club && r.club.id) location.hash = `#/clubs/${encodeURIComponent(r.club.id)}`;
+  }
+
+  /* ── Cups (owners): sign-ups, the draw, calling matches, results ─ */
+
+  const CUP_STATE = { SIGNUP: ["Sign-ups open", "is-good"], RUNNING: ["Running", "is-live"], FINISHED: ["Finished", ""], CANCELLED: ["Cancelled", "is-bad"] };
+  const TEAM_STATUS = { OUT: ["Out", ""], WITHDRAWN: ["Withdrawn", "is-bad"], CHAMPION: ["Champion", "is-good"] };
+  const DECIDED = { forfeit: "Won by forfeit", staff: "Given by staff", bye: "A bye" };
+  const CUP_LIMITS = { teamSize: { min: 2, max: 5 }, maxTeams: [4, 8, 16, 32], halves: { min: 1, max: 4 }, halfMinutes: { min: 1, max: 30 }, teamName: 16, cupName: 32 };
+  const CUP_DEFAULTS = { name: "MCS Cup", teamSize: 3, maxTeams: 8, halves: 2, halfMinutes: 5, extraTime: false };
+  const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  const isOpen = (t) => !!t && (t.state === "SIGNUP" || t.state === "RUNNING");
+  let cupView = null;   // { id, list, t, sig }: what the Cups page shows
+
+  function cupHead(id) {
+    return pageHead("Cups", "Cups", "Run a cup from here: sign-ups, the draw, calling matches to pitches and results. Players see every change in game.",
+      [id ? h("a", { class: "btn btn-dark", href: "#/cups" }, "All cups") : null, h("button", { class: "btn btn-dark", type: "button", onclick: () => cups(id, true) }, "Refresh")]);
+  }
+
+  // quiet: a refresh (the timer or the button), drawn only when the cup changed
+  async function cups(id, quiet) {
+    const seq = pageSeq;
+    if (!quiet) main.replaceChildren(cupHead(id), h("div", { class: "loading" }, "Loading the cup…"));
+    const [list, show] = await Promise.all([call("GET", "/cups/list"), call("GET", `/cups/show?id=${encodeURIComponent(id || "current")}`)]);
+    if (seq !== pageSeq) return;
+    if (leave) { leave(); leave = null; }
+    if (!list.ok) return main.replaceChildren(cupHead(id), errorBox(list.error));
+    const t = show.ok ? show.tournament : null;
+    if (isOpen(t)) {
+      // quick while a match is live or being called, so scores and calls keep up
+      const busy = (t.rounds || []).some((rd) => (rd.matches || []).some((m) => m.state === "LIVE" || m.calling));
+      const timer = setTimeout(() => cups(id, true), document.hidden ? 30000 : busy ? 5000 : 15000);
+      leave = () => clearTimeout(timer);
+    }
+    const sig = JSON.stringify([list.current, (list.items || []).map((c) => [c.id, c.version]), t && t.id, t && t.version]);
+    if (quiet && cupView && cupView.id === id && (sig === cupView.sig || dlg.open)) {
+      const note = $("[data-cup-note]", main);
+      if (note && sig === cupView.sig) note.textContent = `Updated ${clock(Date.now())}`;
+      return;
+    }
+    if (quiet) settle();
+    // a 404 only means there's no cup yet (or no such one); anything else is worth showing
+    cupView = { id, list, t, sig, error: !show.ok && show.httpStatus !== 404 ? show.error : null };
+    drawCups();
+  }
+
+  function drawCups() {
+    const { id, list, t, error } = cupView;
+    const owner = ME && ME.role === "owner";
+    const past = (list.items || []).filter((c) => !(isOpen(t) && c.id === t.id));
+    const parts = [cupHead(id)];
+    if (error) parts.push(errorBox(error));
+    else if (t && (isOpen(t) || id)) parts.push(...cupBoard(t));
+    else if (id) parts.push(errorBox("There's no cup with that id."));
+    else parts.push(panel("No cup is open", [h("p", null, "Start one and sign-ups open in game straight away. Teams join as a party with /tournament join."),
+      owner ? buttons(h("button", { class: "btn btn-sm", type: "button", onclick: () => newCup(t) }, "Start a cup")) : null], { i: 0 }));
+    if (!id) parts.push(panel("Past cups", past.length ? h("div", { class: "rows" }, past.map(cupRow)) : empty("No cups yet."), { i: 5 }));
+    main.replaceChildren(...parts);
+  }
+
+  function cupRow(c) {
+    const [label, cls] = CUP_STATE[c.state] || [c.state, ""];
+    return h("div", { class: "row" },
+      h("div", { class: "row-main" },
+        h("div", { class: "row-title" }, c.name, h("span", { class: `tag ${cls}` }, label),
+          c.champion ? h("span", { class: "club", style: HEX.test(c.champion.color || "") ? `--c:${c.champion.color}` : null }, h("i"), `Won by ${c.champion.name}`) : null),
+        h("div", { class: "row-sub" }, h("span", null, `${c.teamSize}v${c.teamSize}`), h("span", null, plural(c.teamCount || 0, "team")),
+          h("span", null, fmtDay(c.finishedAt || c.startedAt || c.createdAt)))),
+      h("a", { class: "btn btn-dark btn-sm", href: `#/cups/${encodeURIComponent(c.id)}` }, "Open"));
+  }
+
+  /** The cup's panels: what it is and what can be done, its bracket, its teams, what happened. */
+  function cupBoard(t) {
+    const edit = !!(t.editable && ME && ME.role === "owner");
+    const [label, cls] = CUP_STATE[t.state] || [t.state, ""];
+    const rules = t.rules || {};
+    const can = t.can || {};
+    const teams = new Map((t.teams || []).map((x) => [x.id, x]));
+    const parts = [panel(null, [
+      h("div", { class: "panel-head" }, h("h2", { class: "cup-title" }, t.name, h("span", { class: `tag ${cls}` }, label), t.liveGames ? h("span", { class: "tag is-live" }, `${t.liveGames} live`) : null),
+        isOpen(t) ? h("small", { "data-cup-note": "" }, `Updated ${clock(Date.now())}`) : null),
+      t.champion && teams.get(t.champion) ? h("p", { class: "cup-champ" }, h("span", { class: "club", style: HEX.test(teams.get(t.champion).color || "") ? `--c:${teams.get(t.champion).color}` : null }, h("i"), `Won by ${teams.get(t.champion).name}`)) : null,
+      h("p", null, [`${t.teamSize}v${t.teamSize}`, `${t.teamCount || 0} of ${t.maxTeams} teams`, `${rules.halves || 2} halves of ${rules.halfMinutes || 5} min`, rules.extraTime ? "extra time, then penalties" : "a tie goes to penalties"].join(" · ")),
+      h("p", { class: "row-sub" }, [t.createdBy ? `Opened by ${byName(t.createdBy)}` : null, t.createdAt ? fmtWhen(t.createdAt) : null, t.finishedAt ? `ended ${fmtWhen(t.finishedAt)}` : null].filter(Boolean).join(" · ")),
+      t.state === "SIGNUP" ? h("p", { class: "row-sub" }, `Teams sign up in game: a party of exactly ${t.teamSize}, then the leader types /tournament join.`) : null,
+      edit && t.state === "SIGNUP" && !can.draw && t.why && t.why.draw ? h("p", { class: "note" }, t.why.draw) : null,
+      edit ? buttons(
+        can.draw ? h("button", { class: "btn btn-sm", type: "button", onclick: () => drawCup(t, "draw") }, "Draw the bracket") : null,
+        can.redraw ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => drawCup(t, "redraw") }, "Draw again") : null,
+        can.configure ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => configureCup(t) }, "Settings") : null,
+        can.cancel ? h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => cancelCup(t) }, "Cancel the cup") : null) : null,
+    ], { i: 0 })];
+    if ((t.rounds || []).length) parts.push(panel("Bracket", h("div", { class: "bracket" }, t.rounds.map((rd) =>
+      h("section", { class: "bround" }, h("h3", null, rd.name || `Round ${rd.round}`),
+        h("div", { class: "bround-list" }, (rd.matches || []).map((m) => matchCard(t, m, teams, edit)))))), { i: 1 }));
+    parts.push(panel(`Teams (${(t.teams || []).length})`, (t.teams || []).length ? h("div", { class: "rows" }, t.teams.map((x) => teamRow(t, x, edit)))
+      : empty(t.state === "SIGNUP" ? "Nobody's signed up yet." : "No teams."), { i: 2 }));
+    const events = (t.events || []).slice(-25).reverse();
+    if (events.length) parts.push(panel("What happened", h("div", { class: "rows" }, events.map((e) => h("div", { class: "row" },
+      h("div", { class: "row-main" },
+        h("div", { class: "row-title" }, HEX.test(e.teamColor || "") ? h("span", { class: "club", style: `--c:${e.teamColor}` }, h("i")) : null, e.text),
+        h("div", { class: "row-sub" }, h("span", null, `${fmtWhen(e.at)} (${ago(e.at)})`))), h("span")))), { i: 3 }));
+    return parts;
+  }
+
+  function matchCard(t, m, teams, edit) {
+    const side = (k) => {
+      const team = teams.get(m[k]);
+      return h("div", { class: m.winner && m.winner === m[k] ? "bside is-won" : "bside" },
+        h("i", { style: team && HEX.test(team.color || "") ? `background:${team.color}` : null }),
+        h("span", null, team ? team.name : m.bye ? "Bye" : "To be decided"),
+        h("b", null, m.score ? String(m.score[k] ?? "") : ""),
+        h("small", null, m.shootout ? `(${m.shootout[k]})` : ""));
+    };
+    const can = m.can || {};
+    const win = can.win || {};
+    const tag = m.state === "LIVE" ? h("span", { class: "tag is-live" }, "Live")
+      : m.calling ? h("span", { class: "tag is-warn" }, "Calling")
+      : m.state === "READY" ? h("span", { class: "tag is-good" }, "Ready") : null;
+    const decided = m.state !== "DONE" || !m.decidedBy || m.decidedBy === "goals" ? null
+      : m.decidedBy === "shootout" ? (m.shootout ? "Won on penalties" : "Won on a coin flip") : DECIDED[m.decidedBy] || null;
+    const acts = edit ? [
+      can.start ? h("button", { class: "btn btn-sm", type: "button", onclick: () => startMatch(t, m) }, "Start") : null,
+      win.a || win.b ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => winMatch(t, m, teams) }, m.state === "DONE" ? "Change result" : "Give the win") : null,
+      can.void ? h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => voidMatch(t, m) }, m.state === "LIVE" ? "Stop" : "Call off") : null,
+    ].filter(Boolean) : [];
+    return h("div", { class: `bmatch is-${String(m.state || "").toLowerCase()}${m.calling ? " is-calling" : ""}` },
+      h("div", { class: "bmatch-head" }, h("small", null, m.label || m.id), tag),
+      side("a"), side("b"),
+      m.calling && m.calledTo ? h("p", { class: "row-sub" }, `Called to ${m.calledTo.name}`) : m.state === "LIVE" && m.pitch ? h("p", { class: "row-sub" }, m.pitch) : null,
+      decided ? h("p", { class: "row-sub" }, decided) : null,
+      m.lastCall && m.state === "READY" && !m.calling ? h("p", { class: "note bnote" }, m.lastCall.text) : null,
+      edit && m.state === "READY" && !can.start && !m.calling && m.why && m.why.start ? h("p", { class: "row-sub" }, m.why.start) : null,
+      m.matchId ? h("a", { class: "bmatch-link", href: `https://mcsoccer.net/matches/?m=${encodeURIComponent(m.matchId)}`, target: "_blank", rel: "noopener" }, "Match report") : null,
+      acts.length ? h("div", { class: "row-actions", style: "justify-content:flex-start;margin-top:.35rem" }, acts) : null);
+  }
+
+  function teamRow(t, x, edit) {
+    const st = TEAM_STATUS[x.status];
+    const can = x.can || {};
+    return h("div", { class: "row" },
+      h("div", { class: "row-main" },
+        h("div", { class: "row-title" }, h("span", { class: "club", style: HEX.test(x.color || "") ? `--c:${x.color}` : null }, h("i"), x.name),
+          x.seed ? h("span", { class: "tag" }, `Seed ${x.seed}`) : null, st ? h("span", { class: `tag ${st[1]}` }, st[0]) : null,
+          x.currentMatch ? h("span", { class: "tag is-live" }, "Playing") : null),
+        h("div", { class: "row-sub" }, (x.members || []).map((m) => h("span", { class: m.online ? "who is-on" : "who", title: m.online ? "Online" : "Offline" }, m.name, m.leader ? " (leader)" : "")))),
+      edit ? h("div", { class: "row-actions" },
+        can.rename ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => renameTeam(t, x) }, "Rename") : null,
+        can.swap ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => swapPlayer(t, x) }, "Swap a player") : null,
+        can.remove ? h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => removeTeam(t, x) }, t.state === "SIGNUP" ? "Remove" : "Withdraw") : null) : h("span"));
+  }
+
+  /** A cup action on the cup as this page has it (its id and version). The answer is the cup as it is now. */
+  const cupAct = (t, op, body) => call("POST", `/cups/${op}`, { cup: t.id, cupName: t.name, expectVersion: t.version, ...body });
+  function cupDone(r) {
+    toast(r.message || "Done.");
+    if (!cupView) return;
+    // a cup that closed (cancelled, or the final settled) goes back to the list
+    if (!r.tournament || !isOpen(r.tournament)) return cups(cupView.id, true);
+    cupView.t = r.tournament;
+    cupView.sig = "";
+    drawCups();
+  }
+  const mustTick = (force, v) => (force && !v.force ? { ok: false, error: "Tick the box to stop the live game." } : null);
+
+  async function drawCup(t, op) {
+    const again = op === "redraw";
+    const r = await formDialog({ title: again ? "Draw the bracket again?" : "Draw the bracket?", okLabel: again ? "Draw again" : "Draw it",
+      text: again ? "A new random draw. It only works before any match is played." : "Sign-ups close and the seeds are drawn at random. Players are told in game.",
+      fields: [reasonField(again ? "Two friends drew each other" : "Everyone's in")],
+      submit: (v) => cupAct(t, op, { reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  const teamSizeOptions = (L) => range(L.teamSize.min, L.teamSize.max).map((n) => ({ value: String(n), label: `${n}v${n}` }));
+  const halvesFields = (L, rules) => ({ type: "row", fields: [
+    { name: "halves", type: "number", label: "Halves", value: String(rules.halves), min: L.halves.min, max: L.halves.max, required: true },
+    { name: "halfMinutes", type: "number", label: "Minutes a half", value: String(rules.halfMinutes), min: L.halfMinutes.min, max: L.halfMinutes.max, required: true }] });
+
+  async function configureCup(t) {
+    const L = t.limits || CUP_LIMITS;
+    const rules = t.rules || CUP_DEFAULTS;
+    const sizes = !!(t.can && t.can.teamSize);
+    const r = await formDialog({ title: `Settings for ${t.name}`,
+      text: sizes ? null : "Teams have signed up, so the team size stays as it is.",
+      fields: [
+        { type: "row", fields: [
+          sizes ? { name: "teamSize", type: "select", label: "Players a side", value: String(t.teamSize), options: teamSizeOptions(L) } : null,
+          { name: "maxTeams", type: "select", label: "Teams at most", value: String(t.maxTeams), options: L.maxTeams.filter((n) => n >= (t.minMaxTeams || 0)).map((n) => ({ value: String(n), label: String(n) })) }].filter(Boolean) },
+        halvesFields(L, rules),
+        { name: "extraTime", type: "checkbox", label: "Extra time before penalties", value: !!rules.extraTime },
+        reasonField("Shorter halves tonight"),
+      ],
+      submit: (v) => cupAct(t, "configure", { teamSize: sizes ? Number(v.teamSize) : undefined, maxTeams: Number(v.maxTeams), halves: Number(v.halves), halfMinutes: Number(v.halfMinutes), extraTime: v.extraTime, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  async function newCup(last) {
+    const D = (last && last.defaults) || CUP_DEFAULTS;
+    const L = (last && last.limits) || CUP_LIMITS;
+    const r = await formDialog({ title: "Start a cup", okLabel: "Open sign-ups",
+      text: "Sign-ups open in game straight away. Draw the bracket once the teams are in.",
+      fields: [
+        { name: "name", label: "Name", value: D.name, maxlength: L.cupName || 32, required: true },
+        { type: "row", fields: [
+          { name: "teamSize", type: "select", label: "Players a side", value: String(D.teamSize), options: teamSizeOptions(L) },
+          { name: "maxTeams", type: "select", label: "Teams at most", value: String(D.maxTeams), options: L.maxTeams.map((n) => ({ value: String(n), label: String(n) })) }] },
+        halvesFields(L, D),
+        { name: "extraTime", type: "checkbox", label: "Extra time before penalties", value: !!D.extraTime },
+        reasonField("Friday night cup"),
+      ],
+      submit: (v) => call("POST", "/cups/create", { name: v.name, teamSize: Number(v.teamSize), maxTeams: Number(v.maxTeams), halves: Number(v.halves), halfMinutes: Number(v.halfMinutes), extraTime: v.extraTime, reason: v.reason }) });
+    if (!r) return;
+    toast(r.message || "Sign-ups are open.");
+    if (location.hash === "#/cups") cups(""); else location.hash = "#/cups";
+  }
+
+  async function startMatch(t, m) {
+    const free = (t.freePitches || []).filter((p) => !p.reserved);
+    if (!free.length) return toast("No pitch is free right now.", true);
+    const fs = t.forfeitSeconds || 60;
+    const r = await formDialog({ title: `Start ${m.label || m.id}`, okLabel: "Call them",
+      text: `Everyone on both teams who's online is called to the pitch, and it kicks off ${plural(t.callSeconds || 5, "second")} later. A side with nobody there for ${fs % 60 ? plural(fs, "second") : plural(fs / 60, "minute")} loses by forfeit.`,
+      fields: [{ name: "pitch", type: "select", label: "Pitch", value: free[0].id, options: free.map((p) => ({ value: p.id, label: p.name })) }, reasonField("Semifinal time")],
+      submit: (v) => cupAct(t, "start", { match: m.id, matchName: m.label, pitch: v.pitch, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  async function winMatch(t, m, teams) {
+    const win = (m.can && m.can.win) || {};
+    const opts = ["a", "b"].filter((k) => win[k] && teams.get(m[k])).map((k) => ({ value: k, label: teams.get(m[k]).name }));
+    if (!opts.length) return;
+    const force = !!(m.needsForce && m.needsForce.win);
+    const r = await formDialog({ title: m.state === "DONE" ? `Change ${m.label}'s result` : `Give ${m.label} to a side`, okLabel: "Give the win", bad: m.state !== "READY",
+      text: m.state === "LIVE" ? "It's live: this ends it now, and the side you pick goes through." : m.state === "DONE" ? "The side you pick goes through instead." : "For a match that won't be played. The side you pick goes through.",
+      fields: [{ name: "side", type: "select", label: "Winner", value: opts[0].value, options: opts },
+        force ? { name: "force", type: "checkbox", label: "Yes, stop the live game", value: false } : null, reasonField("The other side never showed")].filter(Boolean),
+      submit: (v) => mustTick(force, v) || cupAct(t, "win", { match: m.id, matchName: m.label, side: v.side, teamName: (teams.get(m[v.side]) || {}).name, force: force || undefined, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  async function voidMatch(t, m) {
+    const live = m.state === "LIVE";
+    const force = !!(m.needsForce && m.needsForce.void);
+    const r = await formDialog({ title: live ? `Stop ${m.label}?` : `Call off ${m.label}?`, okLabel: live ? "Stop it" : "Call it off", bad: true,
+      text: live ? "The game stops and its score is lost. The match goes back to ready, to be played again." : "The countdown stops. The match stays ready to start again.",
+      fields: [force ? { name: "force", type: "checkbox", label: "Yes, stop the live game", value: false } : null, reasonField(live ? "Lag, replaying it" : "Wrong pitch")].filter(Boolean),
+      submit: (v) => mustTick(force, v) || cupAct(t, "void", { match: m.id, matchName: m.label, force: force || undefined, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  async function renameTeam(t, x) {
+    const r = await formDialog({ title: `Rename ${x.name}`, okLabel: "Rename",
+      fields: [{ name: "name", label: "Team name", value: x.name, maxlength: (t.limits && t.limits.teamName) || 16, required: true }, reasonField()],
+      submit: (v) => cupAct(t, "rename", { team: x.id, teamName: x.name, name: v.name, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  async function swapPlayer(t, x) {
+    const cands = t.swapCandidates || [];
+    if (!cands.length) return toast("Nobody's free to swap in: they must be online and on no team.", true);
+    const r = await formDialog({ title: `Swap a player on ${x.name}`, okLabel: "Swap",
+      text: "The roster changes for the rest of the cup.",
+      fields: [{ type: "row", fields: [
+        { name: "out", type: "select", label: "Out", value: (x.members[0] || {}).uuid, options: (x.members || []).map((m) => ({ value: m.uuid, label: m.name })) },
+        { name: "in", type: "select", label: "In", value: cands[0].uuid, options: cands.map((p) => ({ value: p.uuid, label: p.name })) }] }, reasonField("Left for the night")],
+      submit: (v) => cupAct(t, "swap", { team: x.id, teamName: x.name, out: v.out, in: v.in,
+        outName: ((x.members || []).find((m) => m.uuid === v.out) || {}).name, inName: (cands.find((p) => p.uuid === v.in) || {}).name, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  async function removeTeam(t, x) {
+    const signup = t.state === "SIGNUP";
+    const force = !!(x.needsForce && x.needsForce.remove);
+    const r = await formDialog({ title: signup ? `Remove ${x.name}?` : `Withdraw ${x.name}?`, okLabel: signup ? "Remove" : "Withdraw", bad: true,
+      text: signup ? "The team comes off the sign-ups." : "The team is out of the cup and forfeits its matches: its opponents go through.",
+      fields: [force ? { name: "force", type: "checkbox", label: "They're playing: stop the live game", value: false } : null, reasonField("Broke the rules")].filter(Boolean),
+      submit: (v) => mustTick(force, v) || cupAct(t, "remove", { team: x.id, teamName: x.name, force: force || undefined, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  async function cancelCup(t) {
+    const live = t.liveGames || 0;
+    const r = await formDialog({ title: `Cancel ${t.name}?`, okLabel: "Cancel the cup", bad: true,
+      text: "It ends with no winner and players are told in game. There's no undo.",
+      fields: [live ? { name: "force", type: "checkbox", label: `Stop the ${plural(live, "live game")} too`, value: false } : null, reasonField("Not enough teams")].filter(Boolean),
+      submit: (v) => mustTick(live > 0, v) || cupAct(t, "cancel", { force: live > 0 || undefined, reason: v.reason }) });
+    if (r) cupDone(r);
+  }
+
+  /* ── Ranked: the queues, found and live matches, pitches, ladders ─ */
+
+  let ladderQueue = "";
+  let rankedSig = "";
+  const PITCH_STATE = { free: ["Free", "is-good"], playing: ["Ranked match on", "is-live"], busy: ["Busy", "is-warn"], notReady: ["Not set up", "is-bad"] };
+  const mmss = (sec) => { const s = Math.max(0, Math.round(sec)); return `${Math.floor(s / 60)}:${pad(s % 60)}`; };
+  const whoList = (players) => (players || []).map((p) => h("span", { class: p.left ? "who is-left" : "who is-on", title: p.left ? "Walked out" : null }, p.name || "?"));
+
+  // quiet: a refresh (the timer or the button), drawn only when something changed
+  async function ranked(quiet) {
+    const seq = pageSeq;
+    const top = pageHead("Ranked", "Ranked", "The ranked queues as they are now: who's searching, matches found and on, every ranked pitch and the ladders.",
+      h("button", { class: "btn btn-dark", type: "button", onclick: () => ranked(true) }, "Refresh"));
+    if (!quiet) main.replaceChildren(top, h("div", { class: "loading" }, "Loading…"));
+    const r = await call("GET", "/ranked/status?limit=500");
+    if (seq !== pageSeq) return;
+    if (leave) leave();
+    const poll = setTimeout(() => ranked(true), document.hidden ? 30000 : 10000);
+    const tick = setInterval(() => {
+      for (const el of $$("[data-since]", main)) el.textContent = `${mmss((Date.now() - Number(el.dataset.since)) / 1000)} waiting`;
+      for (const el of $$("[data-ends]", main)) el.textContent = `${mmss((Number(el.dataset.ends) - Date.now()) / 1000)} left`;
+    }, 1000);
+    leave = () => { clearTimeout(poll); clearInterval(tick); };
+    if (!r.ok) return quiet && rankedSig ? undefined : main.replaceChildren(top, errorBox(r.error));
+    // the clocks tick on the page, so a clock moving on its own isn't a change
+    const sig = JSON.stringify(r, (k, v) => (k === "waitedMs" || k === "halfSecondsLeft" || k === "secondsLeft" || k === "httpStatus" ? undefined : v));
+    if (quiet && (sig === rankedSig || dlg.open)) return;
+    rankedSig = sig;
+    if (quiet) settle();
+    drawRanked(top, r);
+  }
+
+  function drawRanked(top, r) {
+    const owner = ME && ME.role === "owner";
+    const queues = r.queues || [], found = r.found || [], matches = r.matches || [], pitches = r.pitches || [], ladders = r.ladders || [];
+    const searching = queues.reduce((n, q) => n + (q.players || 0), 0);
+    const free = pitches.filter((p) => p.state === "free").length;
+    if (!ladders.some((l) => l.queue === ladderQueue)) ladderQueue = (ladders.find((l) => l.total) || ladders[0] || {}).queue || "";
+    const ladder = ladders.find((l) => l.queue === ladderQueue);
+    const cfg = r.config || {};
+    const win = cfg.window || {};
+    const sides = (teams) => ["red", "blue"].map((k) => teams && teams[k] ? h("span", null, `${teams[k].name} (${teams[k].avgElo}): `, whoList(teams[k].players)) : null);
+    main.replaceChildren(...[top,
+      r.enabled === false ? h("p", { class: "note", style: "margin:0 0 .9rem" }, "Ranked is switched off on the server: nobody can queue.") : null,
+      r.fileOk === false ? errorBox("ranked.yml couldn't be read when the server started, so ratings aren't being saved. Fix it before anyone plays ranked.") : null,
+      h("div", { class: "grid" },
+        panel("Right now", h("div", { class: "stats-2" },
+          stat(searching, searching === 1 ? "player searching" : "players searching"), stat(found.length, found.length === 1 ? "match found" : "matches found"),
+          stat(matches.length, matches.length === 1 ? "match on" : "matches on"), stat(`${free}/${pitches.length}`, "pitches free")), { i: 0 }),
+        panel("Ranked pitches", pitches.length ? h("div", { class: "rows" }, pitches.map((p) => {
+          const [label, cls] = PITCH_STATE[p.state] || [p.state, ""];
+          return h("div", { class: "row" }, h("div", { class: "row-main" },
+            h("div", { class: "row-title" }, p.name || p.id, p.queue ? h("span", { class: "tag" }, p.queue) : null, h("span", { class: `tag ${cls}` }, label)),
+            p.why || (p.problems || []).length ? h("div", { class: "row-sub" }, p.why ? h("span", null, p.why) : null, (p.problems || []).map((x) => h("span", null, x))) : null), h("span"));
+        })) : empty("No pitch has ranked switched on."), { i: 1 })),
+      queues.some((q) => (q.entries || []).length) ? panel("Searching", h("div", { class: "rows" }, queues.flatMap((q) => (q.entries || []).map((e) => h("div", { class: "row" },
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, h("span", { class: "tag" }, q.id), (e.members || []).map((m) => h("span", { class: "club" }, head(m.name, 20), m.name)), h("span", { class: "vs" }, `${e.avgElo} Elo`)),
+          h("div", { class: "row-sub" }, h("span", { "data-since": e.since || Date.now() - (e.waitedMs || 0) }, `${mmss((e.waitedMs || 0) / 1000)} waiting`),
+            h("span", null, e.rangeElo == null ? "open to anyone now" : `within ${e.rangeElo} Elo`), e.waitingForPitch ? h("span", null, "waiting for a free pitch") : null)),
+        h("span"))))), { i: 2 }) : null,
+      found.length ? panel("Matches found", h("div", { class: "rows" }, found.map((f) => {
+        const d = f.draft;
+        return h("div", { class: "row" }, h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, h("span", { class: "tag" }, f.queue), f.pitch ? f.pitch.name : "", f.drafting ? h("span", { class: "tag is-warn" }, "Captains picking") : h("span", { class: "tag is-good" }, "Starting")),
+          d ? h("div", { class: "row-sub" }, (d.sides || []).map((s) => h("span", null, `${s.name} captain: ${s.captain ? s.captain.name : "?"}`)),
+            d.turn ? h("span", null, `${nice(d.turn)} to pick`) : null, d.secondsLeft != null ? h("span", { "data-ends": Date.now() + d.secondsLeft * 1000 }, `${mmss(d.secondsLeft)} left`) : null)
+            : h("div", { class: "row-sub" }, sides(f.teams))), h("span"));
+      })), { i: 3 }) : null,
+      matches.length ? panel("Ranked matches on", h("div", { class: "rows" }, matches.map((m) => {
+        const sc = m.score || {};
+        const left = new Set(m.left || []);
+        const teams = m.teams ? Object.fromEntries(Object.entries(m.teams).map(([k, x]) => [k, { ...x, players: (x.players || []).map((p) => ({ ...p, left: p.left || left.has(p.uuid) })) }])) : null;
+        return h("div", { class: "row" }, h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, h("span", { class: "tag" }, m.queue), m.pitch ? m.pitch.name : "", h("b", { class: "score" }, `${sc.red ?? 0} – ${sc.blue ?? 0}`),
+            m.running ? h("span", { class: "tag is-live" }, "Live") : h("span", { class: "tag" }, "Starting"),
+            m.running && m.halfSecondsLeft != null ? h("span", { class: "vs", "data-ends": Date.now() + m.halfSecondsLeft * 1000 }, `${mmss(m.halfSecondsLeft)} left`) : null),
+          h("div", { class: "row-sub" }, sides(teams))), h("span"));
+      })), { i: 4 }) : null,
+      panel("Ladder", [
+        ladders.length > 1 ? h("div", { class: "panel-head" }, h("div", { class: "tabs" }, ladders.map((l) =>
+          h("button", { type: "button", "aria-pressed": String(l.queue === ladderQueue), onclick: () => { ladderQueue = l.queue; drawRanked(top, r); } }, `${l.queue} (${l.total})`)))) : null,
+        ladder && (ladder.items || []).length ? h("div", { class: "table-wrap" }, h("table", { class: "ladder" },
+          h("thead", null, h("tr", null, h("th", { class: "num" }, "#"), h("th", null, "Player"), h("th", { class: "num" }, "Elo"), h("th", { class: "num" }, "Games"), h("th", { class: "num" }, "Won"), h("th", { class: "num" }, "Lost"), owner ? h("th") : null)),
+          h("tbody", null, ladder.items.map((x) => h("tr", null,
+            h("td", { class: "num" }, String(x.rank)),
+            h("td", null, h("span", { class: "who-cell" }, x.name ? head(x.name, 22) : null,
+              x.uuid ? h("a", { href: `#/players/${encodeURIComponent(x.uuid)}` }, x.name || "Unknown") : x.name || "Unknown",
+              x.linked ? null : h("span", { class: "tag", title: "No Discord link, so the website leaves them off its ladder" }, "Not linked"))),
+            h("td", { class: "num" }, h("b", null, String(x.elo))), h("td", { class: "num" }, String(x.games)), h("td", { class: "num" }, String(x.wins)), h("td", { class: "num" }, String(x.losses)),
+            owner ? h("td", { class: "num" }, h("button", { class: "btn btn-dark btn-sm", type: "button",
+              onclick: async () => { if (await resetRating({ uuid: x.uuid, name: x.name || x.uuid }, ladder.queue)) ranked(true); } }, "Reset")) : null)))))
+          : empty("Nobody's on this ladder yet."),
+        ladder && ladder.total > (ladder.items || []).length ? h("p", { class: "row-sub" }, `Showing ${ladder.items.length} of ${ladder.total}.`) : null,
+      ], { i: 5, aside: ladder && ladder.updatedAt ? h("small", null, `Updated ${ago(ladder.updatedAt)}`) : null }),
+      panel("How the queue is set", h("div", { class: "rows" },
+        actionRow("Starting Elo", String(cfg.startElo ?? "?")),
+        actionRow("Elo moves", `Up to ${cfg.kPlacement ?? "?"} a game for the first ${plural(cfg.placementGames ?? 0, "game")}, then up to ${cfg.kSettled ?? "?"}`),
+        actionRow("Search", `Within ${win.start ?? "?"} Elo, ${win.step ?? "?"} wider every ${win.everySeconds ?? "?"} s, anyone after ${win.anyoneAfterSeconds ?? "?"} s`),
+        actionRow("Captains' draft", cfg.draft && cfg.draft.enabled ? `On, ${cfg.draft.pickSeconds} s a pick` : "Off"),
+        actionRow("Match found", `${cfg.matchFoundSeconds ?? "?"} s to get ready`),
+        actionRow("Forfeit", `After ${cfg.forfeitSeconds ?? "?"} s`),
+        actionRow("Leaver cooldowns", `${(cfg.leaverCooldownMinutes || []).join(", ")} min, forgotten after ${cfg.leaverResetHours ?? "?"} h`),
+        actionRow("On the ladder", `From ${plural(cfg.ladderMinGames ?? 1, "game")}`),
+        actionRow("Discord link", cfg.requireLink ? "Needed to queue" : "Not needed")), { i: 6 }),
+    ].filter(Boolean));
+  }
+
+  /** Reset someone's rating in a queue; true when it was done. */
+  async function resetRating(p, queue) {
+    const r = await formDialog({ title: `Reset ${p.name}'s rating?`, okLabel: "Reset", bad: true,
+      text: "Elo, games, wins and losses go back to the start. Leaves, cooldowns and match history stay.",
+      fields: [{ name: "queue", type: "select", label: "Queue", value: queue || "3v3", options: [{ value: "3v3", label: "3v3" }, { value: "4v4", label: "4v4" }, { value: "both", label: "Both" }] }, reasonField("Boosted by an alt")],
+      submit: (v) => call("POST", "/ranked/reset", { id: p.uuid, name: p.name, queue: v.queue, reason: v.reason }) });
+    if (!r) return false;
+    toast(r.message || "Reset.");
+    return true;
+  }
+
+  /* ── Maintenance (owners): fixing stats, always previewed first ── */
+
+  const PARTS = { stats: "Career stats", matches: "Match history", ranked: "Ranked", training: "Training", sapphires: "Sapphires" };
+  const CAREER = [["games", "game", "games"], ["wins", "win", "wins"], ["goals", "goal", "goals"], ["assists", "assist", "assists"], ["saves", "save", "saves"], ["mvps", "MVP", "MVPs"]];
+  const partRows = (r) => h("div", { class: "rows" }, Object.entries(r.parts || {}).map(([k, line]) => actionRow(PARTS[k] || nice(k), String(line))));
+
+  async function maint() {
+    const seq = pageSeq;
+    const top = pageHead("Maintenance", "Maintenance", "Owner tools for fixing stats. Each one shows what it's going to do before it does it.");
+    main.replaceChildren(top, h("div", { class: "loading" }, "Loading…"));
+    const r = await call("GET", "/maint/status");
+    if (seq !== pageSeq) return;
+    if (!r.ok) return main.replaceChildren(top, errorBox(r.error));
+    const hist = r.history || {}, car = r.careers || {};
+    const warn = [!hist.on ? "Match history is off, so merges can't move matches and old games can't be recounted." : !hist.ready ? "Match history is still loading. Give it a minute." : null,
+      !car.on ? "Career stats are off." : !car.loaded ? "stats.yml didn't load, so careers can't change until it's fixed." : null].filter(Boolean);
+    main.replaceChildren(top, ...[
+      panel("Status", h("div", { class: "form-row" },
+        stat(hist.ready ? Number(hist.matches || 0).toLocaleString() : "…", "matches in history"),
+        stat(hist.ready ? Number(hist.players || 0).toLocaleString() : "…", "players in history"),
+        stat(car.on && car.loaded ? "On" : "Off", "career stats")), { i: 0 }),
+      ...warn.map((w) => h("p", { class: "note" }, w)),
+      h("div", { class: "grid" },
+        toolPanel("Wipe a career", "Clears one account's career stats. Match history, ranked, training and Sapphires stay, and stats.yml is backed up first.", "Wipe a career", "btn-bad", () => statsReset(), 1),
+        toolPanel("Merge two accounts", "Moves an old account's stats, matches, ranked, training and Sapphires onto the main one. Discord links, cosmetics, ranks, clubs and titles stay put. There's no undo.", "Merge accounts", "btn-bad", () => mergeAccounts(), 2),
+        toolPanel("Recount small games", "Old games with 2 or fewer a side at kickoff come off careers, the way new ones never count.", "Check old games", "btn-dark", () => recountSmall(), 3)),
+    ]);
+  }
+
+  async function statsReset(p) {
+    let asked = null;
+    const r = await formDialog({ title: p ? `Wipe ${p.name}'s career?` : "Wipe a career", okLabel: "Show what goes",
+      text: "First a look at what would be cleared. Nothing changes yet.",
+      fields: [p ? null : { name: "who", type: "player", label: "Player", required: true }, reasonField("Stats from a hacked client")].filter(Boolean),
+      submit: async (v) => {
+        const who = p ? { uuid: p.uuid, name: p.name } : await resolvePlayer(v.who);
+        if (who.error) return { ok: false, error: who.error };
+        asked = { who, reason: v.reason };
+        return call("POST", "/maint/statsreset", { id: who.uuid, name: who.name, dry: true, reason: v.reason });
+      } });
+    if (!r || !asked) return;
+    const c = r.career || {};
+    const done = await formDialog({ title: `Wipe ${r.name || asked.who.name}'s career?`, okLabel: "Wipe it", bad: true,
+      text: h("div", { class: "form" }, h("p", null, r.message || ""), h("div", { class: "stats-2" }, CAREER.map(([k, one, many]) => stat(Number(c[k] || 0).toLocaleString(), Number(c[k]) === 1 ? one : many)))),
+      submit: () => call("POST", "/maint/statsreset", { id: r.uuid || asked.who.uuid, name: r.name || asked.who.name, reason: asked.reason }) });
+    if (done) toast(`${done.message || "Cleared."}${done.backup ? " stats.yml was backed up first." : ""}`);
+  }
+
+  async function mergeAccounts(p) {
+    let reason = "";
+    const r = await formDialog({ title: "Merge two accounts", okLabel: "Show what moves",
+      text: "Everything moves from the old account onto the main one, which keeps its name. First a look at what would move: nothing changes yet.",
+      fields: [
+        { name: "from", type: "player", label: "Old account (moves out)", value: p ? { uuid: p.uuid, name: p.name } : null, required: true },
+        { name: "into", type: "player", label: "Main account (keeps everything)", required: true },
+        reasonField("Same player, new account")],
+      submit: async (v) => {
+        const [a, b] = await Promise.all([resolvePlayer(v.from), resolvePlayer(v.into)]);
+        if (a.error || b.error) return { ok: false, error: a.error || b.error };
+        if (a.uuid === b.uuid) return { ok: false, error: "Those are the same account." };
+        reason = v.reason;
+        return call("POST", "/maint/mergeplayer", { from: a.uuid, into: b.uuid, fromName: a.name, intoName: b.name, reason: v.reason });
+      } });
+    if (!r || !r.from || !r.into) return;
+    const done = await formDialog({ title: `Merge ${r.from.name} into ${r.into.name}?`, okLabel: "Merge them", bad: true,
+      text: h("div", { class: "form" }, h("p", null, r.message || ""), partRows(r)),
+      submit: () => call("POST", "/maint/mergeplayer", { from: r.from.uuid, into: r.into.uuid, fromName: r.from.name, intoName: r.into.name, confirm: true, reason }) });
+    if (!done) return;
+    // the game's own line for each part: one can say that part didn't move
+    await formDialog({ title: "Merged", okLabel: "Done", alone: true, text: h("div", { class: "form" }, h("p", null, done.message || "Merged."), partRows(done)) });
+  }
+
+  async function recountSmall() {
+    let reason = "";
+    const r = await formDialog({ title: "Recount small games", okLabel: "Check",
+      text: "It looks through every match in history first, which can take up to a minute. Nothing changes yet.",
+      fields: [reasonField("Old 1v1s still on careers")],
+      submit: (v) => { reason = v.reason; return call("POST", "/maint/recountsmall", { reason: v.reason }); } });
+    if (!r) return;
+    const looked = `Looked through ${plural(r.scanned || 0, "match", "matches")}${r.unreadable ? `; ${r.unreadable} couldn't be read` : ""}.`;
+    if (!r.games) return void formDialog({ title: "Nothing to take off", okLabel: "Done", alone: true, text: `${r.message || "No small games are left on careers."} ${looked}` });
+    const done = await formDialog({ title: `Take ${plural(r.games, "game")} off careers?`, okLabel: "Take them off", bad: true,
+      text: h("div", { class: "form" }, h("p", null, r.message || ""), h("p", { class: "row-sub" }, looked)),
+      submit: () => call("POST", "/maint/recountsmall", { confirm: true, reason }) });
+    if (done) toast(done.message || "Done.");
+  }
+
   /* ── Activity ─────────────────────────────────────────────────── */
 
   function activityRow(a) {
@@ -1308,7 +2103,7 @@
 
   /* ── the router ───────────────────────────────────────────────── */
 
-  const ROUTES = { "": home, fixtures, matches, reports, tiers, players, wallet, bows, settings, server, activity };
+  const ROUTES = { "": home, fixtures, matches, clubs: clubAdmin, cups, ranked, reports, tiers, players, wallet, bows, settings, server, maint, activity };
 
   // A page rises in when it's opened. The first click or key inside it ends that, so
   // the redraws a button causes (a tab, a save, a move) don't replay the animation.
@@ -1327,9 +2122,10 @@
     const page = ROUTES[name] ? name : "";
     $$("[data-route]").forEach((a) => (a.dataset.route === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
     if (tierState && tierState.dirty && page !== "tiers") toast("Your tier list changes aren't saved yet: they're still there in Tier list.");
-    // #/players/<uuid or name> is a player's page
+    // #/players/<uuid or name> is a player's page; #/clubs/<id> a club's; #/cups/<id> an old cup
     if (page === "players" && arg) profile(decodeURIComponent(arg));
     else if (page === "settings") settings(arg);
+    else if (page === "clubs" || page === "cups") ROUTES[page](arg ? decodeURIComponent(arg) : "");
     else ROUTES[page]();
     main.focus({ preventScroll: true });
     window.scrollTo(0, 0);

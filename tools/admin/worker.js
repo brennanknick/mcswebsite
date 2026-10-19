@@ -2,8 +2,8 @@
    MCS admin dashboard: the Cloudflare Worker behind admin.mcsoccer.net
 
    One clean place for the MCS owners to run the server: fixtures,
-   matches, reports, the tier list, and (as the game server's admin
-   routes land) bow skins, players and Sapphires.
+   matches, reports, the tier list, players and Sapphires, bow skins,
+   settings, the server itself, clubs, cups, ranked and the stats tools.
 
    Who gets in: Discord login only, and only members of the MCS Discord
    who hold the Owner role: Brenn, cold and duck (Brenn, 2026-10-18: "the
@@ -45,11 +45,12 @@ const RECHECK_MS = 10 * 60 * 1000;      // the Discord role, looked at again eve
 const LOG_TTL = 90 * 86400;             // activity kept 90 days
 const PLUGIN_TIMEOUT_MS = 12000;
 const WIPE_TIMEOUT_MS = 25000;          // a match wipe can take the plugin ~15 s
+const RECOUNT_TIMEOUT_MS = 75000;       // the small-games recount waits up to 60 s on the server
 
 const SECURITY = {
   "Content-Security-Policy": [
     "default-src 'self'",
-    "img-src 'self' data: https://mc-heads.net https://minotar.net https://cdn.discordapp.com https://mcsoccer.net",
+    "img-src 'self' data: https://mc-heads.net https://minotar.net https://cdn.discordapp.com https://mcsoccer.net https://api.mcsoccer.net",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src https://fonts.gstatic.com",
     "script-src 'self'",
@@ -100,6 +101,10 @@ const NAME = /^[A-Za-z0-9_]{1,16}$/;
 /** A settings scope the game server knows (docs/admin-api.md, "Settings (knobs)"). */
 const SCOPE = /^(pitch:[A-Za-z0-9_-]{1,64}|server|sounds|ranks|crates|cosmetics)$/;
 const LINE = /^[A-Za-z0-9_-]{1,64}$/;
+const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
+/** The clubs' and cups' writes (docs/admin-api.md, "Clubs" and "Cups"): POST /clubs/<op>, /cups/<op>. */
+const CLUB_OPS = ["create", "rename", "color", "gradient", "short", "code", "flag", "logo", "add", "remove", "delete"];
+const CUP_OPS = ["create", "configure", "draw", "redraw", "start", "win", "void", "rename", "swap", "remove", "cancel"];
 
 /* ── sessions ──────────────────────────────────────────────────────── */
 
@@ -426,6 +431,104 @@ async function api(request, env, s, path) {
     await log(env, who, action, detail + (r.ok ? "" : ` (refused: ${r.body && r.body.error})`), r.ok);
     return json(r.ok ? { ok: true, ...(r.body || {}) } : { ok: false, error: (r.body && r.body.error) || "That didn't work." }, r.ok ? 200 : (r.status >= 400 && r.status < 500 ? 400 : 502));
   };
+  // a read, or a preview that changes nothing: passed on as it is, never in the activity log
+  const pass = (r) => (r.ok ? json({ ok: true, ...(r.body || {}) })
+    : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : r.status >= 400 && r.status < 500 ? 400 : 502));
+
+  const [, area, op, extra] = path.split("/");
+  if (method === "POST" && !extra && area === "clubs" && CLUB_OPS.includes(op)) return clubWrite(op);
+  if (method === "POST" && !extra && area === "cups" && CUP_OPS.includes(op)) return cupWrite(op);
+
+  /** A club edit (owners). The game server checks every value again and answers with the club as it is now. */
+  async function clubWrite(op) {
+    if (s.role !== "owner") return fail(403, "Only owners can change clubs.");
+    const p = { reason: clean(input.reason, 120), by: by(s) };
+    if (!p.reason) return fail(400, "Give a reason.");
+    const club = clean(input.club, 64);
+    if (club) p.club = club;
+    else if (op !== "create" && op !== "remove") return fail(400, "Which club?");
+    const need = (k, n, error) => { p[k] = clean(input[k], n); return p[k] ? null : fail(400, error); };
+    let bad = null;
+    if (op === "create" || op === "rename") {
+      bad = need("name", 32, "Give the club a name.");
+      if (op === "create" && input.flag) p.flag = clean(input.flag, 64);
+    } else if (op === "color") bad = need("color", 20, "Pick a colour.");
+    else if (op === "gradient") bad = need("gradient", 60, "Give 2 to 5 hex colours, or off.");
+    else if (op === "short") bad = need("short", 8, "Give a short name, or off.");
+    else if (op === "code") bad = need("code", 8, "Give a code, or off.");
+    else if (op === "flag") bad = need("flag", 64, "Pick a crest, or none.");
+    else if (op === "logo") {
+      // a head site's value is long base64, with no spaces in it (and no 256-character chat limit here)
+      p.logo = String(input.logo ?? "").replace(/[\s\u0000-\u001f\u007f]/g, "").slice(0, 4000);
+      if (!p.logo) bad = fail(400, "Paste the skin link, head value or hash, or none.");
+    } else if (op === "add" || op === "remove") bad = need("id", 40, "Which player?");
+    else if (op === "delete") {
+      p.confirm = clean(input.confirm, 64);
+      if (input.force === true) p.force = "true";
+    }
+    if (bad) return bad;
+    const r = await plugin(env, "POST", `/discord/admin/clubs/${op}`, p);
+    const b = r.body || {};
+    const name = (b.club && b.club.name) || (b.before && b.before.name) || clean(input.clubName, 32) || club || p.name;
+    const what = { create: "made a club", rename: "renamed a club", color: "changed a club's colour", gradient: "changed a club's gradient", short: "changed a club's short name",
+      code: "changed a club's code", flag: "changed a club's crest", logo: "changed a club's logo", add: "added a club member", remove: "took a member out of a club", delete: "deleted a club" }[op];
+    const value = { rename: p.name, color: p.color, gradient: p.gradient, short: p.short, code: p.code, flag: p.flag, add: clean(input.name, 16) || p.id, remove: clean(input.name, 16) || p.id }[op];
+    return done(r, what, `${name}${value ? ` (${value})` : ""}${p.force ? ", forced" : ""}: ${p.reason}`);
+  }
+
+  /**
+   * A cup action (owners). It names the cup and the version the page loaded: if the cup moved on
+   * since (a goal counts), the game server refuses it rather than act on a stale page.
+   */
+  async function cupWrite(op) {
+    if (s.role !== "owner") return fail(403, "Only owners can run cups.");
+    const p = { reason: clean(input.reason, 120), by: by(s) };
+    if (!p.reason) return fail(400, "Give a reason.");
+    if (op !== "create") {
+      p.cup = clean(input.cup, 64);
+      p.expectVersion = Number(input.expectVersion);
+      if (!ID.test(p.cup) || !Number.isInteger(p.expectVersion) || p.expectVersion < 0) return fail(400, "Reload the cup and try again.");
+    }
+    const num = (k, lo, hi) => {
+      if (input[k] == null || input[k] === "") return true;
+      const n = Number(input[k]);
+      if (!Number.isInteger(n) || n < lo || n > hi) return false;
+      p[k] = n;
+      return true;
+    };
+    const id = (k) => ID.test((p[k] = clean(input[k], 64)));
+    const text = (k, n) => !!(p[k] = clean(input[k], n));
+    let ok = true;
+    if (op === "create" || op === "configure") {
+      if (op === "create" && input.name) p.name = clean(input.name, 32);
+      ok = num("teamSize", 2, 5) && num("maxTeams", 4, 32) && num("halves", 1, 4) && num("halfMinutes", 1, 30);
+      if (typeof input.extraTime === "boolean") p.extraTime = String(input.extraTime);
+    } else if (op === "start") ok = id("match") && text("pitch", 64);
+    else if (op === "win") ok = id("match") && text("side", 64);
+    else if (op === "void") ok = id("match");
+    else if (op === "rename") ok = id("team") && text("name", 16);
+    else if (op === "swap") ok = id("team") && text("out", 40) && text("in", 40);
+    else if (op === "remove") ok = id("team");
+    else if (op === "cancel") p.confirm = p.cup;   // the page asked "are you sure?" already
+    if (!ok) return fail(400, "Something in that wasn't right. Reload the cup and try again.");
+    if (input.force === true && ["win", "void", "remove", "cancel"].includes(op)) p.force = "true";
+    const r = await plugin(env, "POST", `/discord/admin/cups/${op}`, p);
+    // names from the cup in the answer, for the activity log
+    const t = (r.body && r.body.tournament) || {};
+    const match = (t.rounds || []).flatMap((x) => x.matches || []).find((m) => m.id === p.match) || {};
+    const matchName = match.label || clean(input.matchName, 40) || p.match;
+    const teamName = (tid) => ((t.teams || []).find((x) => x.id === tid) || {}).name || clean(input.teamName, 16) || tid;
+    const cupName = t.name || clean(input.cupName, 32) || p.cup || p.name || "a cup";
+    const [what, detail] = {
+      create: ["opened a cup", cupName], configure: ["changed a cup's settings", cupName], draw: ["drew a cup's bracket", cupName], redraw: ["drew a cup's bracket again", cupName],
+      start: ["started a cup match", `${matchName} on ${(r.body && r.body.pitch && r.body.pitch.name) || p.pitch}`],
+      win: ["gave a cup match the win", `${matchName} to ${teamName(p.side === "a" || p.side === "b" ? match[p.side] : p.side)}`],
+      void: ["called off a cup match", matchName], rename: ["renamed a cup team", `${clean(input.teamName, 16) || p.team} to ${p.name}`],
+      swap: ["swapped a cup player", `${clean(input.outName, 16) || p.out} for ${clean(input.inName, 16) || p.in} in ${teamName(p.team)}`],
+      remove: ["took a team out of a cup", teamName(p.team)], cancel: ["cancelled a cup", cupName],
+    }[op];
+    return done(r, what, `${detail}${p.force ? ", forced" : ""}: ${p.reason}`);
+  }
 
   switch (`${method} ${path}`) {
     case "GET /me":
@@ -572,7 +675,8 @@ async function api(request, env, s, path) {
 
     /* players, Sapphires, ranks, cosmetics, bow skins: the game server's admin routes */
     case "GET /players": {
-      const r = await plugin(env, "GET", "/discord/admin/players", { q: clean(q.get("q"), 16) });
+      // a name prefix or a whole UUID (36 with its dashes)
+      const r = await plugin(env, "GET", "/discord/admin/players", { q: clean(q.get("q"), 36) });
       return r.ok ? json({ ok: true, items: (r.body && r.body.items) || [] }) : json({ ok: false, error: r.body.error, status: r.status }, r.status === 404 ? 404 : 502);
     }
     case "GET /player": {
@@ -688,6 +792,71 @@ async function api(request, env, s, path) {
       if (!/^[A-Za-z0-9_-]{8,59}$/.test(p.key)) return fail(400, "Reload the page and try again.");
       const r = await plugin(env, "POST", "/discord/admin" + path, p);
       return done(r, path === "/wallet/reset" ? "reset a wallet to zero" : "cleared a wallet's debt", `${input.name ? clean(input.name, 36) : p.id}: ${p.reason}`);
+    }
+
+    /* clubs, cups, ranked, maintenance (stage 3): the reads here, the clubs' and cups' writes above */
+    case "GET /clubs/list":
+      return pass(await plugin(env, "GET", "/discord/admin/clubs/list", { q: clean(q.get("q"), 40) }));
+    case "GET /clubs/show": {
+      const club = clean(q.get("club"), 64);
+      if (!club) return fail(400, "Which club?");
+      return pass(await plugin(env, "GET", "/discord/admin/clubs/show", { club }));
+    }
+    case "GET /clubs/crests": {
+      const kind = ["club", "nation", "symbol"].includes(q.get("kind")) ? q.get("kind") : undefined;
+      return pass(await plugin(env, "GET", "/discord/admin/clubs/crests", { q: clean(q.get("q"), 40), kind }));
+    }
+    case "GET /cups/list":
+      return pass(await plugin(env, "GET", "/discord/admin/cups/list"));
+    case "GET /cups/show": {
+      const id = clean(q.get("id"), 64) || "current";
+      if (!ID.test(id)) return fail(400, "Which cup?");
+      return pass(await plugin(env, "GET", "/discord/admin/cups/show", { id }));
+    }
+    case "GET /ranked/status": {
+      const limit = Math.max(1, Math.min(1000, parseInt(q.get("limit") || "100", 10) || 100));
+      return pass(await plugin(env, "GET", "/discord/admin/ranked/status", { limit }));
+    }
+    case "POST /ranked/reset": {
+      if (s.role !== "owner") return fail(403, "Only owners can reset ratings.");
+      const p = { id: clean(input.id, 40), queue: ["3v3", "4v4", "both"].includes(input.queue) ? input.queue : "", reason: clean(input.reason, 120), by: by(s) };
+      if (!p.id || !p.queue || !p.reason) return fail(400, "Give a player, a queue and a reason.");
+      const r = await plugin(env, "POST", "/discord/admin/ranked/reset", p);
+      return done(r, "reset a ranked rating", `${(r.body && r.body.name) || clean(input.name, 16) || p.id}, ${p.queue}: ${p.reason}`);
+    }
+    case "GET /maint/status":
+      return pass(await plugin(env, "GET", "/discord/admin/maint/status"));
+    case "POST /maint/statsreset": {
+      if (s.role !== "owner") return fail(403, "Only owners can do that.");
+      const p = { id: clean(input.id, 40), reason: clean(input.reason, 120), by: by(s) };
+      if (!p.id || !p.reason) return fail(400, "Give a player and a reason.");
+      if (input.dry === true) p.dry = 1;
+      const r = await plugin(env, "POST", "/discord/admin/maint/statsreset", p);
+      if (p.dry) return pass(r);
+      return done(r, "wiped a player's career stats", `${(r.body && r.body.name) || clean(input.name, 16) || p.id}: ${p.reason}`);
+    }
+    case "POST /maint/mergeplayer": {
+      if (s.role !== "owner") return fail(403, "Only owners can do that.");
+      // UUIDs only: a name two accounts have held could pick the wrong one, and a merge can't be undone
+      const p = { from: clean(input.from, 40), into: clean(input.into, 40), reason: clean(input.reason, 120), by: by(s) };
+      if (!UUID.test(p.from) || !UUID.test(p.into)) return fail(400, "Pick both accounts from the search.");
+      if (!p.reason) return fail(400, "Give a reason.");
+      // a preview unless this is the go-ahead; dry=1 wins over confirm, so a preview can never merge
+      if (input.confirm === true) p.confirm = "true"; else p.dry = 1;
+      const r = await plugin(env, "POST", "/discord/admin/maint/mergeplayer", p);
+      if (p.dry) return pass(r);
+      const b = r.body || {};
+      return done(r, "merged two accounts", `${(b.from && b.from.name) || clean(input.fromName, 16) || p.from} into ${(b.into && b.into.name) || clean(input.intoName, 16) || p.into}: ${p.reason}`);
+    }
+    case "POST /maint/recountsmall": {
+      if (s.role !== "owner") return fail(403, "Only owners can do that.");
+      const p = { reason: clean(input.reason, 120), by: by(s) };
+      if (!p.reason) return fail(400, "Give a reason.");
+      if (input.confirm === true) p.confirm = "true"; else p.dry = 1;
+      const r = await plugin(env, "POST", "/discord/admin/maint/recountsmall", p, RECOUNT_TIMEOUT_MS);
+      if (p.dry) return pass(r);
+      const b = r.body || {};
+      return done(r, "took small games off careers", `${b.games ?? "?"} games, ${b.careers ?? "?"} players: ${p.reason}`);
     }
 
     /* bow skins: the game server's bow panel, through its admin routes */
