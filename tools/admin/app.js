@@ -435,7 +435,7 @@
   /* ── Reports ──────────────────────────────────────────────────── */
 
   let reportTab = "open";
-  const REASONS = { CHEATING: "Cheating", CHAT: "Chat", TROLLING: "Trolling", OTHER: "Other" };
+  const REASONS = { CHEATING: "Cheating", CHAT: "Chat", VOICE: "Voice chat", TROLLING: "Trolling", OTHER: "Other" };
 
   async function reports() {
     main.replaceChildren(pageHead("Reports", "Reports", "What players reported in game. Closing one here closes it in game and in the Discord too."), h("div", { class: "loading" }, "Loading reports…"));
