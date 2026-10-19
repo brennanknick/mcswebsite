@@ -84,7 +84,7 @@
   // leaderboards: [api key, label, kind, what it means]
   const STATS = [
     ["goals", "Goals", "count", "Goals scored. Own goals don't count."],
-    ["assists", "Assists", "count", "Passes caught in the air that went straight into a goal."],
+    ["assists", "Assists", "count", "Passes that went straight into a goal, caught or picked up off the ground. Older matches only counted passes caught in the air."],
     ["ga", "Goals + assists", "count", "Goals and assists together."],
     ["wins", "Wins", "count", "Matches won."],
     ["winrate", "Win rate", "rate", "Share of matches won. A draw counts as not won."],
