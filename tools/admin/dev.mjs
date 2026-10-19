@@ -23,6 +23,7 @@ const TOKEN = (() => {
 const flag = (k, d) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || `--${k}=${d}`).split("=")[1];
 const CUP_MODE = flag("cup", "running");
 const RANKED_MODE = flag("ranked", "live");
+const PACK_MODE = flag("pack", "live");   // stale: the real answers, dressed as a pack nobody published
 
 // The admin secret signs the bench's reads of /discord/admin/* (docs/admin-api.md, "Signed
 // requests"), so pages show real data. It's read here and never printed or sent anywhere else.
@@ -371,6 +372,13 @@ async function pluginBench(req, url) {
       if (p === "/discord/admin/server") return { status: 200, body: JSON.stringify(serverSample()) };
       if (p === "/discord/admin/wallet/audit") return url.searchParams.get("q") === "none" ? { status: 200, body: JSON.stringify({ lines: [] }) } : { status: 200, body: JSON.stringify(AUDIT) };
       if (SAMPLE[p]) return { status: 200, body: JSON.stringify(SAMPLE[p]) };
+    }
+    // --pack=stale: the plugin's pack.built / pack.sent / pack.stale, as after a bow edit nobody published
+    if (PACK_MODE === "stale" && r.ok && (p === "/discord/admin/server" || p === "/discord/admin/bows")) {
+      const body = await r.json();
+      if (body.pack && typeof body.pack === "object") Object.assign(body.pack, { built: "c56bc24fb33db696bcfd342a1d0fdbfa1d282f6b", sent: "4dc054cf9b513b514f1c39d7f84bddd3cf06a9b5", stale: true });
+      else Object.assign(body, { pack: "c56bc24f", stale: true });
+      return { status: 200, body: JSON.stringify(body) };
     }
     return { status: r.status, body: Buffer.from(await r.arrayBuffer()), type: r.headers.get("content-type") || "application/json" };
   }

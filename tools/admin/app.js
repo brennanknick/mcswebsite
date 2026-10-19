@@ -258,11 +258,12 @@
     out.push(grid);
     main.replaceChildren(...out);
 
-    const [status, fx, reports, act] = await Promise.all([call("GET", "/status"), call("GET", "/fixtures"), call("GET", "/reports?status=open"), call("GET", "/activity")]);
+    const [status, fx, reports, act, srv] = await Promise.all([call("GET", "/status"), call("GET", "/fixtures"), call("GET", "/reports?status=open"), call("GET", "/activity"), call("GET", "/server")]);
 
     const server = status.ok && status.server;
     grid.append(panel("Game server", [
       h("p", null, h("span", { class: server ? "dot" : "dot is-down" }), server ? "Online and answering" : "Not answering right now"),
+      srv.ok && srv.pack && srv.pack.stale === true ? staleNote() : null,
       status.ok && status.meta ? h("div", { class: "form-row", style: "margin-top:.8rem" },
         h("div", { class: "stat" }, h("b", null, Number(status.meta.matches || 0).toLocaleString()), h("span", null, "matches played")),
         h("div", { class: "stat" }, h("b", null, Number(status.meta.players || 0).toLocaleString()), h("span", null, "players"))) : null,
@@ -861,6 +862,7 @@
     const items = r.bows || [];
     const warnings = (r.warnings || []).filter(Boolean);
     main.replaceChildren(...[main.firstChild,
+      r.stale === true ? panel(null, staleNote()) : null,
       warnings.length ? panel(null, warnings.map((w) => h("p", { class: "note", style: "margin:.2rem 0" }, String(w)))) : null,
       panel(null, items.length ? h("div", { class: "rows" }, items.map((b) => h("div", { class: "row" },
         h("div", { class: "row-main" },
@@ -956,6 +958,10 @@
     h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:.9rem" }, h("button", { class: `btn btn-sm ${cls}`, type: "button", onclick: () => fn() }, label))], { i });
   const buttons = (...kids) => h("div", { class: "dlg-foot", style: "justify-content:flex-start;margin-top:.9rem" }, kids);
   const HEX = /^#[0-9a-f]{6}$/i;
+  // The server built a pack that players don't get yet: a bow change nobody published. Until it
+  // is, new bows don't show and the painted menus fall back to plain (the plugin's pack.stale).
+  const staleNote = () => h("p", { class: "err" }, h("b", null, "Players have an old pack. "),
+    "A bow change built a new one that hasn't been published, so new bows don't show and menus are plain until it is. To publish: scripts/push-pack.sh on Brenn's PC.");
 
   /* ── Settings: the staff menus' knobs ─────────────────────────── */
 
@@ -1195,6 +1201,7 @@
     const TYPE = { quick: "Quick", scrim: "Scrim", match: "Match", knockout: "Knockout", ranked: "Ranked" };
     const heard = clock(Date.now());
     main.replaceChildren(...[top,
+      pk && pk.stale === true ? panel(null, staleNote()) : null,
       rs ? panel(null, h("div", { class: "row" },
         h("div", { class: "row-main" },
           h("div", { class: "row-title" }, h("span", { class: "dot is-live" }), h("span", null, "Restarting in ", h("b", { "data-left": rs.at }, leftText(rs.at)))),
@@ -1227,6 +1234,7 @@
           h("a", { class: "btn btn-dark btn-sm", href: `#/players/${encodeURIComponent(p.uuid)}` }, "Open")))) : empty("Nobody's on right now."), { i: 3 })),
       pk ? panel("Resource pack", [
         h("p", null, `${pk.loaded} of ${pk.online} online have it loaded. ${pk.required ? "Players must accept it." : "Players may turn it down."}`),
+        pk.built ? h("p", { class: "row-sub" }, `Built here ${String(pk.built).slice(0, 8)} · players get ${pk.sent ? String(pk.sent).slice(0, 8) : "none set"}${pk.stale === false ? ", the same" : ""}`) : null,
         h("p", { class: "row-sub", style: "overflow-wrap:anywhere" }, `From ${pk.source}${pk.url ? `: ${pk.url}` : ""}`),
       ], { i: 4 }) : null].filter(Boolean));
   }
