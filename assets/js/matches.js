@@ -434,6 +434,16 @@
     helper: ["Helper", "#66d36e"], media: ["Media", "#d16bff"], affiliate: ["Affiliate", "#ffb300"],
     // the ranks you buy: the API's own names and colours win (meta.ranks); MVP's id is "vipplus"
     vipplus: ["MVP", "#ff7811"], vip: ["VIP", "#ffc107"], donator: ["Donator", "#66d36e"] };
+  // VIP and MVP frame their page (the store's "frame on your stats card"; the bot's /stats card
+  // wears the same). `rank` is the one that shows, and a staff rank beats a bought one there, so
+  // `ranks`, everything they hold, decides. MVPs hold vip too.
+  const FRAMES = { vipplus: { cls: "is-mvp", art: "rank-mvp.png", name: "MVP" }, vip: { cls: "is-vip", art: "rank-vip.png", name: "VIP" } };
+  function frameOf(d) {
+    const held = [d.rank].concat(arr(d.ranks)).map((x) => str(x).toLowerCase());
+    if (held.includes("vipplus") || held.includes("mvp")) return "vipplus";
+    return held.includes("vip") ? "vip" : null;
+  }
+
   function rankChip(rank) {
     const id = str(rank).toLowerCase();
     const known = RANKS.get(id) || {};
@@ -2130,16 +2140,20 @@
     });
     body.addEventListener("error", () => body.replaceWith(avatar(r.uuid, name, 120, "mh-pl-ava")), { once: true });
 
-    const hero = h("section", { class: "mh-pl-hero", "aria-labelledby": "mh-pl-name" },
+    const frame = frameOf(d);
+    const fr = frame && FRAMES[frame];
+    const hero = h("section", { class: "mh-pl-hero" + (fr ? " is-framed " + fr.cls : ""), "aria-labelledby": "mh-pl-name" },
       h("div", { class: "mh-hero-top" },
-        h("a", { class: "mh-back", href: S.lastList, "data-go": true }, icon("tri"), "Match history")),
+        h("a", { class: "mh-back", href: S.lastList, "data-go": true }, icon("tri"), "Match history"),
+        fr ? h("img", { class: "mh-pl-ranktag", src: `${IMG}store/${fr.art}`, width: 111, height: 33, alt: fr.name }) : null),
       h("div", { class: "mh-pl-grid" },
         h("div", { class: "mh-pl-render" }, body),
         h("div", { class: "mh-pl-text" },
           h("p", { class: "mh-eyebrow" }, "Player"),
           h("h1", { class: "mh-pl-name", id: "mh-pl-name" }, name),
           h("div", { class: "mh-pl-tags" },
-            rankChip(d.rank),
+            // the frame's tag already says VIP or MVP; a staff rank still gets its chip
+            frame && str(d.rank).toLowerCase() === frame ? null : rankChip(d.rank),
             tierChip(tier),
             arr(d.badges).includes("champions_league") || isCL(r.uuid) ? clChip() : null,
             clubChip(club),

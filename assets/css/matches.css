@@ -1272,6 +1272,62 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-pl-head li { justify-content: space-between; }
 .mh-pl-head .is-rating { align-items: flex-start; gap: .3rem; }
 
+/* VIP and MVP: their page wears the rank's frame, like their /stats card in Discord. A band in
+   the rank's colours, a glow in from the edges, the rank's sparkle on each corner, its tag top
+   right and their name colour in game. One sheen runs along the band on arrival. */
+.mh-pl-hero.is-vip { --rk1: #ffeb3b; --rk2: #ffc107; --rk3: #ffb300; --rkc: #ffc107; --rk-spark: url("../img/ranks/vip.png"); }
+.mh-pl-hero.is-mvp { --rk1: #ff5722; --rk2: #ff7811; --rk3: #ff9800; --rkc: #ff7811; --rk-spark: url("../img/ranks/vipplus.png"); }
+.mh-pl-hero.is-framed {
+  box-shadow:
+    inset 0 0 56px color-mix(in srgb, var(--rkc) 15%, transparent),
+    0 0 36px color-mix(in srgb, var(--rkc) 13%, transparent);
+}
+.mh-pl-hero.is-framed::before,
+.mh-pl-hero.is-framed::after { content: ""; position: absolute; pointer-events: none; }
+.mh-pl-hero.is-framed::before {
+  --s: 22px;
+  inset: 7px;
+  background:
+    var(--rk-spark) left top / var(--s) no-repeat,
+    var(--rk-spark) right top / var(--s) no-repeat,
+    var(--rk-spark) left bottom / var(--s) no-repeat,
+    var(--rk-spark) right bottom / var(--s) no-repeat;
+  image-rendering: pixelated;
+}
+.mh-pl-hero.is-framed::after {
+  inset: 0;
+  padding: 3px;
+  border-radius: inherit;
+  background:
+    linear-gradient(110deg, transparent 42%, rgba(255, 255, 255, .9) 50%, transparent 58%) 0 0 / 300% 100% no-repeat,
+    linear-gradient(135deg, var(--rk1), var(--rk2) 55%, var(--rk3));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: mh-rk-sheen 1.5s .4s ease-out both;
+}
+@keyframes mh-rk-sheen { from { background-position: 100% 0, 0 0; } to { background-position: 0 0, 0 0; } }
+.mh-pl-ranktag { flex: 0 0 auto; width: 111px; height: 33px; image-rendering: pixelated; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--rkc) 55%, transparent)); }
+.mh-pl-hero.is-vip .mh-pl-name { color: var(--rk2); }
+.mh-pl-hero.is-mvp .mh-pl-name {
+  display: inline-block;
+  max-width: 100%;
+  color: transparent;
+  background: linear-gradient(90deg, #ff5722, #ff9800);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+@media (max-width: 800px) {
+  .mh-pl-hero.is-framed::before { --s: 11px; inset: 5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mh-pl-hero.is-framed::after { animation: none; }
+}
+@media (forced-colors: active) {
+  .mh-pl-hero.is-mvp .mh-pl-name { color: CanvasText; background: none; }
+}
+
 .mh-pl-hero + .mh-seg { margin-bottom: 1.25rem; }
 .mh-view > .mh-callout { margin: 0 0 1.25rem; }
 
