@@ -15,11 +15,17 @@ window.MCS = {
 
   // Your Discord invite, e.g. "https://discord.gg/abc123". While this is
   // empty, Discord buttons say "Invite coming soon" and don't link anywhere.
-  discordInvite: "https://discord.gg/RuAYjQfb7g",
+  discordInvite: "https://discord.gg/mcsoccer",
 
   // The tier list site. The "Top of the tier list" section reads its
   // player data live, so it is always current.
-  tierListUrl: "https://tiers.mcsoccer.net/",
+  tierListUrl: "/tiers/",
+
+  // Where the tier list's players come from: a data.js that declares
+  // TIER_DATA. The /tiers/ page and the home page's "Top of the tier
+  // list" both read it. Owners and admins edit it in the admin dashboard
+  // (admin.mcsoccer.net, Tier list), which serves it here.
+  tierData: "https://admin.mcsoccer.net/tiers.js",
 
   // Hero background video. Record 20-40s of a match, run
   // tools/make-hero.sh on it, and set these two. Until then the hero

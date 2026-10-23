@@ -29,6 +29,13 @@
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Things rise in when the page first loads, and only then: after the visitor's first click
+  // or key, every redraw (a tab, a match, a page) stays still. Brenn: animations replaying on
+  // each click felt like the page resetting.
+  let settled = reduceMotion;
+  const settle = () => { settled = true; document.documentElement.classList.add("mh-settled"); };
+  document.addEventListener("pointerdown", settle, { capture: true, once: true });
+  document.addEventListener("keydown", settle, { capture: true, once: true });
 
   const view = $("[data-mh-view]");
   const head = $("[data-mh-head]");
@@ -77,7 +84,7 @@
   // leaderboards: [api key, label, kind, what it means]
   const STATS = [
     ["goals", "Goals", "count", "Goals scored. Own goals don't count."],
-    ["assists", "Assists", "count", "Passes caught in the air that went straight into a goal."],
+    ["assists", "Assists", "count", "Passes that went straight into a goal, caught or picked up off the ground. Older matches only counted passes caught in the air."],
     ["ga", "Goals + assists", "count", "Goals and assists together."],
     ["wins", "Wins", "count", "Matches won."],
     ["winrate", "Win rate", "rate", "Share of matches won. A draw counts as not won."],
@@ -87,7 +94,7 @@
     ["steals", "Steals", "count", "Tackles that won the ball."],
     ["tackles", "Tackles", "count", "Hits on the player with the ball."],
     ["interceptions", "Interceptions", "count", "The other side's balls caught in the air, and their shots blocked."],
-    ["rating", "Rating", "rate", "Average match rating, from 3.0 to 10.0."],
+    ["rating", "Rating", "rate", "Average match rating, from 3.0 to 10.0. About 7 is a normal game and 8 or more a great one. Ratings got harsher on Oct 18, so averages with older matches run high."],
     ["games", "Matches", "count", "Matches played to a result."],
     ["possession", "On the ball", "time", "Total time holding the ball."],
   ];
@@ -153,6 +160,7 @@
     dot: ["0 0 6 6", "M1 0h4v1h1v4H5v1H1V5H0V1h1z"],
     pencil: ["0 0 8 8", "M6 0h1v1h1v1H7v1H6v1H5v1H4v1H3v1H2v1H0V6h1V5h1V4h1V3h1V2h1V1h1z"],
     pause: ["0 0 6 7", "M0 0h2v7H0zM4 0h2v7H4z"],
+    swap: ["0 0 9 9", "M5 0h1v1H5zM5 1h2v1H5zM0 2h8v1H0zM5 3h2v1H5zM5 4h1v1H5zM3 4h1v1H3zM2 5h2v1H2zM1 6h8v1H1zM2 7h2v1H2zM3 8h1v1H3z"],
   };
   function icon(name, cls) {
     const d = ICONS[name];
@@ -383,7 +391,7 @@
   let metaPromise = null;
   function getMeta(fresh) {
     if (fresh || !metaPromise) {
-      metaPromise = get("/meta", null, 30000).then((m) => { learnBadges(m); return m; }).catch((e) => { metaPromise = null; throw e; });
+      metaPromise = get("/meta", null, 30000).then((m) => { learnBadges(m); learnRanks(m); return m; }).catch((e) => { metaPromise = null; throw e; });
     }
     return metaPromise;
   }
@@ -403,6 +411,63 @@
   // the small gold star next to a name, and the chip on a player page
   const clMark = (uuid) => (isCL(uuid) ? h("span", { class: "mh-cl-mark", title: badgeName }, icon("star"), vh(", " + badgeName)) : null);
   const clChip = () => h("span", { class: "mh-tag mh-cl" }, icon("star"), badgeName);
+
+  // Ranks, also published on meta: each rank's name and colour (staff and Player for now; VIP
+  // and MVP once they're out). A staff rank shows the game's own 11 px icon, the same art as
+  // the prefix in game and the Discord role. This file's own URL finds the pictures.
+  const IMG = (() => {
+    const me = document.currentScript && document.currentScript.src;
+    try { return new URL("../img/", me || location.href).href; } catch { return "/assets/img/"; }
+  })();
+  const RANK_ICONS = new Set(["owner", "admin", "developer", "mod", "helper", "media", "affiliate"]);
+  const RANKS = new Map();   // id -> {name, color}
+  function learnRanks(meta) {
+    const r = obj(obj(meta).ranks);
+    if (!Object.keys(r).length) return;
+    RANKS.clear();
+    for (const [id, v] of Object.entries(r)) {
+      const c = str(obj(v).color);
+      RANKS.set(id.toLowerCase(), { name: str(obj(v).name), color: /^#[0-9a-f]{6}$/i.test(c) ? c : "" });
+    }
+  }
+  const RANK_LOOK = { owner: ["Owner", "#ff3b3b"], admin: ["Admin", "#ff5555"], developer: ["Developer", "#b388ff"], mod: ["Mod", "#4fc3f7"],
+    helper: ["Helper", "#66d36e"], media: ["Media", "#d16bff"], affiliate: ["Affiliate", "#ffb300"] };
+  function rankChip(rank) {
+    const id = str(rank).toLowerCase();
+    const known = RANKS.get(id) || {};
+    const look = RANK_LOOK[id];
+    if (!id || id === "player" || (!look && !known.name)) return null;
+    return h("span", { class: "mh-tag mh-rank", style: { "--rc": known.color || (look && look[1]) || "#c8c8c8" } },
+      RANK_ICONS.has(id) ? h("img", { src: `${IMG}ranks/${id}.png`, width: 11, height: 11, alt: "" }) : null,
+      known.name || look[0]);
+  }
+
+  // The tier list, from the dashboard's public feed (tierData's JSON twin): a player's badge on
+  // their page, linking to their card. Fetched once, and a failure just leaves the badge off.
+  const TIERS_JSON = (() => {
+    const t = str(CFG.tierData) || "https://admin.mcsoccer.net/tiers.js";
+    return /\.js(\?|$)/.test(t) ? t.replace(/\.js(\?|$)/, ".json$1") : "https://admin.mcsoccer.net/tiers.json";
+  })();
+  let tiersPromise = null;
+  const loadTiers = () => (tiersPromise = tiersPromise || fetch(TIERS_JSON).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+  function tierOf(data, names) {
+    const want = new Set(names.filter(Boolean).map((n) => str(n).toLowerCase()));
+    for (const t of arr(obj(data).tiers)) {
+      for (const band of ["high", "low"]) {
+        const hit = arr(t[band]).find((n) => want.has(str(n).toLowerCase()));
+        if (hit) return { tier: num(t.tier), band, color: str(t.color), name: str(hit) };
+      }
+    }
+    return null;
+  }
+  function tierChip(t) {
+    if (!t || !(t.tier >= 1 && t.tier <= 7)) return null;
+    const low = t.band === "low";
+    const page = str(CFG.tierListUrl) || "/tiers/";
+    return h("a", { class: "mh-tag mh-tier", href: `${page}?p=${encodeURIComponent(t.name)}`, style: /^#[0-9a-f]{6}$/i.test(t.color) ? { "--tc": t.color } : null,
+      title: `${low ? "Low" : "High"} Tier ${t.tier} on the tier list` },
+      h("img", { src: `${IMG}tiers/${low ? "lt" : "ht"}${t.tier}.png`, width: 11, height: 11, alt: "" }), `${low ? "LT" : "HT"}${t.tier}`);
+  }
 
   /* ── pictures of people and clubs ──────────────────────────────── */
 
@@ -459,10 +524,13 @@
     return h("span", { class: "mh-club", style: sideVars(side) }, shield(side, "xs"), h("span", null, club.name));
   }
 
-  function ratingBadge(r, big, labelled) {
+  // the bands match the server's scale (doc 4.9, harsher since 2026-10-18): under 6 poor,
+  // 6 to 6.9 average, 7 to 7.9 good, 8 and up excellent
+  const RATING_TIP = "Match rating, 3.0 to 10.0. About 7 is a normal game, 8 or more a great one.";
+  function ratingBadge(r, big, labelled, tip) {
     r = num(r);
     const tier = r >= 8 ? "top" : r >= 7 ? "good" : r >= 6 ? "ok" : "low";
-    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: "Match rating" }, labelled ? null : vh("Rating "), r.toFixed(1));
+    return h("span", { class: "mh-rating is-" + tier + (big ? " is-big" : ""), title: tip || RATING_TIP }, labelled ? null : vh("Rating "), r.toFixed(1));
   }
 
   // goals, assists: an icon, the count when it's more than one, and words
@@ -684,9 +752,9 @@
     view.replaceChildren(...nodes.filter(Boolean));
     view.removeAttribute("aria-busy");
     view.classList.remove("is-loading");
-    // stagger the top-level blocks in, but only on a real change of view:
-    // a new filter or page shouldn't make everything bounce again
-    if (!quiet) {
+    // stagger the top-level blocks in, but only on the first view: a click
+    // (a new tab, match, filter or page) shouldn't make everything bounce again
+    if (!quiet && !settled) {
       [...view.children].forEach((el, i) => {
         el.classList.add("mh-in");
         el.style.setProperty("--i", Math.min(i, 8));
@@ -1480,9 +1548,26 @@
     return ordinal(num(e.half)) + " half";
   }
 
-  const LEAVE = { quit: "disconnected", left: "left the match", spectate: "went to spectate", removed: "was taken off by the referee" };
+  const LEAVE = { quit: "disconnected", left: "left the match", spectate: "went to spectate", removed: "was taken off by the referee", sub: "was subbed off" };
   const KICK = { SCORED: "scored", SAVED: "saved", MISSED: "missed", SKIPPED: "skipped" };
-  const KEY_TYPES = new Set(["GOAL", "AWARDED_GOAL", "DISALLOWED", "NO_GOAL", "SET_PIECE", "HALF_END", "EXTRA_TIME", "SHOOTOUT", "PENALTY", "FULL_TIME", "SCORE_EDIT", "KICKOFF"]);
+  const KEY_TYPES = new Set(["GOAL", "AWARDED_GOAL", "DISALLOWED", "NO_GOAL", "SET_PIECE", "HALF_END", "EXTRA_TIME", "SHOOTOUT", "PENALTY", "FULL_TIME", "SCORE_EDIT", "KICKOFF", "SUB"]);
+
+  // A staff sub (doc 4.21) is written as the moves themselves, the going-off LEAVE (reason
+  // "sub") and the coming-on JOIN, plus a SUB in the same second. The SUB tells it in one
+  // line, so those two moves are left out: the indexes of the events a SUB stands for.
+  function subMoves(events) {
+    const paired = new Set();
+    events.forEach((e, i) => {
+      if (e.type !== "SUB") return;
+      const near = (x) => Math.abs(num(x.t) - num(e.t)) <= 1;
+      for (let j = Math.max(0, i - 6); j <= Math.min(events.length - 1, i + 6); j++) {
+        const x = events[j];
+        if (paired.has(j) || !near(x)) continue;
+        if ((x.type === "LEAVE" && x.reason === "sub" && e.off && x.player === e.off) || (x.type === "JOIN" && e.player && x.player === e.player)) paired.add(j);
+      }
+    });
+    return paired;
+  }
 
   function timelineCard(rec, events, sides, who) {
     const rows = [];
@@ -1490,8 +1575,10 @@
     const tname = (k) => (sides[k] ? sides[k].name : "");
     let pens = { RED: 0, BLUE: 0 };
     let kickoffs = 0, kickNo = 0;
+    const paired = subMoves(events);
 
     events.forEach((e, i) => {
+      if (paired.has(i)) return;
       const next = events[i + 1];
       const k = e.team;
       let side = sides[k] ? k : "";
@@ -1579,6 +1666,15 @@
           kind = "move"; ic = "arrow";
           text = [pLink(e.player, who), " switched to " + tname(k)];
           break;
+        case "SUB": {
+          // swap: one on in another's place; bringon: on into an empty place; takeoff: off only
+          kind = "sub"; ic = "swap";
+          const on = e.player ? [pLink(e.player, who), " on"] : null;
+          const off = e.off ? [pLink(e.off, who), " off"] : null;
+          text = [h("b", null, "Sub: "), on, on && off ? ", " : null, off,
+            ["swap", "bringon", "takeoff"].includes(e.reason) || !str(e.reason) ? null : h("span", { class: "mh-ev-sub" }, str(e.reason))];
+          break;
+        }
         case "SCORE_EDIT": {
           kind = "set"; ic = "pencil";
           const d = num(e.delta);
@@ -1666,6 +1762,8 @@
       ["Shots on target", "shotsOnTarget", rec.schema >= 2 ? "Goals and saved shots" : null],
       ["Attempts", "shots", rec.schema >= 2 ? "Real shots at goal: goals, and shots that were saved, blocked, hit the post or missed" : "Every time a player released the ball, apart from completed passes"],
       ["Passes", "passes"], ["Tackles", "tackles"], ["Steals", "steals"], ["Interceptions", "interceptions"],
+      // schema 3 counts turnovers; below it, none were counted (a rewritten record says 0)
+      ...(rec.schema >= 3 ? [["Turnovers", "turnovers", "Times the side gave the ball away in open play: tackled off them, or a pass the other side caught or picked up"]] : []),
       ["Saves", "saves"], ["Corners", "corners"], ["Free kicks", "freeKicks"], ["Penalties", "penalties", "Penalties awarded during play"],
       ["Pass-ins", "passIns"], ["Goal kicks", "goalKicks"], ["Own goals", "ownGoals"],
     ].filter(([, k], i) => i < 4 || num(a[k]) || num(b[k]));
@@ -1778,7 +1876,7 @@
       h("div", { class: "mh-lu-cols" }, col(red), col(blue)));
   }
 
-  const LEFT = { quit: "Disconnected", left: "Left", spectate: "Went to spectate", removed: "Taken off by the referee" };
+  const LEFT = { quit: "Disconnected", left: "Left", spectate: "Went to spectate", removed: "Taken off by the referee", sub: "Subbed off" };
 
   function lineupRow(rec, p, side, moves, parties) {
     const s = obj(p.stats);
@@ -1790,13 +1888,16 @@
     if (num(s.ownGoals)) badges.push(h("span", { class: "mh-b is-og", title: "Own goal" }, "OG", s.ownGoals > 1 ? "×" + s.ownGoals : null));
     if (p.cleanSheet) badges.push(h("span", { class: "mh-b is-cs", title: "Clean sheet" }, icon("glove"), vh(" clean sheet")));
     if (p.mvp) badges.push(h("span", { class: "mh-b is-mvp", title: "Player of the match" }, icon("star"), "MVP"));
+    // staff subs in competitive games (doc 4.21): only ever true when present
+    if (p.subbedOn === true) badges.push(h("span", { class: "mh-b is-sub-on", title: "Subbed on" }, icon("arrow"), vh(" subbed on")));
+    if (p.subbedOff === true) badges.push(h("span", { class: "mh-b is-sub-off", title: "Subbed off" }, icon("arrow"), vh(" subbed off")));
 
     const notes = [];
     // (clockOf of the raw seconds is only a fallback: exact for scrims and
     // quick games, whose clock is real time)
     if (num(p.joinedAt) > 0) {
       const j = moves.join.get(p.uuid);
-      notes.push("On at " + (j ? evClock(j, rec) : clockOf(p.joinedAt)));
+      notes.push((p.subbedOn === true ? "Subbed on at " : "On at ") + (j ? evClock(j, rec) : clockOf(p.joinedAt)));
     }
     if (!p.present && p.leftAt != null) {
       const l = moves.leave.get(p.uuid), verb = LEFT[l && l.e.reason] || "Left";
@@ -1812,8 +1913,9 @@
     const detail = h("div", { class: "mh-lu-detail", id: pid, hidden: true },
       h("dl", { class: "mh-mini" },
         [["Attempts", s.shots], ["On target", s.shotsOnTarget], ["Passes", s.passes], ["Saves", s.saves],
-          ["Tackles", s.tackles], ["Steals", s.steals], ["Interceptions", s.interceptions],
-          ["On the ball", clockOf(s.possessionSeconds)], ["Time played", clockOf(p.secondsPlayed)]]
+          ["Tackles", s.tackles], ["Steals", s.steals], ["Interceptions", s.interceptions]]
+          .concat(rec.schema >= 3 ? [["Turnovers", s.turnovers]] : [])
+          .concat([["On the ball", clockOf(s.possessionSeconds)], ["Time played", clockOf(p.secondsPlayed)]])
           .concat(num(s.pkScored) + num(s.pkMissed) + num(s.pkSaved) ? [["Pens scored", s.pkScored], ["Pens missed", s.pkMissed], ["Pens saved", s.pkSaved]] : [])
           .map(([k, v]) => h("div", null, h("dt", null, k), h("dd", null, typeof v === "string" ? v : num(v))))),
       arr(p.positions).length > 1 ? h("p", { class: "mh-dim" }, "Positions: " + arr(p.positions).map((x) => POSITIONS[x] || x).join(" → ")) : null,
@@ -1991,6 +2093,7 @@
 
   async function viewPlayer(r, token) {
     if (!UUID_RE.test(r.uuid)) throw new ApiError("notfound");
+    const tiersReady = loadTiers();
     const d = await get("/players/" + r.uuid, { page: r.page, size: 20 }, 30000);
     if (token !== S.token) return null;
     const rankedLines = rankedOf(d);
@@ -2008,6 +2111,8 @@
     const name = nameOf(me.name ? me : all || me);
     // the ladder can have a newer name than their newest record (doc 3)
     const ladderName = places.map((p) => p && p.name).find((n) => n && n !== name) || null;
+    const tier = tierOf(await tiersReady, [name, ladderName]);
+    if (token !== S.token) return null;
     const games = obj(d.games);
     setTitle(name);
 
@@ -2032,6 +2137,8 @@
           h("p", { class: "mh-eyebrow" }, "Player"),
           h("h1", { class: "mh-pl-name", id: "mh-pl-name" }, name),
           h("div", { class: "mh-pl-tags" },
+            rankChip(d.rank),
+            tierChip(tier),
             arr(d.badges).includes("champions_league") || isCL(r.uuid) ? clChip() : null,
             clubChip(club),
             src ? h("span", { class: "mh-dim" }, "Last played " + ago(num(src.lastPlayed))) : null,
@@ -2085,7 +2192,8 @@
     ];
     return h("ul", { class: "mh-pl-head" },
       tiles.map(([k, v]) => h("li", null, h("b", null, v), h("span", { class: "mh-pl-k" }, k))),
-      h("li", { class: "is-rating" }, ratingBadge(t.rating, true, true), h("span", { class: "mh-pl-k" }, "Avg rating")));
+      h("li", { class: "is-rating" }, ratingBadge(t.rating, true, true,
+        "Their average match rating. Ratings got harsher on Oct 18, so matches before then pull it up for a while."), h("span", { class: "mh-pl-k" }, "Avg rating")));
   }
 
   function totalsGrid(t) {
@@ -2110,7 +2218,9 @@
       h("div", { class: "mh-tot-grid" },
         group("Scoring", [["Goals", num(t.goals)], ["Assists", num(t.assists)], ["Goals + assists per match", per(num(t.goals) + num(t.assists))], ["On target", num(t.shotsOnTarget)], num(t.ownGoals) ? ["Own goals", num(t.ownGoals)] : null]),
         group("Defending", [["Tackles", num(t.tackles)], ["Steals", num(t.steals)], ["Interceptions", num(t.interceptions)], ["Saves", num(t.saves)], ["Clean sheets", num(t.cleanSheets)]]),
-        group("On the ball", [["Passes", num(t.passes)], ["Time on the ball", clockOf(t.possessionSeconds)], ["Time played", minutesText(t.secondsPlayed)], ["Player of the match", num(t.mvps)]]),
+        group("On the ball", [["Passes", num(t.passes)],
+          typeof t.turnovers === "number" ? [h("span", { title: "Times they gave the ball away in open play. Counted from October 18, 2026." }, "Turnovers ", h("small", { class: "mh-dim" }, "since Oct 18")), num(t.turnovers)] : null,
+          ["Time on the ball", clockOf(t.possessionSeconds)], ["Time played", minutesText(t.secondsPlayed)], ["Player of the match", num(t.mvps)]]),
         pk ? group("Shootouts", [["Scored", num(t.pkScored)], ["Missed", num(t.pkMissed)], ["Saved", num(t.pkSaved)]]) : null,
         positions.length ? h("div", { class: "mh-tot" },
           h("h3", null, "Positions"),

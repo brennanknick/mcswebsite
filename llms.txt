@@ -1,0 +1,26 @@
+# MCS: The Minecraft Soccer Server
+
+> MCS (Minecraft Soccer) is a Minecraft: Java Edition server built entirely around soccer (football): real matches on full pitches with teams, positions, tackling, set pieces, ranked games, clubs and a Champions League. It's free to play. Join at play.mcsoccer.net with Minecraft: Java Edition 1.21.4 or newer. The server is in open alpha.
+
+## Playing
+
+- Server address: play.mcsoccer.net (Minecraft: Java Edition 1.21.4 or newer; accept the resource pack, it carries the kits, crests and goals)
+- To play, walk into a pitch's ready zone and the match starts itself. Pitches are 3v3 and 4v4.
+- Game modes: Match (two timed halves, 10 minutes each), Knockout (extra time and penalties, for tournaments), Scrim (first to the goal limit, no clock) and Quick game (first to 5).
+- Ranked: a 3v3 and 4v4 ranked queue with an Elo rating, and captains who draft the teams.
+- Clubs play scheduled games in the MCS Champions League, with a league table, live scores and results.
+- Cosmetics only: trails, goal celebrations and bow skins, bought with Sapphires (the server's currency) or found in crates. Nothing you can buy gives an advantage in a match.
+
+## Pages
+
+- [Home](https://mcsoccer.net/): what MCS is and how to join
+- [Rules](https://mcsoccer.net/rules/): how matches work, positions, tackling, scoring, set pieces and every game mode
+- [Match history](https://mcsoccer.net/matches/): every match played, full match reports, player pages and leaderboards
+- [Champions League](https://mcsoccer.net/champions-league/): club fixtures, the league table, live scores and results
+- [Tier list](https://mcsoccer.net/tiers/): the best MCS players, tier by tier
+- [Store](https://mcsoccer.net/store/): Sapphires for cosmetics, sold through PayNow
+- [Crate odds](https://mcsoccer.net/crates/): every crate's contents and exact odds
+
+## Community
+
+- [Discord](https://discord.gg/mcsoccer): the MCS community, announcements, match results and the league
