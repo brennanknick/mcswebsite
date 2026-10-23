@@ -823,6 +823,12 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 .st .st-rk-sa img { width: 16px; height: 16px; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--sa-glow) 45%, transparent)); }
 
 .st-rk-price td b { font-size: 30px; font-weight: 800; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.st-rk-per { display: block; margin-top: .2rem; font-size: 12.5px; font-weight: 650; color: var(--text-faint); }
+/* the buy buttons, in each rank's column under the perks */
+.st-rk-table tfoot td { padding: 1.1rem .7rem 1.5rem; text-align: center; }
+.st-rk-table tfoot tr > * { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .055); }
+.st-rk-buy .st-buy { justify-content: center; width: 100%; max-width: 190px; }
+.st-rk-soon { font-size: 13px; font-weight: 700; color: var(--text-faint); }
 
 /* a group's name, as the page's kickers */
 .st-rk-group th {
@@ -1005,6 +1011,9 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 .st-dlg-art img { width: 128px; height: 80px; }
 .st-dlg-art img.is-gem { width: 64px; height: 64px; }
 .st-dlg-what { min-width: 0; }
+.st-dlg-art img.is-rank { width: 111px; height: 33px; }
+/* a rank's term ("for 30 days") isn't Sapphire blue */
+.st-dlg-what .st-rk-name ~ .st-dlg-unit { color: var(--text-faint); }
 .st-dlg-kicker { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--text-faint); }
 .st-dlg-what h2 { margin: .1rem 0 .2rem; font-size: 2.1rem; font-weight: 800; line-height: 1.1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .st-dlg-unit { font-size: 1rem; font-weight: 700; letter-spacing: 0; color: var(--sa-text); }
@@ -1287,6 +1296,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   .st-dlg-art { width: 72px; height: 56px; }
   .st-dlg-art img { width: 64px; height: 40px; }
   .st-dlg-art img.is-gem { width: 48px; height: 48px; }
+  .st-dlg-art img.is-rank { width: 74px; height: 22px; }
   .st-dlg-what h2 { font-size: 1.6rem; }
   .st-dlg-x { top: 8px; right: 6px; }
   .st-ty h1 { font-size: min(56px, 14vw); }

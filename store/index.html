@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=d6a7c521" />
-<link rel="stylesheet" href="../assets/css/store.css?v=e67c7bdd" />
+<link rel="stylesheet" href="../assets/css/store.css?v=23a2e6ba" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -34,7 +34,7 @@
 <!-- Loaded up here, before anything paints, so the page opens straight
      into the right state (on its way / not open yet / open) with no flash. -->
 <script src="../site.config.js?v=7002da49"></script>
-<script src="../assets/js/store.js?v=542955bf" data-page="store"></script>
+<script src="../assets/js/store.js?v=c03dfced" data-page="store"></script>
 </head>
 <body>
 
@@ -236,12 +236,12 @@
         <thead>
           <tr style="--r:0">
             <td></td>
-            <th scope="col" class="is-vip"><img class="st-rk-badge" src="../assets/img/ranks/vip.png" width="111" height="33" alt="VIP" /></th>
-            <th scope="col" class="is-mvp"><span class="st-rk-req" aria-hidden="true">Needs VIP</span><img class="st-rk-badge" src="../assets/img/ranks/mvp.png" width="111" height="33" alt="MVP" /></th>
+            <th scope="col" class="is-vip"><img class="st-rk-badge" src="../assets/img/store/rank-vip.png" width="111" height="33" alt="VIP" /></th>
+            <th scope="col" class="is-mvp"><span class="st-rk-req" aria-hidden="true">Needs VIP</span><img class="st-rk-badge" src="../assets/img/store/rank-mvp.png" width="111" height="33" alt="MVP" /></th>
           </tr>
         </thead>
         <tbody>
-          <tr class="st-rk-price" style="--r:1"><th scope="row">Price</th><td class="is-vip"><b>$20</b></td><td class="is-mvp"><b>$10</b></td></tr>
+          <tr class="st-rk-price" style="--r:1"><th scope="row">Price</th><td class="is-vip" data-rank-price="rank-vip"><b>$20</b><small class="st-rk-per">forever</small></td><td class="is-mvp" data-rank-price="rank-mvp"><b>$10</b><small class="st-rk-per">for 30 days</small></td></tr>
           <tr style="--r:2"><th scope="row">Or with Sapphires</th><td class="is-vip"><span class="st-rk-sa">2,000<img src="../assets/img/store/gem.png" width="16" height="16" alt=" Sapphires" /></span></td><td class="is-mvp"><span class="st-rk-sa">1,000<img src="../assets/img/store/gem.png" width="16" height="16" alt=" Sapphires" /></span></td></tr>
           <tr style="--r:3"><th scope="row">Lasts</th><td class="is-vip">Forever</td><td class="is-mvp">30 days</td></tr>
         </tbody>
@@ -271,6 +271,11 @@
           <tr style="--r:20"><th scope="row">Frame on your stats card</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-mvp"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
           <tr style="--r:21"><th scope="row">Name on the supporters wall</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-mvp"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td></tr>
         </tbody>
+        <!-- buy buttons, filled in from PayNow's "ranks" tag (store.js); until then, or
+             when a rank isn't on sale, the cell says so -->
+        <tfoot>
+          <tr class="st-rk-buy"><th scope="row"><span class="visually-hidden">Buy</span></th><td class="is-vip" data-rank-buy="rank-vip"><span class="st-rk-soon">Coming soon</span></td><td class="is-mvp" data-rank-buy="rank-mvp"><span class="st-rk-soon">Coming soon</span></td></tr>
+        </tfoot>
       </table>
     </div>
   </section>

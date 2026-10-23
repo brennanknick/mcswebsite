@@ -92,6 +92,17 @@
     "sapphires-starter": { name: "Starter Pack", base: 500,   bonus: 100,  pile: "starter", starter: true },
   };
 
+  /* ── the ranks, from PayNow's "ranks" tag (the product slugs). Prices
+     come from PayNow, as for the bundles; `id` is the game's rank id. ── */
+  const RANK_TAG = override("paynowRankTag", "pn-rank-tag") || "ranks";
+  const RANK_PRODUCTS = {
+    "rank-vip": { id: "vip", label: "VIP", art: "rank-vip.png", term: "forever" },
+    "rank-mvp": { id: "vipplus", label: "MVP", art: "rank-mvp.png", term: "for 30 days" },
+  };
+  // the match API, which knows who holds VIP (MVP needs it); ?api= on
+  // localhost, the same override /matches/ reads
+  const SITE_API = (override("api", "mh-api") || String(CFG.matchesApi || "")).trim().replace(/\/+$/, "");
+
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
   // one number format for the whole page, the page's own language: counts,
@@ -184,12 +195,26 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     fillSupport();
+    thanksFor();
     const box = $("[data-catalog]");
     if (box && STORE_ID) {
       loadCatalog(box);
       setupBuy();
+      if (html.dataset.ranks === "on") loadRanks();
     }
   });
+
+  /* the thanks page after a rank: it lands in game, not Sapphires */
+  function thanksFor() {
+    let rank = "";
+    try { rank = new URLSearchParams(location.search).get("rank") || ""; } catch {}
+    const r = Object.values(RANK_PRODUCTS).find((x) => x.label.toLowerCase() === rank.toLowerCase());
+    if (!r) return;
+    const lead = $("[data-ty-lead]");
+    if (lead) lead.textContent = `Once your payment clears, your ${r.label} lands in game within about a minute, or when you next join.`;
+    const step = $("[data-ty-ingame]");
+    if (step) step.textContent = "It goes to the player you bought for. Online now? About a minute. Offline? It's waiting when you join.";
+  }
 
   /* contact: the support email, or the Discord until there is one */
   function fillSupport() {
@@ -439,7 +464,7 @@
     return box;
   }
 
-  function buyButton(p, d, heading) {
+  function buyButton(p, d, heading, label) {
     const b = el("button", "btn st-buy");
     b.type = "button";
     if (!d.canBuy) {
@@ -448,7 +473,7 @@
       b.textContent = "Unavailable";
       return b;
     }
-    b.innerHTML = "Buy" + ARROW;
+    b.innerHTML = (label || "Buy") + ARROW;
     b.setAttribute("aria-label", "Buy " + heading + " for " + d.price);
     b.addEventListener("click", () => openBuy(p, d, b));
     return b;
@@ -578,6 +603,78 @@
     return frag;
   }
 
+  /* ── the ranks' buy buttons ──────────────────────────────────────── */
+
+  // Each rank column's footer cell gets its button, and its price cell PayNow's price in this
+  // buyer's currency. A rank PayNow doesn't list (not on sale yet) keeps "Coming soon".
+  async function loadRanks() {
+    const cells = $$("[data-rank-buy]");
+    if (!cells.length) return;
+    let list;
+    try {
+      list = await pn("/store/products?tag=" + encodeURIComponent(RANK_TAG), { timeout: 15000 });
+    } catch (err) {
+      if (LOCAL) console.warn("MCS store: the ranks didn't load", err.kind, err.status || "");
+      cells.forEach((c) => c.replaceChildren(el("span", "st-rk-soon", "Didn't load. Refresh to try again.")));
+      return;
+    }
+    const bySlug = new Map((Array.isArray(list) ? list : []).filter(usable).map((p) => [p.slug, p]));
+    cells.forEach((cell) => {
+      const slug = cell.dataset.rankBuy;
+      const p = bySlug.get(slug);
+      if (!p || !RANK_PRODUCTS[slug]) return;
+      const d = describeRank(p);
+      const price = $(`[data-rank-price="${slug}"] b`);
+      if (price) price.textContent = d.price;
+      cell.replaceChildren(buyButton(p, d, d.label, "Get " + d.label));
+    });
+  }
+
+  function describeRank(p) {
+    const r = RANK_PRODUCTS[p.slug];
+    const pr = p.pricing;
+    const cut = Number.isFinite(pr.price_original) && pr.price_original > pr.price_final;
+    return {
+      k: null, rank: r.id, label: r.label, term: r.term, amount: 0, total: 0,
+      price: money(pr.price_final, p.currency),
+      was: cut ? money(pr.price_original, p.currency) : "",
+      off: "", saleName: "",
+      vat: taxLine(p),
+      pile: IMG + r.art, plain: false,
+      canBuy: !p.stock || p.stock.available_to_purchase !== false,
+      gift: p.is_gifting_disabled !== true,
+    };
+  }
+
+  // Does this player hold VIP? true or false, or it throws (kind "rankcheck") when the match API
+  // can't say. meta.ranks lists every holder by name, played or not, except anyone who hid from
+  // the supporters wall; their own page still lists their ranks, if they've played.
+  async function vipHeld(name, signal) {
+    const fail = (kind) => Object.assign(new Error(kind), { kind });
+    if (!SITE_API) throw fail("rankcheck");
+    const get = async (path) => {
+      let r;
+      try { r = await fetch(SITE_API + path, { signal, credentials: "omit", headers: { Accept: "application/json" } }); }
+      catch { throw fail(signal && signal.aborted ? "abort" : "rankcheck"); }
+      if (r.status === 404) return null;
+      if (!r.ok) throw fail("rankcheck");
+      const j = await r.json().catch(() => null);
+      // a server still loading its history can't answer yet
+      if (!j || j.loading) throw fail("rankcheck");
+      return j;
+    };
+    const lower = name.toLowerCase();
+    const named = (x) => String((x && x.name) || "").toLowerCase() === lower;
+    const meta = await get("/api/v1/meta");
+    const vip = meta && meta.ranks && meta.ranks.vip;
+    if (vip && Array.isArray(vip.players) && vip.players.some(named)) return true;
+    const found = await get("/api/v1/players?q=" + encodeURIComponent(name));
+    const hit = found && Array.isArray(found.items) ? found.items.find(named) : null;
+    if (!hit) return false;
+    const prof = await get("/api/v1/players/" + encodeURIComponent(hit.uuid));
+    return !!(prof && Array.isArray(prof.ranks) && prof.ranks.includes("vip"));
+  }
+
   /* ── buying ──────────────────────────────────────────────────────── */
 
   let dlg, form, uIn, gIn, toggle, giftWrap, giftField, go, goLabel, alertBox, statusBox, sumBox;
@@ -644,9 +741,16 @@
     const pile = $("[data-buy-pile]", dlg);
     pile.src = d.pile;
     pile.classList.toggle("is-gem", d.plain);
-    $("[data-buy-name]", dlg).textContent = d.k ? d.label : "Bundle";
-    $("[data-buy-amount]", dlg).textContent = d.amount ? num(d.amount) : d.label;
-    $("[data-buy-unit]", dlg).hidden = !d.amount;
+    pile.classList.toggle("is-rank", !!d.rank);
+    $("[data-buy-name]", dlg).textContent = d.rank ? "Rank" : d.k ? d.label : "Bundle";
+    const amount = $("[data-buy-amount]", dlg);
+    amount.textContent = d.amount ? num(d.amount) : d.label;
+    // a rank in its own colour, as in the table
+    amount.className = d.rank ? "st-rk-name is-" + (d.rank === "vip" ? "vip" : "mvp") : "st-grad";
+    const unit = $("[data-buy-unit]", dlg);
+    unit.textContent = d.rank ? d.term : "Sapphires";
+    unit.hidden = !d.amount && !d.rank;
+    $("#buy-gift-hint", dlg).textContent = (d.rank ? "The rank goes" : "The Sapphires go") + " to them. The receipt comes to you.";
     $("[data-buy-price]", dlg).textContent = d.price;
     const was = $("[data-buy-was]", dlg);
     was.hidden = !d.was;
@@ -724,7 +828,8 @@
     const u = uIn.value.trim();
     const g = gIn.value.trim();
     const giftOn = toggle.checked && !giftWrap.hidden;
-    const what = current.d.k ? num(current.d.total) + " Sapphires" : current.d.label;
+    const d = current.d;
+    const what = d.rank ? (d.rank === "vipplus" ? "30 days of MVP" : "VIP forever") : d.k ? num(d.total) + " Sapphires" : d.label;
     const b = (t) => el("b", "", t);
     const parts = [];
     if (giftOn && NAME.test(g)) {
@@ -734,12 +839,14 @@
     } else if (!giftOn && NAME.test(u)) {
       parts.push(b(u), " gets " + what + " in game.");
     } else {
-      parts.push(giftOn ? "The Sapphires go to the player you're gifting to." : "The Sapphires go to the username you type.");
+      const thing = d.rank ? "The rank goes" : "The Sapphires go";
+      parts.push(thing + (giftOn ? " to the player you're gifting to." : " to the username you type."));
     }
+    // the Sapphire glyph, or the rank's own icon (11px, drawn at 2x)
     const gem = el("img");
-    gem.src = IMG + "glyph.png";
-    gem.width = 18;
-    gem.height = 18;
+    gem.src = d.rank ? new URL("../ranks/" + d.rank + ".png", IMG).href : IMG + "glyph.png";
+    gem.width = d.rank ? 22 : 18;
+    gem.height = d.rank ? 22 : 18;
     gem.alt = "";
     // one inline run of text beside the gem, so the names flow with it
     const text = el("span");
@@ -826,15 +933,28 @@
     const user = uIn.value.trim();
     const gift = giftOn ? gIn.value.trim() : "";
     const p = current.p;
+    const rank = current.d.rank || "";
+    const who = gift || user;
     const ctl = new AbortController();
     flight = ctl;
-    let stage = "auth";
-    working("Checking your username…");
+    let stage = rank ? "rank" : "auth";
+    working(rank ? "Checking " + who + "'s rank…" : "Checking your username…");
     slowTimer = setTimeout(() => say("PayNow is taking a while. Hang on…", true), 4000);
     // closed (or replaced by a newer try) while a reply was on its way
     const gone = () => ctl.signal.aborted || flight !== ctl;
 
     try {
+      // MVP needs VIP (it's 30 days on top of it), and VIP is forever, so a second one is money
+      // for nothing. The game refuses either too, but only after the payment.
+      if (rank) {
+        const has = await vipHeld(who, ctl.signal);
+        if (gone()) return;
+        const field = gift ? gIn : uIn;
+        if (rank === "vipplus" && !has) throw Object.assign(new Error("needs vip"), { kind: "rank", field, msg: "MVP needs VIP first, and " + who + " doesn't have it yet." });
+        if (rank === "vip" && has) throw Object.assign(new Error("has vip"), { kind: "rank", field, msg: who + " already has VIP. It's theirs forever." });
+        stage = "auth";
+        step("Checking your username…");
+      }
       const signIn = async () => {
         const r = await pn("/store/customer/auth", { body: { platform: "minecraft", id: user }, signal: ctl.signal });
         if (!r || typeof r.customer_token !== "string" || !r.customer_token) throw Object.assign(new Error("no token"), { kind: "bad" });
@@ -842,9 +962,11 @@
       };
       const line = { product_id: p.id, quantity: 1 };
       if (gift) line.gift_to = { platform: "minecraft", id: gift };
+      const thanks = new URL("thanks/", new URL("./", location.href));
+      if (rank) thanks.searchParams.set("rank", current.d.label.toLowerCase());
       const body = {
         lines: [line],
-        return_url: new URL("thanks/", new URL("./", location.href)).href,
+        return_url: thanks.href,
         cancel_url: new URL("./", location.href).href,
         auto_redirect: true,
       };
@@ -890,6 +1012,17 @@
     const said = String(d.message || "") + " " + String(d.code || "");
     const ref = typeof d.trace_id === "string" && /^[A-Za-z0-9-]{6,64}$/.test(d.trace_id) ? d.trace_id : "";
 
+    // the rank check: said under the name it's about
+    if (err.kind === "rank") {
+      setErr(err.field, err.msg);
+      err.field.focus();
+      return;
+    }
+    if (err.kind === "rankcheck") {
+      showAlert("We couldn't check " + (gift || user) + "'s rank just now. Try again in a minute.");
+      go.focus();
+      return;
+    }
     if (err.kind === "http" && err.status === 400 && /player\W*not\W*found/i.test(said)) {
       const input = stage === "checkout" && gift ? gIn : uIn;
       setErr(input, "We couldn't find that Minecraft player.");
@@ -902,7 +1035,7 @@
     else if (err.kind === "bad") msg = "PayNow sent back something we didn't expect. Try again in a minute.";
     else if (err.status === 429) msg = "Too many tries at once. Wait a few seconds, then try again.";
     else if (err.status >= 500) msg = "PayNow had a problem on its side. Try again in a minute.";
-    else if (err.status === 404) msg = "This bundle isn't on sale any more. Refresh the page to see what is.";
+    else if (err.status === 404) msg = (current && current.d.rank ? "This rank" : "This bundle") + " isn't on sale any more. Refresh the page to see what is.";
     else if (/limit|stock/i.test(said)) {
       msg = current && current.d.k && current.d.k.starter
         ? "The Starter Pack is one per player, and " + (gift || user) + " already has it."

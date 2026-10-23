@@ -419,7 +419,7 @@
     const me = document.currentScript && document.currentScript.src;
     try { return new URL("../img/", me || location.href).href; } catch { return "/assets/img/"; }
   })();
-  const RANK_ICONS = new Set(["owner", "admin", "developer", "mod", "helper", "media", "affiliate"]);
+  const RANK_ICONS = new Set(["owner", "admin", "developer", "mod", "helper", "media", "affiliate", "vipplus", "vip", "donator"]);
   const RANKS = new Map();   // id -> {name, color}
   function learnRanks(meta) {
     const r = obj(obj(meta).ranks);
@@ -431,7 +431,9 @@
     }
   }
   const RANK_LOOK = { owner: ["Owner", "#ff3b3b"], admin: ["Admin", "#ff5555"], developer: ["Developer", "#b388ff"], mod: ["Mod", "#4fc3f7"],
-    helper: ["Helper", "#66d36e"], media: ["Media", "#d16bff"], affiliate: ["Affiliate", "#ffb300"] };
+    helper: ["Helper", "#66d36e"], media: ["Media", "#d16bff"], affiliate: ["Affiliate", "#ffb300"],
+    // the ranks you buy: the API's own names and colours win (meta.ranks); MVP's id is "vipplus"
+    vipplus: ["MVP", "#ff7811"], vip: ["VIP", "#ffc107"], donator: ["Donator", "#66d36e"] };
   function rankChip(rank) {
     const id = str(rank).toLowerCase();
     const known = RANKS.get(id) || {};
