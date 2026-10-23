@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=d6a7c521" />
-<link rel="stylesheet" href="../assets/css/store.css?v=23a2e6ba" />
+<link rel="stylesheet" href="../assets/css/store.css?v=4d4eab1d" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -34,7 +34,7 @@
 <!-- Loaded up here, before anything paints, so the page opens straight
      into the right state (on its way / not open yet / open) with no flash. -->
 <script src="../site.config.js?v=7002da49"></script>
-<script src="../assets/js/store.js?v=c03dfced" data-page="store"></script>
+<script src="../assets/js/store.js?v=70c88c9a" data-page="store"></script>
 </head>
 <body>
 
@@ -278,6 +278,20 @@
         </tfoot>
       </table>
     </div>
+  </section>
+
+  <!-- ═══════════════════════ SUPPORTERS WALL ═══════════════════════
+       Everyone with VIP or MVP, MVP first, longest first, from the match
+       API's meta.supporters (store.js). Anyone can leave it with
+       /supporters hide in game. Hidden until ranks are out and someone's
+       on it. -->
+  <section class="st-wrap st-wall" id="supporters" aria-labelledby="wall-title" data-show="on" data-ranks data-wall hidden>
+    <div class="st-wall-head">
+      <p class="st-kicker">Supporters</p>
+      <h2 class="st-h2" id="wall-title">The supporters <span class="st-gold">wall</span></h2>
+      <p class="st-wall-lead">Every rank keeps MCS running. Thank you.</p>
+    </div>
+    <ul class="st-wall-list" data-wall-list></ul>
   </section>
 
   <!-- ═════════════════════════════ FAQ ════════════════════════════ -->

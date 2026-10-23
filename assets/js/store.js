@@ -200,7 +200,7 @@
     if (box && STORE_ID) {
       loadCatalog(box);
       setupBuy();
-      if (html.dataset.ranks === "on") loadRanks();
+      if (html.dataset.ranks === "on") { loadRanks(); loadWall(); }
     }
   });
 
@@ -673,6 +673,45 @@
     if (!hit) return false;
     const prof = await get("/api/v1/players/" + encodeURIComponent(hit.uuid));
     return !!(prof && Array.isArray(prof.ranks) && prof.ranks.includes("vip"));
+  }
+
+  /* ── the supporters wall: everyone with a rank who hasn't hidden ── */
+
+  // meta.supporters comes MVP first, then VIP, longest first, only while ranks are out. Nobody
+  // on it (or the API not answering): the section stays hidden.
+  async function loadWall() {
+    const box = $("[data-wall]");
+    const list = $("[data-wall-list]");
+    if (!box || !list || !SITE_API) return;
+    let meta = null;
+    try {
+      const r = await fetch(SITE_API + "/api/v1/meta", { credentials: "omit", headers: { Accept: "application/json" } });
+      if (r.ok) meta = await r.json();
+    } catch {}
+    const people = meta && Array.isArray(meta.supporters)
+      ? meta.supporters.filter((x) => x && typeof x.uuid === "string" && /^[0-9a-f-]{32,36}$/i.test(x.uuid) && NAME.test(String(x.name || "")))
+      : [];
+    if (!people.length) return;
+    const month = new Intl.DateTimeFormat(LOCALE, { month: "short", year: "numeric" });
+    list.replaceChildren(...people.map((x) => {
+      const mvp = x.rank === "vipplus";
+      const li = el("li", "st-wall-item " + (mvp ? "is-mvp" : "is-vip"));
+      const a = el("a");
+      a.href = "../matches/?p=" + encodeURIComponent(x.uuid);
+      const img = el("img");
+      img.src = "https://mc-heads.net/avatar/" + encodeURIComponent(x.uuid) + "/48";
+      img.width = 24;
+      img.height = 24;
+      img.alt = "";
+      img.loading = "lazy";
+      const who = el("span", "st-wall-who");
+      const since = Number(x.since) > 0 ? " since " + month.format(new Date(Number(x.since))) : "";
+      who.append(el("span", "st-rk-name " + (mvp ? "is-mvp" : "is-vip"), x.name), el("small", "", (mvp ? "MVP" : "VIP") + since));
+      a.append(img, who);
+      li.append(a);
+      return li;
+    }));
+    box.hidden = false;
   }
 
   /* ── buying ──────────────────────────────────────────────────────── */

@@ -883,6 +883,37 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 
 /* ── how it works ───────────────────────────────────────────────── */
 
+/* ── the supporters wall: a head and name per supporter, MVP first ── */
+.st-wall {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr);
+  align-items: start;
+  gap: 1.5rem 4rem;
+  margin-top: 5.5rem;
+  scroll-margin-top: 1.5rem;
+}
+.st-wall-head { position: sticky; top: 2rem; }
+.st-wall-lead { margin: .9rem 0 0; color: var(--text); }
+.st-wall-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.st-wall-item a {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .6rem .8rem;
+  color: inherit;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--vip) 5%, rgba(255, 255, 255, .025));
+  box-shadow: inset 3px 0 0 var(--vip);
+  clip-path: var(--notch);
+  transition: background-color .15s;
+}
+.st-wall-item.is-mvp a { background: color-mix(in srgb, var(--mvp) 10%, rgba(255, 255, 255, .025)); box-shadow: inset 3px 0 0 var(--mvp); }
+.st-wall-item a:hover, .st-wall-item a:focus-visible { background: rgba(255, 255, 255, .07); }
+.st-wall-item img { flex: 0 0 auto; image-rendering: pixelated; }
+.st-wall-who { display: grid; min-width: 0; }
+.st-wall-who .st-rk-name { overflow: hidden; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.st-wall-who small { font-size: 12px; font-weight: 600; color: var(--text-faint); }
+
 .st-faq {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr);
@@ -1221,8 +1252,8 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   .st-starter .st-art img { width: 192px; height: 120px; }
   .st-starter-buy { grid-column: 1 / -1; justify-content: space-between; padding-top: 1rem; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07); }
   .st-starter-buy .st-price { align-items: flex-start; text-align: left; }
-  .st-faq { grid-template-columns: minmax(0, 1fr); }
-  .st-faq-head { position: static; }
+  .st-faq, .st-wall { grid-template-columns: minmax(0, 1fr); }
+  .st-faq-head, .st-wall-head { position: static; }
   .st-ranks { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
   .st-rk-side { position: static; }
   .st-rk-notes { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 2rem; }
@@ -1248,7 +1279,7 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
   .st-title { font-size: min(76px, 19vw); }
   .st-title.is-off { font-size: min(44px, 11.4vw); }
   .st-lead { font-size: 1.1rem; }
-  .st-bundles, .st-ingame, .st-faq, .st-ranks { margin-top: 4rem; }
+  .st-bundles, .st-ingame, .st-faq, .st-ranks, .st-wall { margin-top: 4rem; }
   .st-rk-notes { grid-template-columns: minmax(0, 1fr); }
   .st-rk { --rk-perk: 40%; --rk-rank: 30%; }
   .st-rk-table { font-size: 14px; }
