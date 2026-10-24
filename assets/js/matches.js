@@ -393,7 +393,7 @@
   let metaPromise = null;
   function getMeta(fresh) {
     if (fresh || !metaPromise) {
-      metaPromise = get("/meta", null, 30000).then((m) => { learnBadges(m); learnRanks(m); return m; }).catch((e) => { metaPromise = null; throw e; });
+      metaPromise = get("/meta", null, 30000).then((m) => { learnBadges(m); learnRanks(m); learnPaid(m); return m; }).catch((e) => { metaPromise = null; throw e; });
     }
     return metaPromise;
   }
@@ -413,6 +413,30 @@
   // the small gold star next to a name, and the chip on a player page
   const clMark = (uuid) => (isCL(uuid) ? h("span", { class: "mh-cl-mark", title: badgeName }, icon("star"), vh(", " + badgeName)) : null);
   const clChip = () => h("span", { class: "mh-tag mh-cl" }, icon("star"), badgeName);
+
+  // VIP and MVP holders, from meta.ranks (MVPs are listed under vip too; anyone who hid from the
+  // supporters wall isn't listed, so they get no mark). Empty until ranks are out.
+  const PAID = new Map();   // uuid -> "vipplus" | "vip"
+  function learnPaid(meta) {
+    const m = obj(meta);
+    if (m.loading || !("server" in m || "ranks" in m)) return;   // a loading meta teaches nothing
+    PAID.clear();
+    const r = obj(m.ranks);
+    for (const id of ["vip", "vipplus"]) {
+      arr(obj(r[id]).players).forEach((p) => {
+        const u = str(obj(p).uuid).toLowerCase();
+        if (UUID_RE.test(u)) PAID.set(u, id);
+      });
+    }
+  }
+  // the rank's own sparkle (the in-game art, 11 px) after a VIP's or MVP's name
+  const rankMark = (uuid) => {
+    const id = PAID.get(str(uuid).toLowerCase());
+    if (!id) return null;
+    const label = (RANKS.get(id) || {}).name || (RANK_LOOK[id] || [])[0] || id;
+    return h("span", { class: "mh-rk-mark is-" + (id === "vipplus" ? "mvp" : "vip"), title: label },
+      h("img", { src: `${IMG}ranks/${id}.png`, width: 11, height: 11, alt: "" }), vh(", " + label));
+  };
 
   // Ranks, also published on meta: each rank's name and colour (staff and Player for now; VIP
   // and MVP once they're out). A staff rank shows the game's own 11 px icon, the same art as
@@ -1162,7 +1186,7 @@
         h("span", { class: "mh-row-pitch" }, str(m.fieldName) || str(m.fieldId) || "Unknown pitch")),
       h("div", { class: "mh-row-mvp" },
         m.mvp && UUID_RE.test(str(m.mvp.uuid))
-          ? [icon("star", "mh-mvp-star"), avatar(m.mvp.uuid, nameOf(m.mvp), 20), h("span", null, vh("MVP: "), nameOf(m.mvp), clMark(m.mvp.uuid))]
+          ? [icon("star", "mh-mvp-star"), avatar(m.mvp.uuid, nameOf(m.mvp), 20), h("span", null, vh("MVP: "), nameOf(m.mvp), clMark(m.mvp.uuid), rankMark(m.mvp.uuid))]
           : h("span", { class: "mh-dim" }, num(m.players) + (num(m.players) === 1 ? " player" : " players"))),
       h("span", { class: "mh-row-go", "aria-hidden": "true" }, icon("tri")),
     ]);
@@ -1952,7 +1976,7 @@
       h("div", { class: "mh-lu-main" },
         avatar(p.uuid, nameOf(p), 32),
         h("div", { class: "mh-lu-who" },
-          UUID_RE.test(str(p.uuid)) ? h("a", { class: "mh-lu-name", href: toPlayer(p.uuid), "data-go": true }, nameOf(p), clMark(p.uuid)) : h("span", { class: "mh-lu-name" }, nameOf(p)),
+          UUID_RE.test(str(p.uuid)) ? h("a", { class: "mh-lu-name", href: toPlayer(p.uuid), "data-go": true }, nameOf(p), clMark(p.uuid), rankMark(p.uuid)) : h("span", { class: "mh-lu-name" }, nameOf(p)),
           notes.length ? h("small", null, notes.join(" · ")) : null,
           eloOf(p) ? eloLine(eloOf(p)) : null),
         // badges first, so the position chips form a column down the list
@@ -2441,7 +2465,7 @@
             h("a", { href: toPlayer(x.uuid), "data-go": true },
               h("span", { class: "mh-podium-rank" }, vh("Rank "), num(x.rank)),
               avatar(x.uuid, nameOf(x), 64),
-              h("b", { class: "mh-podium-name" }, nameOf(x)),
+              h("b", { class: "mh-podium-name" }, nameOf(x), rankMark(x.uuid)),
               h("span", { class: "mh-podium-val" }, num(x.elo), vh(" Elo")),
               h("small", null, wl(x)),
               placementTag(x.games))))),
@@ -2454,7 +2478,7 @@
             h("td", { class: "mh-lb-rank" }, num(x.rank)),
             h("td", { class: "mh-lb-player" },
               h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true, "data-focus": j + 3 === firstNew ? "rk-more" : null },
-                avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x))),
+                avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)), rankMark(x.uuid)),
               placementTag(x.games),
               h("small", { class: "mh-rk-wl" }, wl(x))),
             h("td", { class: "mh-lb-val" }, num(x.elo)),
@@ -2560,7 +2584,7 @@
     // after "Show more", focus goes to the first row it brought in
     const firstNew = r.limit > 25 ? (r.limit === 50 ? 25 : 50) : -1;
     const whoLink = (x, i) => h("a", { class: "mh-lb-who", href: toPlayer(x.uuid), "data-go": true, "data-focus": i === firstNew ? "lb-more" : null },
-      avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)));
+      avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)), rankMark(x.uuid));
 
     out.push(h("section", { class: "mh-board", "aria-labelledby": "mh-lb" },
       h("h2", { class: "mh-sec-title", id: "mh-lb" }, def[1], per ? " per match" : null, r.mode ? h("span", { class: "mh-dim" }, " · " + modeName(r.mode)) : null),
@@ -2571,7 +2595,7 @@
           h("a", { href: toPlayer(x.uuid), "data-go": true },
             h("span", { class: "mh-podium-rank" }, vh("Rank "), num(x.rank)),
             avatar(x.uuid, nameOf(x), 64),
-            h("b", { class: "mh-podium-name" }, nameOf(x)),
+            h("b", { class: "mh-podium-name" }, nameOf(x), rankMark(x.uuid)),
             x.club ? clubChip(x.club) : null,
             h("span", { class: "mh-podium-val" }, val(x), vh(unit)),
             showGames ? h("small", null, (per ? fmtStat(r.stat, totalOf(x)) + " in " : "") + num(x.games) + (num(x.games) === 1 ? " match" : " matches")) : null)))),
@@ -2620,7 +2644,7 @@
         h("h2", { class: "mh-sec-title", id: "mh-fp" }, "Players matching \u201c" + r.q + "\u201d"),
         h("p", { class: "mh-sec-sub" }, sub),
         hits.length ? h("ul", { class: "mh-sresults is-inline" }, hits.map((x) =>
-          h("li", null, h("a", { href: toPlayer(x.uuid), "data-go": true }, avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)))))) : null));
+          h("li", null, h("a", { href: toPlayer(x.uuid), "data-go": true }, avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)), rankMark(x.uuid))))) : null));
     }
 
     // the Champions League: everyone with the badge, A to Z
@@ -2632,7 +2656,7 @@
         h("ul", { class: "mh-reg-grid" }, league.map((x, i) => h("li", { style: { "--i": Math.min(i, 16) } },
           h("a", { href: toPlayer(x.uuid), "data-go": true, title: nameOf(x) },
             avatar(x.uuid, nameOf(x), 40),
-            h("b", null, nameOf(x)),
+            h("b", null, nameOf(x), rankMark(x.uuid)),
             h("small", { class: "mh-cl-small" }, icon("star"), badgeName)))))));
     }
 
@@ -2644,7 +2668,7 @@
         h("ul", { class: "mh-reg-grid" }, regulars.map((x, i) => h("li", { style: { "--i": Math.min(i, 16) } },
           h("a", { href: toPlayer(x.uuid), "data-go": true, title: nameOf(x) },
             avatar(x.uuid, nameOf(x), 40),
-            h("b", null, nameOf(x)),
+            h("b", null, nameOf(x), rankMark(x.uuid)),
             h("small", null, num(x.games) + (num(x.games) === 1 ? " match" : " matches"))))))));
     } else if (!r.q) {
       out.push(note("wait", "No regulars yet", "Players show up here once they've played a match to the end. Search for anyone with the box above.", []));
@@ -2724,7 +2748,7 @@
         if (my !== seq) return;
         results = arr(d.items).filter((x) => UUID_RE.test(str(x.uuid)));
         list.replaceChildren(...results.map((x, i) => inline
-          ? h("li", null, h("a", { href: toPlayer(x.uuid), "data-go": true }, avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x))))
+          ? h("li", null, h("a", { href: toPlayer(x.uuid), "data-go": true }, avatar(x.uuid, nameOf(x), 28), h("span", null, nameOf(x)), rankMark(x.uuid)))
           : h("li", { id: id + "-o" + i, role: "option", "aria-selected": "false",
             on: { pointerdown: (e) => { e.preventDefault(); pick(i); } } }, avatar(x.uuid, nameOf(x), 24), h("span", null, nameOf(x)))));
         highlight(-1);

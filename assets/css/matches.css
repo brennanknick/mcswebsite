@@ -407,6 +407,10 @@
 .mh-tag.mh-rank img, .mh-tag.mh-tier img { flex: 0 0 auto; width: 11px; height: 11px; image-rendering: pixelated; }
 .mh-cl-mark { display: inline-flex; align-items: center; margin-left: .35rem; vertical-align: -1px; }
 .mh-cl-mark .mh-i { width: 11px; height: 11px; fill: #ffcf6e; filter: drop-shadow(0 0 4px rgba(255, 207, 110, .5)); }
+/* a VIP's or MVP's sparkle after their name, the in-game art at 1x (2x on sharp screens) */
+.mh-rk-mark { display: inline-flex; flex: 0 0 auto; align-items: center; margin-left: .35rem; vertical-align: -1px; }
+.mh-rk-mark img { width: 11px; height: 11px; image-rendering: pixelated; filter: drop-shadow(0 0 4px rgba(255, 193, 7, .55)); }
+.mh-rk-mark.is-mvp img { filter: drop-shadow(0 0 4px rgba(255, 120, 17, .6)); }
 .mh-cl-title-star { width: 18px; height: 18px; fill: #ffcf6e; margin-right: .45rem; vertical-align: -1px; }
 .mh-cl-list { margin-bottom: 2.75rem; }
 .mh-cl-list .mh-cl-small { display: inline-flex; align-items: center; gap: .3rem; color: #ffcf6e; }

@@ -208,16 +208,19 @@
   function thanksFor() {
     let rank = "";
     let sub = false;
+    let both = false;
     try {
       const q = new URLSearchParams(location.search);
       rank = q.get("rank") || "";
       sub = q.get("sub") === "1";
+      both = q.get("with") === "vip";
     } catch {}
     const r = Object.values(RANK_PRODUCTS).find((x) => x.label.toLowerCase() === rank.toLowerCase());
     if (!r) return;
     const lead = $("[data-ty-lead]");
-    if (lead) lead.textContent = `Once your payment clears, your ${r.label} lands in game within about a minute, or when you next join.` +
-      (sub ? " It renews by itself until you cancel." : "");
+    if (lead) lead.textContent = both
+      ? "Once your payment clears, VIP and MVP land in game within about a minute, or when you next join." + (sub ? " VIP renews by itself until you cancel." : "")
+      : `Once your payment clears, your ${r.label} lands in game within about a minute, or when you next join.` + (sub ? " It renews by itself until you cancel." : "");
     const step = $("[data-ty-ingame]");
     if (step) step.textContent = sub
       ? "To cancel, go to checkout.paynow.gg/subscriptions and type the email you paid with. You keep it until the time you paid for runs out."
@@ -615,6 +618,8 @@
 
   // Each rank column's footer cell gets its button, and its price cell PayNow's price in this
   // buyer's currency. A rank PayNow doesn't list (not on sale yet) keeps "Coming soon".
+  const RANK_LOADED = {};   // rank id -> { p, d } once PayNow lists it: VIP for the "VIP + MVP" offer
+
   async function loadRanks() {
     const cells = $$("[data-rank-buy]");
     if (!cells.length) return;
@@ -632,6 +637,7 @@
       const p = bySlug.get(slug);
       if (!p || !RANK_PRODUCTS[slug]) return;
       const d = describeRank(p);
+      RANK_LOADED[d.rank] = { p, d };
       const price = $(`[data-rank-price="${slug}"] b`);
       if (price) price.textContent = d.price;
       cell.replaceChildren(buyButton(p, d, d.label, "Get " + d.label));
@@ -816,7 +822,7 @@
 
   /* ── buying ──────────────────────────────────────────────────────── */
 
-  let dlg, form, uIn, gIn, toggle, giftWrap, giftField, go, goLabel, alertBox, statusBox, sumBox, subBox;
+  let dlg, form, uIn, gIn, toggle, giftWrap, giftField, go, goLabel, alertBox, statusBox, sumBox, subBox, bundleBox;
   let current = null;      // { p, d, opener }
   let busy = false;
   let flight = null;       // AbortController for the calls in progress
@@ -838,6 +844,7 @@
     statusBox = $("[data-buy-status]", dlg);
     sumBox = $("[data-buy-sum]", dlg);
     subBox = $("[data-buy-subnote]", dlg);
+    bundleBox = $("[data-buy-bundle]", dlg);
 
     $("[data-buy-close]", dlg).addEventListener("click", () => closeBuy());
     dlg.addEventListener("cancel", (e) => { e.preventDefault(); closeBuy(); });
@@ -848,6 +855,7 @@
     dlg.addEventListener("click", (e) => { if (e.target === dlg && downOut) closeBuy(); });
 
     toggle.addEventListener("change", () => {
+      setBundle(null);
       giftField.hidden = !toggle.checked;
       giftWrap.classList.toggle("is-on", toggle.checked);
       if (toggle.checked) gIn.focus();
@@ -857,6 +865,7 @@
 
     [uIn, gIn].forEach((input) => {
       input.addEventListener("input", () => {
+        setBundle(null);
         // a fix clears the message as soon as the name is right
         const f = input.closest(".st-field");
         if (f.classList.contains("has-err") && !checkName(input)) setErr(input, "");
@@ -877,7 +886,8 @@
 
   function openBuy(p, d, opener) {
     if (!dlg) return;
-    current = { p, d, opener };
+    current = { p, d, opener, bundle: null };
+    if (bundleBox) bundleBox.hidden = true;
     const pile = $("[data-buy-pile]", dlg);
     pile.src = d.pile;
     pile.classList.toggle("is-gem", d.plain);
@@ -971,15 +981,23 @@
     const d = current.d;
     // a subscription for yourself, or 30 days as a gift: the heading and the note follow the switch
     const subOn = !!d.sub && !giftOn;
+    const bundle = current.bundle;
+    const vipSub = !!(bundle && bundle.d.sub && !giftOn);
     if (d.rank) {
-      $("[data-buy-name]", dlg).textContent = subOn ? "Subscription" : "Rank";
-      $("[data-buy-unit]", dlg).textContent = subOn ? d.every : d.term;
+      $("[data-buy-name]", dlg).textContent = bundle ? "Ranks" : subOn ? "Subscription" : "Rank";
+      $("[data-buy-amount]", dlg).textContent = bundle ? "VIP + MVP" : d.label;
+      $("[data-buy-unit]", dlg).textContent = bundle ? "together" : subOn ? d.every : d.term;
+      $("[data-buy-price]", dlg).textContent = bundle ? bundle.total : d.price;
     }
-    subBox.hidden = !subOn;
-    subBox.textContent = subOn
-      ? `Renews by itself at ${d.price} ${d.every} until you cancel. Cancel any time on PayNow, and you keep ${d.label} until the time you paid for runs out.`
-      : "";
-    const what = d.rank ? (subOn ? d.label : "30 days of " + d.label) : d.k ? num(d.total) + " Sapphires" : d.label;
+    subBox.hidden = !subOn && !vipSub;
+    subBox.textContent = vipSub
+      ? `VIP renews by itself at ${bundle.d.price} ${bundle.d.every} until you cancel. MVP is 30 days and doesn't renew. Cancel VIP any time on PayNow.`
+      : subOn
+        ? `Renews by itself at ${d.price} ${d.every} until you cancel. Cancel any time on PayNow, and you keep ${d.label} until the time you paid for runs out.`
+        : "";
+    const what = bundle
+      ? (vipSub ? "VIP, renewing " + bundle.d.every + " until you cancel, and 30 days of MVP" : "30 days of VIP and 30 days of MVP")
+      : d.rank ? (subOn ? d.label : "30 days of " + d.label) : d.k ? num(d.total) + " Sapphires" : d.label;
     const b = (t) => el("b", "", t);
     const parts = [];
     if (giftOn && NAME.test(g)) {
@@ -987,7 +1005,7 @@
       if (NAME.test(u)) parts.push(", as a gift from ", b(u));
       parts.push(".");
     } else if (!giftOn && NAME.test(u)) {
-      parts.push(b(u), " gets " + what + " in game" + (subOn ? ", renewing " + d.every + " until you cancel." : "."));
+      parts.push(b(u), " gets " + what + " in game" + (subOn && !bundle ? ", renewing " + d.every + " until you cancel." : "."));
     } else {
       const thing = d.rank ? "The rank goes" : "The Sapphires go";
       parts.push(thing + (giftOn ? " to the player you're gifting to." : " to the username you type."));
@@ -1002,6 +1020,32 @@
     const text = el("span");
     text.append(...parts.map((x) => (typeof x === "string" ? document.createTextNode(x) : x)));
     sumBox.replaceChildren(gem, text);
+  }
+
+  // The "VIP + MVP" offer for a player without VIP (vip: RANK_LOADED.vip), or null to drop it.
+  function setBundle(vip) {
+    if (!current || (!vip && !current.bundle)) return;
+    if (vip) {
+      const sum = Number(vip.p.pricing.price_final) + Number(current.p.pricing.price_final);
+      current.bundle = { p: vip.p, d: vip.d, total: money(sum, current.p.currency) };
+    } else {
+      current.bundle = null;
+    }
+    if (bundleBox) {
+      bundleBox.hidden = !vip;
+      bundleBox.replaceChildren();
+      if (vip) {
+        const who = (toggle.checked && !giftWrap.hidden ? gIn : uIn).value.trim();
+        bundleBox.append(el("b", "", who), " doesn't have VIP yet, and MVP needs it. Get both in one go: VIP ",
+          el("b", "", vip.d.price), " and MVP ", el("b", "", current.d.price), ".");
+      }
+    }
+    if (!busy) goLabel.textContent = goText();
+    summary();
+  }
+
+  function goText() {
+    return current && current.bundle ? "Get VIP + MVP" : "Continue to checkout";
   }
 
   function showAlert(msg, ref) {
@@ -1043,7 +1087,7 @@
     if (!go) return;
     go.removeAttribute("aria-disabled");
     go.classList.remove("is-busy");
-    goLabel.textContent = "Continue to checkout";
+    goLabel.textContent = goText();
     uIn.readOnly = false;
     gIn.readOnly = false;
     toggle.disabled = false;
@@ -1096,11 +1140,22 @@
     try {
       // MVP needs VIP active: its days only run while VIP's do, and the game refuses it too,
       // but only after the payment. VIP needs no check: a second one adds 30 days.
-      if (rank === "vipplus") {
+      if (rank === "vipplus" && !current.bundle) {
         const has = await vipHeld(who, ctl.signal);
         if (gone()) return;
-        const field = gift ? gIn : uIn;
-        if (!has) throw Object.assign(new Error("needs vip"), { kind: "rank", field, msg: "MVP needs VIP active, and " + who + " doesn't have it right now." });
+        if (!has) {
+          const vip = RANK_LOADED.vip;
+          const field = gift ? gIn : uIn;
+          // VIP not on sale (or not loaded): nothing to offer, so say why
+          if (!vip || !vip.d.canBuy || (gift && !vip.d.gift)) {
+            throw Object.assign(new Error("needs vip"), { kind: "rank", field, msg: "MVP needs VIP active, and " + who + " doesn't have it right now." });
+          }
+          flight = null;
+          idle();
+          setBundle(vip);
+          go.focus();
+          return;
+        }
         stage = "auth";
         step("Checking your username…");
       }
@@ -1114,11 +1169,21 @@
       // for yourself, a subscription rank renews by itself; a gift is one block of 30 days
       const subscribe = !!current.d.sub && !gift;
       if (subscribe) line.subscription = true;
+      // the offer taken: VIP first (a subscription for yourself, 30 days as a gift), then MVP
+      const bundle = current.bundle;
+      const lines = [line];
+      if (bundle) {
+        const vl = { product_id: bundle.p.id, quantity: 1 };
+        if (gift) vl.gift_to = { platform: "minecraft", id: gift };
+        else if (bundle.d.sub) vl.subscription = true;
+        lines.unshift(vl);
+      }
       const thanks = new URL("thanks/", new URL("./", location.href));
       if (rank) thanks.searchParams.set("rank", current.d.label.toLowerCase());
-      if (subscribe) thanks.searchParams.set("sub", "1");
+      if (subscribe || (bundle && bundle.d.sub && !gift)) thanks.searchParams.set("sub", "1");
+      if (bundle) thanks.searchParams.set("with", "vip");
       const body = {
-        lines: [line],
+        lines,
         return_url: thanks.href,
         cancel_url: new URL("./", location.href).href,
         auto_redirect: true,
