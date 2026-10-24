@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=5778383a" />
-<link rel="stylesheet" href="../assets/css/store.css?v=f39d0f9b" />
+<link rel="stylesheet" href="../assets/css/store.css?v=f9154b8d" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -34,7 +34,7 @@
 <!-- Loaded up here, before anything paints, so the page opens straight
      into the right state (on its way / not open yet / open) with no flash. -->
 <script src="../site.config.js?v=7002da49"></script>
-<script src="../assets/js/store.js?v=f0f191e7" data-page="store"></script>
+<script src="../assets/js/store.js?v=a476f93c" data-page="store"></script>
 </head>
 <body>
 
@@ -293,6 +293,23 @@
       <p class="st-wall-lead">Every rank keeps MCS running. Thank you.</p>
     </div>
     <ul class="st-wall-list" data-wall-list></ul>
+  </section>
+
+  <!-- ═══════════════════════════ TOP GIFTERS ══════════════════════════
+       Who has gifted the most ranks, in game (/gift) and on this store,
+       from the match API's meta.gifters (store.js): a podium for the top
+       three, then the rest. Hidden until ranks are out and someone has
+       gifted. -->
+  <section class="st-wrap st-gifters" id="gifters" aria-labelledby="gifters-title" data-show="on" data-ranks data-gifters hidden>
+    <div class="st-wall-head">
+      <p class="st-kicker">Gifting</p>
+      <h2 class="st-h2" id="gifters-title">Top <span class="st-gold">gifters</span></h2>
+      <p class="st-wall-lead">Every VIP or MVP you gift counts, in game with <code>/gift</code> or here as a gift. Fifty gifts unlock a gradient name, and 150 a rainbow.</p>
+    </div>
+    <div class="st-gift-board">
+      <ol class="st-gift-podium" data-gift-podium></ol>
+      <ol class="st-gift-list" start="4" data-gift-list></ol>
+    </div>
   </section>
 
   <!-- ═════════════════════════════ FAQ ════════════════════════════ -->

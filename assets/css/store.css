@@ -1180,6 +1180,77 @@ html:not([data-ranks="on"]) [data-ranks] { display: none !important; }
 .st-go.is-busy .arrow { animation: st-nudge .7s steps(2, jump-none) infinite; }
 @keyframes st-nudge { 50% { transform: translateX(4px); } }
 
+/* ── top gifters: a podium for the top three, then the rest ── */
+.st-gifters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr);
+  align-items: start;
+  gap: 1.5rem 4rem;
+  margin-top: 5.5rem;
+  scroll-margin-top: 1.5rem;
+}
+.st-gift-board { display: grid; gap: 1.5rem; }
+.st-gift-podium {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  align-items: end;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.st-gift-step { display: grid; justify-items: center; gap: .45rem; min-width: 0; text-align: center; }
+.st-gift-step a { display: grid; justify-items: center; gap: .4rem; min-width: 0; max-width: 100%; color: inherit; text-decoration: none; }
+.st-gift-step img { image-rendering: pixelated; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .5)); }
+.st-gift-step .st-gift-name { max-width: 100%; overflow: hidden; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; color: var(--text-strong); }
+.st-gift-step.is-p1 .st-gift-name { color: #ffd98a; }
+.st-gift-step a:hover .st-gift-name, .st-gift-step a:focus-visible .st-gift-name { color: #fff; text-decoration: underline; }
+/* the plinth: gold, silver, bronze, the winner's the tallest */
+.st-gift-plinth {
+  --p: #c9a227;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 54px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0b1210;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--p) 75%, #fff), var(--p) 45%, color-mix(in srgb, var(--p) 70%, #000));
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, .35), inset 0 -4px 0 rgba(0, 0, 0, .25);
+  clip-path: var(--notch);
+}
+.st-gift-step.is-p1 .st-gift-plinth { --p: #ffc107; height: 84px; font-size: 2rem; }
+.st-gift-step.is-p2 .st-gift-plinth { --p: #b9c3cf; height: 62px; }
+.st-gift-step.is-p3 .st-gift-plinth { --p: #cd7f32; height: 46px; }
+.st-gift-step.is-p1 img { filter: drop-shadow(0 0 18px rgba(255, 193, 7, .45)) drop-shadow(0 6px 10px rgba(0, 0, 0, .5)); }
+.st-gift-count { display: inline-flex; align-items: center; gap: .35rem; font-variant-numeric: tabular-nums; color: #ffd98a; }
+.st-gift-count b { font-weight: 800; color: #fff; }
+.st-gift-ico { width: 13px; height: 13px; fill: #ffc107; }
+.st-gift-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.st-gift-list[hidden] { display: none; }
+.st-gift-row {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .75rem;
+  padding: .45rem .9rem .45rem .6rem;
+  background: rgba(255, 255, 255, .03);
+  clip-path: var(--notch);
+}
+.st-gift-place { font-weight: 800; color: var(--text-faint); text-align: right; font-variant-numeric: tabular-nums; }
+.st-gift-row a { display: flex; align-items: center; gap: .6rem; min-width: 0; color: inherit; text-decoration: none; }
+.st-gift-row img { flex: 0 0 auto; image-rendering: pixelated; }
+.st-gift-row .st-gift-name { overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.st-gift-row a:hover .st-gift-name, .st-gift-row a:focus-visible .st-gift-name { color: #fff; text-decoration: underline; }
+@media (max-width: 860px) {
+  .st-gifters { grid-template-columns: minmax(0, 1fr); margin-top: 4rem; }
+  .st-gifters .st-wall-head { position: static; }
+}
+@media (max-width: 420px) {
+  .st-gift-podium { gap: 6px; }
+  .st-gift-step .st-gift-name { font-size: 13px; }
+}
+
 /* a subscription's terms, in full, before the button (gold, VIP's colour) */
 .st-subnote {
   margin: .75rem 0 0;

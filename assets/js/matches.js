@@ -161,6 +161,8 @@
     pencil: ["0 0 8 8", "M6 0h1v1h1v1H7v1H6v1H5v1H4v1H3v1H2v1H0V6h1V5h1V4h1V3h1V2h1V1h1z"],
     pause: ["0 0 6 7", "M0 0h2v7H0zM4 0h2v7H4z"],
     swap: ["0 0 9 9", "M5 0h1v1H5zM5 1h2v1H5zM0 2h8v1H0zM5 3h2v1H5zM5 4h1v1H5zM3 4h1v1H3zM2 5h2v1H2zM1 6h8v1H1zM2 7h2v1H2zM3 8h1v1H3z"],
+    // a wrapped present: the bow, the lid and the box, with the ribbon down the middle
+    gift: ["0 0 9 9", "M2 0h2v1H2zM5 0h2v1H5zM1 1h1v1H1zM4 1h1v1H4zM7 1h1v1H7zM0 2h4v2H0zM5 2h4v2H5zM1 4h3v5H1zM5 4h3v5H5z"],
   };
   function icon(name, cls) {
     const d = ICONS[name];
@@ -438,6 +440,14 @@
   // wears the same). `rank` is the one that shows, and a staff rank beats a bought one there, so
   // `ranks`, everything they hold, decides. MVPs hold vip too.
   const FRAMES = { vipplus: { cls: "is-mvp", art: "rank-mvp.png", name: "MVP" }, vip: { cls: "is-vip", art: "rank-vip.png", name: "VIP" } };
+  // Their name's look in game (API nameStyle, from the loyalty colours): one colour is a solid name,
+  // more fade across it. A CSS background for the name, or null to keep the rank's own colour.
+  function nameLook(ns) {
+    const c = arr(obj(ns).colours).map(str).filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 8);
+    if (!c.length) return null;
+    return "linear-gradient(90deg, " + (c.length === 1 ? c[0] + ", " + c[0] : c.join(", ")) + ")";
+  }
+
   function frameOf(d) {
     const held = [d.rank].concat(arr(d.ranks)).map((x) => str(x).toLowerCase());
     if (held.includes("vipplus") || held.includes("mvp")) return "vipplus";
@@ -2142,6 +2152,8 @@
 
     const frame = frameOf(d);
     const fr = frame && FRAMES[frame];
+    const look = nameLook(d.nameStyle);
+    const gifted = num(d.gifted);
     const hero = h("section", { class: "mh-pl-hero" + (fr ? " is-framed " + fr.cls : ""), "aria-labelledby": "mh-pl-name" },
       h("div", { class: "mh-hero-top" },
         h("a", { class: "mh-back", href: S.lastList, "data-go": true }, icon("tri"), "Match history"),
@@ -2150,11 +2162,12 @@
         h("div", { class: "mh-pl-render" }, body),
         h("div", { class: "mh-pl-text" },
           h("p", { class: "mh-eyebrow" }, "Player"),
-          h("h1", { class: "mh-pl-name", id: "mh-pl-name" }, name),
+          h("h1", { class: "mh-pl-name" + (look ? " has-look" : ""), id: "mh-pl-name", style: look ? { "--nm": look } : null }, name),
           h("div", { class: "mh-pl-tags" },
             // the frame's tag already says VIP or MVP; a staff rank still gets its chip
             frame && str(d.rank).toLowerCase() === frame ? null : rankChip(d.rank),
             tierChip(tier),
+            gifted > 0 ? h("span", { class: "mh-tag mh-gifted", title: "Ranks they've gifted to other players" }, icon("gift"), "Gifted " + gifted) : null,
             arr(d.badges).includes("champions_league") || isCL(r.uuid) ? clChip() : null,
             clubChip(club),
             src ? h("span", { class: "mh-dim" }, "Last played " + ago(num(src.lastPlayed))) : null,

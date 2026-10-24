@@ -200,7 +200,7 @@
     if (box && STORE_ID) {
       loadCatalog(box);
       setupBuy();
-      if (html.dataset.ranks === "on") { loadRanks(); loadWall(); }
+      if (html.dataset.ranks === "on") { loadRanks(); loadWall(); loadGifters(); }
     }
   });
 
@@ -700,15 +700,22 @@
 
   // meta.supporters comes MVP first, then VIP, longest first, only while ranks are out. Nobody
   // on it (or the API not answering): the section stays hidden.
+  // one read of meta for the wall and the gifters both (null when the API doesn't answer)
+  let metaOnce = null;
+  function siteMeta() {
+    if (!metaOnce) {
+      metaOnce = fetch(SITE_API + "/api/v1/meta", { credentials: "omit", headers: { Accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+    }
+    return metaOnce;
+  }
+
   async function loadWall() {
     const box = $("[data-wall]");
     const list = $("[data-wall-list]");
     if (!box || !list || !SITE_API) return;
-    let meta = null;
-    try {
-      const r = await fetch(SITE_API + "/api/v1/meta", { credentials: "omit", headers: { Accept: "application/json" } });
-      if (r.ok) meta = await r.json();
-    } catch {}
+    const meta = await siteMeta();
     const people = meta && Array.isArray(meta.supporters)
       ? meta.supporters.filter((x) => x && typeof x.uuid === "string" && /^[0-9a-f-]{32,36}$/i.test(x.uuid) && NAME.test(String(x.name || "")))
       : [];
@@ -732,6 +739,78 @@
       li.append(a);
       return li;
     }));
+    box.hidden = false;
+  }
+
+  /* ── top gifters: who has gifted the most ranks ──────────────────── */
+
+  // the wrapped present from the player pages, at 11 art pixels
+  function giftIcon() {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 9 9");
+    svg.setAttribute("class", "st-gift-ico px");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", "M2 0h2v1H2zM5 0h2v1H5zM1 1h1v1H1zM4 1h1v1H4zM7 1h1v1H7zM0 2h4v2H0zM5 2h4v2H5zM1 4h3v5H1zM5 4h3v5H5z");
+    svg.append(path);
+    return svg;
+  }
+
+  // meta.gifters: the top 50, most gifted first, only while ranks are out. Nobody yet (or the API
+  // not answering): the section stays hidden. Ties share a place.
+  async function loadGifters() {
+    const box = $("[data-gifters]");
+    const podium = $("[data-gift-podium]");
+    const list = $("[data-gift-list]");
+    if (!box || !podium || !list || !SITE_API) return;
+    const meta = await siteMeta();
+    const people = meta && Array.isArray(meta.gifters)
+      ? meta.gifters.filter((x) => x && typeof x.uuid === "string" && /^[0-9a-f-]{32,36}$/i.test(x.uuid) && NAME.test(String(x.name || "")) && Number(x.gifted) > 0)
+      : [];
+    if (!people.length) return;
+    let place = 0;
+    let last = null;
+    people.forEach((x, i) => {
+      if (Number(x.gifted) !== last) place = i + 1;
+      last = Number(x.gifted);
+      x.place = place;
+    });
+    const count = (x) => {
+      const c = el("span", "st-gift-count");
+      c.append(el("b", "", num(x.gifted)), giftIcon(), el("span", "visually-hidden", Number(x.gifted) === 1 ? " rank gifted" : " ranks gifted"));
+      return c;
+    };
+    const link = (x, size) => {
+      const a = el("a");
+      a.href = "../matches/?p=" + encodeURIComponent(x.uuid);
+      const img = el("img");
+      img.src = "https://mc-heads.net/avatar/" + encodeURIComponent(x.uuid) + "/" + size * 2;
+      img.width = size;
+      img.height = size;
+      img.alt = "";
+      img.loading = "lazy";
+      a.append(img, el("span", "st-gift-name", x.name));
+      return a;
+    };
+    // the podium in the order it stands: second, first, third
+    const top = people.slice(0, 3);
+    const order = [top[1], top[0], top[2]].filter(Boolean);
+    podium.replaceChildren(...order.map((x) => {
+      const li = el("li", "st-gift-step is-p" + Math.min(x.place, 3));
+      li.style.setProperty("--i", String(x === top[0] ? 1 : x === top[1] ? 0 : 2));
+      li.classList.add("st-in");
+      const plinth = el("span", "st-gift-plinth");
+      plinth.append(el("span", "visually-hidden", "Place "), el("b", "", String(x.place)));
+      li.append(link(x, x === top[0] ? 56 : 44), count(x), plinth);
+      return li;
+    }));
+    list.replaceChildren(...people.slice(3).map((x) => {
+      const li = el("li", "st-gift-row");
+      li.append(el("span", "st-gift-place", String(x.place)), link(x, 24), count(x));
+      return li;
+    }));
+    list.hidden = people.length <= 3;
     box.hidden = false;
   }
 

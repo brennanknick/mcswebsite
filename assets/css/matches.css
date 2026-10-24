@@ -1318,6 +1318,17 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   -webkit-background-clip: text;
   background-clip: text;
 }
+/* their loyalty colours in game (nameStyle), over the rank's own: a solid name or a fade */
+.mh-pl-hero .mh-pl-name.has-look {
+  display: inline-block;
+  max-width: 100%;
+  color: transparent;
+  background: var(--nm);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.mh-tag.mh-gifted { display: inline-flex; align-items: center; gap: .4rem; color: #ffd98a; background: rgba(255, 193, 7, .12); box-shadow: inset 0 0 0 1px rgba(255, 193, 7, .4); }
+.mh-tag.mh-gifted .mh-i { width: 11px; height: 11px; fill: currentColor; }
 @media (max-width: 800px) {
   .mh-pl-hero.is-framed::before { --s: 11px; inset: 5px; }
 }
@@ -1325,7 +1336,7 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   .mh-pl-hero.is-framed::after { animation: none; }
 }
 @media (forced-colors: active) {
-  .mh-pl-hero.is-mvp .mh-pl-name { color: CanvasText; background: none; }
+  .mh-pl-hero.is-mvp .mh-pl-name, .mh-pl-hero .mh-pl-name.has-look { color: CanvasText; background: none; }
 }
 
 .mh-pl-hero + .mh-seg { margin-bottom: 1.25rem; }
