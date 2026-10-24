@@ -96,7 +96,7 @@
      come from PayNow, as for the bundles; `id` is the game's rank id. ── */
   const RANK_TAG = override("paynowRankTag", "pn-rank-tag") || "ranks";
   const RANK_PRODUCTS = {
-    "rank-vip": { id: "vip", label: "VIP", art: "rank-vip.png", term: "forever" },
+    "rank-vip": { id: "vip", label: "VIP", art: "rank-vip.png", term: "for 30 days" },
     "rank-mvp": { id: "vipplus", label: "MVP", art: "rank-mvp.png", term: "for 30 days" },
   };
   // the match API, which knows who holds VIP (MVP needs it); ?api= on
@@ -646,9 +646,10 @@
     };
   }
 
-  // Does this player hold VIP? true or false, or it throws (kind "rankcheck") when the match API
-  // can't say. meta.ranks lists every holder by name, played or not, except anyone who hid from
-  // the supporters wall; their own page still lists their ranks, if they've played.
+  // Does this player have VIP active? true or false, or it throws (kind "rankcheck") when the
+  // match API can't say. meta.ranks lists every active holder by name, played or not, except
+  // anyone who hid from the supporters wall; their own page still lists their ranks, if they've
+  // played. Ranks that ran out drop off both.
   async function vipHeld(name, signal) {
     const fail = (kind) => Object.assign(new Error(kind), { kind });
     if (!SITE_API) throw fail("rankcheck");
@@ -868,7 +869,7 @@
     const g = gIn.value.trim();
     const giftOn = toggle.checked && !giftWrap.hidden;
     const d = current.d;
-    const what = d.rank ? (d.rank === "vipplus" ? "30 days of MVP" : "VIP forever") : d.k ? num(d.total) + " Sapphires" : d.label;
+    const what = d.rank ? (d.rank === "vipplus" ? "30 days of MVP" : "30 days of VIP") : d.k ? num(d.total) + " Sapphires" : d.label;
     const b = (t) => el("b", "", t);
     const parts = [];
     if (giftOn && NAME.test(g)) {
@@ -976,21 +977,20 @@
     const who = gift || user;
     const ctl = new AbortController();
     flight = ctl;
-    let stage = rank ? "rank" : "auth";
-    working(rank ? "Checking " + who + "'s rank…" : "Checking your username…");
+    let stage = rank === "vipplus" ? "rank" : "auth";
+    working(rank === "vipplus" ? "Checking " + who + "'s rank…" : "Checking your username…");
     slowTimer = setTimeout(() => say("PayNow is taking a while. Hang on…", true), 4000);
     // closed (or replaced by a newer try) while a reply was on its way
     const gone = () => ctl.signal.aborted || flight !== ctl;
 
     try {
-      // MVP needs VIP (it's 30 days on top of it), and VIP is forever, so a second one is money
-      // for nothing. The game refuses either too, but only after the payment.
-      if (rank) {
+      // MVP needs VIP active: its days only run while VIP's do, and the game refuses it too,
+      // but only after the payment. VIP needs no check: a second one adds 30 days.
+      if (rank === "vipplus") {
         const has = await vipHeld(who, ctl.signal);
         if (gone()) return;
         const field = gift ? gIn : uIn;
-        if (rank === "vipplus" && !has) throw Object.assign(new Error("needs vip"), { kind: "rank", field, msg: "MVP needs VIP first, and " + who + " doesn't have it yet." });
-        if (rank === "vip" && has) throw Object.assign(new Error("has vip"), { kind: "rank", field, msg: who + " already has VIP. It's theirs forever." });
+        if (!has) throw Object.assign(new Error("needs vip"), { kind: "rank", field, msg: "MVP needs VIP active, and " + who + " doesn't have it right now." });
         stage = "auth";
         step("Checking your username…");
       }
