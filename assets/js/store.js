@@ -207,13 +207,21 @@
   /* the thanks page after a rank: it lands in game, not Sapphires */
   function thanksFor() {
     let rank = "";
-    try { rank = new URLSearchParams(location.search).get("rank") || ""; } catch {}
+    let sub = false;
+    try {
+      const q = new URLSearchParams(location.search);
+      rank = q.get("rank") || "";
+      sub = q.get("sub") === "1";
+    } catch {}
     const r = Object.values(RANK_PRODUCTS).find((x) => x.label.toLowerCase() === rank.toLowerCase());
     if (!r) return;
     const lead = $("[data-ty-lead]");
-    if (lead) lead.textContent = `Once your payment clears, your ${r.label} lands in game within about a minute, or when you next join.`;
+    if (lead) lead.textContent = `Once your payment clears, your ${r.label} lands in game within about a minute, or when you next join.` +
+      (sub ? " It renews by itself until you cancel." : "");
     const step = $("[data-ty-ingame]");
-    if (step) step.textContent = "It goes to the player you bought for. Online now? About a minute. Offline? It's waiting when you join.";
+    if (step) step.textContent = sub
+      ? "To cancel, go to checkout.paynow.gg/subscriptions and type the email you paid with. You keep it until the time you paid for runs out."
+      : "It goes to the player you bought for. Online now? About a minute. Offline? It's waiting when you join.";
   }
 
   /* contact: the support email, or the Discord until there is one */
@@ -630,19 +638,31 @@
     });
   }
 
+  // "every 30 days", "every month": PayNow's billing interval in words
+  function everyText(value, scale) {
+    const n = Math.max(1, Math.round(Number(value) || 1));
+    const unit = { day: "day", week: "week", month: "month", year: "year" }[scale] || "month";
+    return n === 1 ? "every " + unit : "every " + n + " " + unit + "s";
+  }
+
   function describeRank(p) {
     const r = RANK_PRODUCTS[p.slug];
     const pr = p.pricing;
     const cut = Number.isFinite(pr.price_original) && pr.price_original > pr.price_final;
+    // A rank PayNow sells as a subscription (VIP) renews by itself when you buy it for yourself.
+    // A gift is one block of 30 days, so a gift needs the one-time option on too.
+    const sub = p.allow_subscription === true;
+    const once = p.allow_one_time_purchase !== false;
     return {
       k: null, rank: r.id, label: r.label, term: r.term, amount: 0, total: 0,
+      sub, every: sub ? everyText(p.subscription_interval_value, p.subscription_interval_scale) : "",
       price: money(pr.price_final, p.currency),
       was: cut ? money(pr.price_original, p.currency) : "",
       off: "", saleName: "",
       vat: taxLine(p),
       pile: IMG + r.art, plain: false,
       canBuy: !p.stock || p.stock.available_to_purchase !== false,
-      gift: p.is_gifting_disabled !== true,
+      gift: p.is_gifting_disabled !== true && (!sub || once),
     };
   }
 
@@ -717,7 +737,7 @@
 
   /* ── buying ──────────────────────────────────────────────────────── */
 
-  let dlg, form, uIn, gIn, toggle, giftWrap, giftField, go, goLabel, alertBox, statusBox, sumBox;
+  let dlg, form, uIn, gIn, toggle, giftWrap, giftField, go, goLabel, alertBox, statusBox, sumBox, subBox;
   let current = null;      // { p, d, opener }
   let busy = false;
   let flight = null;       // AbortController for the calls in progress
@@ -738,6 +758,7 @@
     alertBox = $("[data-buy-alert]", dlg);
     statusBox = $("[data-buy-status]", dlg);
     sumBox = $("[data-buy-sum]", dlg);
+    subBox = $("[data-buy-subnote]", dlg);
 
     $("[data-buy-close]", dlg).addEventListener("click", () => closeBuy());
     dlg.addEventListener("cancel", (e) => { e.preventDefault(); closeBuy(); });
@@ -869,7 +890,17 @@
     const g = gIn.value.trim();
     const giftOn = toggle.checked && !giftWrap.hidden;
     const d = current.d;
-    const what = d.rank ? (d.rank === "vipplus" ? "30 days of MVP" : "30 days of VIP") : d.k ? num(d.total) + " Sapphires" : d.label;
+    // a subscription for yourself, or 30 days as a gift: the heading and the note follow the switch
+    const subOn = !!d.sub && !giftOn;
+    if (d.rank) {
+      $("[data-buy-name]", dlg).textContent = subOn ? "Subscription" : "Rank";
+      $("[data-buy-unit]", dlg).textContent = subOn ? d.every : d.term;
+    }
+    subBox.hidden = !subOn;
+    subBox.textContent = subOn
+      ? `Renews by itself at ${d.price} ${d.every} until you cancel. Cancel any time on PayNow, and you keep ${d.label} until the time you paid for runs out.`
+      : "";
+    const what = d.rank ? (subOn ? d.label : "30 days of " + d.label) : d.k ? num(d.total) + " Sapphires" : d.label;
     const b = (t) => el("b", "", t);
     const parts = [];
     if (giftOn && NAME.test(g)) {
@@ -877,7 +908,7 @@
       if (NAME.test(u)) parts.push(", as a gift from ", b(u));
       parts.push(".");
     } else if (!giftOn && NAME.test(u)) {
-      parts.push(b(u), " gets " + what + " in game.");
+      parts.push(b(u), " gets " + what + " in game" + (subOn ? ", renewing " + d.every + " until you cancel." : "."));
     } else {
       const thing = d.rank ? "The rank goes" : "The Sapphires go";
       parts.push(thing + (giftOn ? " to the player you're gifting to." : " to the username you type."));
@@ -1001,8 +1032,12 @@
       };
       const line = { product_id: p.id, quantity: 1 };
       if (gift) line.gift_to = { platform: "minecraft", id: gift };
+      // for yourself, a subscription rank renews by itself; a gift is one block of 30 days
+      const subscribe = !!current.d.sub && !gift;
+      if (subscribe) line.subscription = true;
       const thanks = new URL("thanks/", new URL("./", location.href));
       if (rank) thanks.searchParams.set("rank", current.d.label.toLowerCase());
+      if (subscribe) thanks.searchParams.set("sub", "1");
       const body = {
         lines: [line],
         return_url: thanks.href,

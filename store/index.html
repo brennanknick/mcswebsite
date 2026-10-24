@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css?v=5778383a" />
-<link rel="stylesheet" href="../assets/css/store.css?v=4d4eab1d" />
+<link rel="stylesheet" href="../assets/css/store.css?v=f39d0f9b" />
 <script>
   document.documentElement.classList.add("reveal-on");
   setTimeout(function () {
@@ -34,7 +34,7 @@
 <!-- Loaded up here, before anything paints, so the page opens straight
      into the right state (on its way / not open yet / open) with no flash. -->
 <script src="../site.config.js?v=7002da49"></script>
-<script src="../assets/js/store.js?v=773627fb" data-page="store"></script>
+<script src="../assets/js/store.js?v=f0f191e7" data-page="store"></script>
 </head>
 <body>
 
@@ -216,9 +216,9 @@
       <h2 class="st-h2" id="ranks-title">Pick a <span class="st-gold">rank</span></h2>
       <p class="st-rk-lead">Stand out on the pitch, in chat and on Discord.</p>
       <ul class="st-rk-notes">
-        <li>Each one lasts <b>30 days</b>. Buy again to add 30 more.</li>
-        <li><b>MVP</b> needs VIP active. If VIP runs out, MVP pauses until it's back.</li>
-        <li>Send either one to a friend as a gift.</li>
+        <li><b>VIP</b> is a subscription. It renews every 30 days until you cancel.</li>
+        <li><b>MVP</b> is 30 days at a time and needs VIP active. If VIP runs out, MVP pauses until it's back.</li>
+        <li>Gift either one to a friend: 30 days, no subscription.</li>
         <li>Looks and lobby only. No edge in a match.</li>
       </ul>
     </div>
@@ -241,9 +241,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr class="st-rk-price" style="--r:1"><th scope="row">Price</th><td class="is-vip" data-rank-price="rank-vip"><b>$10</b><small class="st-rk-per">for 30 days</small></td><td class="is-mvp" data-rank-price="rank-mvp"><b>$10</b><small class="st-rk-per">for 30 days</small></td></tr>
-          <tr style="--r:2"><th scope="row">Or with Sapphires</th><td class="is-vip"><span class="st-rk-sa">1,000<img src="../assets/img/store/gem.png" width="16" height="16" alt=" Sapphires" /></span></td><td class="is-mvp"><span class="st-rk-sa">1,000<img src="../assets/img/store/gem.png" width="16" height="16" alt=" Sapphires" /></span></td></tr>
-          <tr style="--r:3"><th scope="row">Lasts</th><td class="is-vip">30 days</td><td class="is-mvp">30 days</td></tr>
+          <tr class="st-rk-price" style="--r:1"><th scope="row">Price</th><td class="is-vip" data-rank-price="rank-vip"><b>$10</b><small class="st-rk-per">every 30 days</small></td><td class="is-mvp" data-rank-price="rank-mvp"><b>$10</b><small class="st-rk-per">for 30 days</small></td></tr>
+          <tr style="--r:2"><th scope="row">Or with Sapphires</th><td class="is-vip"><span class="st-rk-sa">1,000<img src="../assets/img/store/gem.png" width="16" height="16" alt=" Sapphires" /></span><small class="st-rk-per">for 30 days</small></td><td class="is-mvp"><span class="st-rk-sa">1,000<img src="../assets/img/store/gem.png" width="16" height="16" alt=" Sapphires" /></span><small class="st-rk-per">for 30 days</small></td></tr>
+          <tr style="--r:3"><th scope="row">Renews by itself</th><td class="is-vip"><svg class="st-rk-yes px" viewBox="0 0 10 7" aria-hidden="true"><path d="M8 0h2v1H8zM7 1h2v1H7zM6 2h2v1H6zM0 3h2v1H0zM5 3h2v1H5zM1 4h2v1H1zM4 4h2v1H4zM2 5h3v1H2zM3 6h1v1H3z"/></svg><span class="visually-hidden">Yes</span></td><td class="is-mvp"><svg class="st-rk-no px" viewBox="0 0 8 7" aria-hidden="true"><path d="M0 0h2v1H0zM6 0h2v1H6zM1 1h2v1H1zM5 1h2v1H5zM2 2h4v1H2zM3 3h2v1H3zM2 4h4v1H2zM1 5h2v1H1zM5 5h2v1H5zM0 6h2v1H0zM6 6h2v1H6z"/></svg><span class="visually-hidden">No</span></td></tr>
         </tbody>
         <tbody>
           <tr class="st-rk-group" style="--r:4"><th scope="colgroup" colspan="3">In game</th></tr>
@@ -341,6 +341,14 @@
         <p>Refunds are handled by PayNow, under its <a href="https://paynow.gg/legal/buyer-agreement" target="_blank" rel="noopener">Buyer Agreement</a>.</p>
         <p>If you bought from the EU, you can withdraw within 14 days of buying and get your money back for any Sapphires you haven't used. For a refund, <span data-support-line>ask us on <a href="../#discord">Discord</a></span> with your order ID.</p>
         <p>Refunded Sapphires are taken back off your balance.</p>
+      </div>
+    </details>
+
+    <details class="acc" data-ranks>
+      <summary>How do I cancel VIP?</summary>
+      <div class="acc-body">
+        <p>Bought for yourself, VIP renews every 30 days until you cancel. Go to <a href="https://checkout.paynow.gg/subscriptions" target="_blank" rel="noopener">checkout.paynow.gg/subscriptions</a>, type the email you paid with, and PayNow emails you a link to cancel.</p>
+        <p>You keep VIP until the time you paid for runs out. Cancelling doesn't refund time you've already paid for.</p>
       </div>
     </details>
 
@@ -495,6 +503,7 @@
     </div>
 
     <p class="st-sum" id="buy-sum" data-buy-sum></p>
+    <p class="st-subnote" data-buy-subnote hidden></p>
 
     <div class="st-alert" role="alert" data-buy-alert></div>
 
