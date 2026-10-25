@@ -672,11 +672,12 @@
     };
   }
 
-  // Does this player have VIP active? true or false, or it throws (kind "rankcheck") when the
-  // match API can't say. meta.ranks lists every active holder by name, played or not, except
-  // anyone who hid from the supporters wall; their own page still lists their ranks, if they've
-  // played. Ranks that ran out drop off both.
-  async function vipHeld(name, signal) {
+  // A player's ranks as the match API shows them: { vip, mvp, staff } (true or false), or it throws
+  // (kind "rankcheck") when the API can't say. meta.ranks lists every active holder by name, played
+  // or not, except anyone who hid from the supporters wall; their own page still shows their ranks
+  // (and "rank" still names a staff rank), if they've played. Ranks that ran out drop off both.
+  const STAFF_RANKS = ["owner", "admin", "developer", "mod", "helper", "media"];
+  async function rankInfo(name, signal) {
     const fail = (kind) => Object.assign(new Error(kind), { kind });
     if (!SITE_API) throw fail("rankcheck");
     const get = async (path) => {
@@ -693,13 +694,18 @@
     const lower = name.toLowerCase();
     const named = (x) => String((x && x.name) || "").toLowerCase() === lower;
     const meta = await get("/api/v1/meta");
-    const vip = meta && meta.ranks && meta.ranks.vip;
-    if (vip && Array.isArray(vip.players) && vip.players.some(named)) return true;
+    const ranks = (meta && meta.ranks) || {};
+    const holds = (id) => !!(ranks[id] && Array.isArray(ranks[id].players) && ranks[id].players.some(named));
+    const listed = { vip: holds("vip"), mvp: holds("vipplus"), staff: STAFF_RANKS.some(holds) };
+    // listed anywhere means they aren't hidden, so meta says it all
+    if (listed.vip || listed.mvp || listed.staff) return listed;
     const found = await get("/api/v1/players?q=" + encodeURIComponent(name));
     const hit = found && Array.isArray(found.items) ? found.items.find(named) : null;
-    if (!hit) return false;
+    if (!hit) return listed;
     const prof = await get("/api/v1/players/" + encodeURIComponent(hit.uuid));
-    return !!(prof && Array.isArray(prof.ranks) && prof.ranks.includes("vip"));
+    const held = prof && Array.isArray(prof.ranks) ? prof.ranks.map(String) : [];
+    const shown = String((prof && prof.rank) || "");
+    return { vip: held.includes("vip"), mvp: held.includes("vipplus"), staff: STAFF_RANKS.includes(shown) || held.some((x) => STAFF_RANKS.includes(x)) };
   }
 
   /* ── the supporters wall: everyone with a rank who hasn't hidden ── */
@@ -1137,21 +1143,27 @@
     const who = gift || user;
     const ctl = new AbortController();
     flight = ctl;
-    let stage = rank === "vipplus" ? "rank" : "auth";
-    working(rank === "vipplus" ? "Checking " + who + "'s rank…" : "Checking your username…");
+    // a rank gift, or MVP: their ranks first (once; the "VIP + MVP" offer was checked already)
+    const checks = !!rank && !current.bundle && (!!gift || rank === "vipplus");
+    let stage = checks ? "rank" : "auth";
+    working(checks ? "Checking " + who + "'s rank…" : "Checking your username…");
     slowTimer = setTimeout(() => say("PayNow is taking a while. Hang on…", true), 4000);
     // closed (or replaced by a newer try) while a reply was on its way
     const gone = () => ctl.signal.aborted || flight !== ctl;
 
     try {
-      // MVP needs VIP active: its days only run while VIP's do, and the game refuses it too,
-      // but only after the payment. VIP needs no check: a second one adds 30 days.
-      if (rank === "vipplus" && !current.bundle) {
-        const has = await vipHeld(who, ctl.signal);
+      // Before any payment (Brenn 2026-10-25): no rank gifts to staff, no MVP gift on top of MVP,
+      // and MVP needs VIP active, since its days only run while VIP's do (without it, the offer of
+      // both). The game refuses these too, but only after the payment. Buying for yourself skips
+      // the first two, and VIP for yourself needs no check: a second one adds 30 days.
+      if (checks) {
+        const info = await rankInfo(who, ctl.signal);
         if (gone()) return;
-        if (!has) {
+        const field = gift ? gIn : uIn;
+        if (gift && info.staff) throw Object.assign(new Error("staff"), { kind: "rank", field, msg: "Staff can't be gifted ranks." });
+        if (gift && rank === "vipplus" && info.mvp) throw Object.assign(new Error("has mvp"), { kind: "rank", field, msg: who + " has MVP already." });
+        if (rank === "vipplus" && !info.vip) {
           const vip = RANK_LOADED.vip;
-          const field = gift ? gIn : uIn;
           // VIP not on sale (or not loaded): nothing to offer, so say why
           if (!vip || !vip.d.canBuy || (gift && !vip.d.gift)) {
             throw Object.assign(new Error("needs vip"), { kind: "rank", field, msg: "MVP needs VIP active, and " + who + " doesn't have it right now." });
