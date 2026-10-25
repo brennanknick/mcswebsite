@@ -787,9 +787,15 @@
       c.append(el("b", "", num(x.gifted)), giftIcon(), el("span", "visually-hidden", Number(x.gifted) === 1 ? " rank gifted" : " ranks gifted"));
       return c;
     };
+    // Only rank holders surely have a player page (anyone can gift; a gifter with no rank and no
+    // matches gets "Player not found"), so only their names link.
+    const r = meta && meta.ranks ? meta.ranks : {};
+    const holders = new Set(["vip", "vipplus"].flatMap((id) => (r[id] && Array.isArray(r[id].players) ? r[id].players : []))
+      .map((p) => String((p && p.uuid) || "").toLowerCase()));
     const link = (x, size) => {
-      const a = el("a");
-      a.href = "../matches/?p=" + encodeURIComponent(x.uuid);
+      const linked = holders.has(x.uuid.toLowerCase());
+      const a = el(linked ? "a" : "span", "st-gift-who");
+      if (linked) a.href = "../matches/?p=" + encodeURIComponent(x.uuid);
       const img = el("img");
       img.src = "https://mc-heads.net/avatar/" + encodeURIComponent(x.uuid) + "/" + size * 2;
       img.width = size;
