@@ -57,7 +57,7 @@ window.MCS = {
   // The VIP and MVP ranks on /store/ (the perk table). false: hidden.
   // true: shown. Leave false until the rank products are released on
   // PayNow and in game.
-  ranksOpen: false,
+  ranksOpen: true,
 
   // Where buyers write about a purchase, e.g. "support@mcsoccer.net".
   // Shown wherever the store needs a contact. While it's empty the store
