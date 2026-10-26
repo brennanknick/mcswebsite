@@ -1467,7 +1467,8 @@
           actionRow("Gradient", grad.length >= 2 ? inline(gradBar(grad), grad.join(" ")) : "Off", edit("Change", gradientClub)),
           actionRow("Short name", c.shortName || "None, the full name is used", edit("Change", shortClub)),
           actionRow("Code", `${c.codeShown || "?"}${c.code ? "" : ", made from the name"}`, edit("Change", codeClub)),
-          actionRow("Crest", c.flag ? inline(crestMark(c.crest, c.flag, c.flagKind), c.flagName || c.flagCode || "") : "None", edit("Change", crestClub)),
+          actionRow("Crest", c.flag ? inline(crestMark(c.crest, c.flag, c.flagKind), c.flagName || c.flagCode || "") : "None", edit("Change", crestClub),
+            owner ? h("a", { class: "btn btn-dark btn-sm", href: `#/crests/${encodeURIComponent(c.id)}` }, "Upload one") : null),
           actionRow("Logo", c.logo ? inline(h("img", { src: `https://mc-heads.net/avatar/${encodeURIComponent(c.logo)}/44`, width: 22, height: 22, alt: "" }), "A player head") : "None", edit("Change", logoClub))), { i: 0 }),
         panel(`Members (${members.length})`, [
           members.length ? h("div", { class: "rows" }, members.map((m) => h("div", { class: "row" },
@@ -1597,6 +1598,442 @@
     clubsCache = null;
     toast(r.repeat ? "That club was made already." : (r.message || "Made."));
     if (r.club && r.club.id) location.hash = `#/clubs/${encodeURIComponent(r.club.id)}`;
+  }
+
+  /* ── Crests (owners): a club's logo, seen as the game draws it, built into the pack ── */
+
+  const CREST_PILL = { held: ["Waiting for build", "is-warn"], building: ["Building", ""], built: ["Run push-pack", "is-warn"],
+    live: ["Live", "is-good"], failed: ["Failed", "is-bad"], retired: ["Deleted", ""] };
+  const crestSays = (c) => (c.status === "held" ? `Waiting for Build the pack.${c.liveRev > 0 ? " Players see the old picture till then." : ""}`
+    : c.status === "building" ? "Building the pack…"
+    : c.status === "built" ? "Run scripts/push-pack.sh so players get it."
+    : c.status === "live" ? "Live in game."
+    : c.status === "failed" ? (c.warning || "It didn't go in the pack.")
+    : "Deleted.");
+  const crestCode = (c) => c.code || `:${c.name}:`;
+  const png64 = (x) => (x && x.png ? `data:image/png;base64,${x.png}` : "");
+  // a display name as a crest name: "Red Lions" is red_lions
+  const slugOf = (s) => String(s || "").normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+  const CREST_OPTS = { fit: "contain", crop: "", trim: true, bg: "auto", tol: 24, colors: 0, resample: "smooth" };
+  const optsOf = (o) => ({ ...CREST_OPTS, ...(o || {}), crop: o && o.crop ? [].concat(o.crop).join(",") : "" });
+  const sameOpts = (a, b) => Object.keys(CREST_OPTS).every((k) => String(a[k]) === String(b[k]));
+
+  let crestUp = null;   // the uploader in use (one at a time)
+
+  /** A row of buttons, one pressed: the dashboard's tabs as a choice. */
+  function seg(items, value, pick, label) {
+    const wrap = h("div", { class: "tabs", role: "group", "aria-label": label });
+    wrap.set = (v) => $$("button", wrap).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === String(v))));
+    for (const [v, text] of items) wrap.append(h("button", { type: "button", "data-v": v, "aria-pressed": String(String(value) === String(v)), onclick: () => { wrap.set(v); pick(v); } }, text));
+    return wrap;
+  }
+
+  /**
+   * Any picture the browser can open, as one the server takes: PNG, at most 1024 px a side (the server
+   * decodes no bigger), so WebP, GIF, SVG, AVIF, CMYK JPEGs and huge files all work. A PNG already
+   * that small goes as it is.
+   */
+  async function crestFile(file) {
+    if (!file || (!/^image\//.test(file.type || "") && !/\.(png|jpe?g|gif|webp|avif|svg|bmp)$/i.test(file.name || ""))) return { error: "That isn't a picture." };
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      // the load event, not decode(): decode() can wait for a paint that a background tab never makes
+      const loaded = await new Promise((ok) => { img.onload = () => ok(true); img.onerror = () => ok(false); img.src = url; });
+      if (!loaded) return { error: "That picture couldn't be opened here. Try a PNG." };
+      let w = img.naturalWidth || 1024, ht = img.naturalHeight || 1024;
+      if (w < 16 || ht < 16) return { error: "That picture is under 16 px a side." };
+      if (file.type === "image/png" && file.size <= 4 * 1024 * 1024 && Math.max(w, ht) <= 1024) return { blob: file, w, h: ht };
+      const k = Math.min(1, 1024 / Math.max(w, ht));
+      w = Math.max(16, Math.round(w * k));
+      ht = Math.max(16, Math.round(ht * k));
+      const cv = h("canvas", { width: w, height: ht });
+      const g = cv.getContext("2d");
+      g.imageSmoothingQuality = "high";
+      g.drawImage(img, 0, 0, w, ht);
+      const blob = await new Promise((ok) => cv.toBlob(ok, "image/png"));
+      return blob && blob.size <= 4 * 1024 * 1024 ? { blob, w, h: ht } : { error: "That picture couldn't be made small enough. Try a PNG." };
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function crestStop() {
+    if (!crestUp) return;
+    clearTimeout(crestUp.timer);
+    if (crestUp.ctl) crestUp.ctl.abort();
+    if (crestUp.src) URL.revokeObjectURL(crestUp.src);
+    crestUp = null;
+  }
+
+  /** The upload panel: a new crest, or (c) a new picture or new names for one. */
+  function crestUploader(clubs, clubId, c) {
+    crestStop();
+    const up = crestUp = { file: null, src: "", id: c ? c.id : "", seq: 0, timer: 0, ctl: null, last: null, error: "", pending: false, retried: false,
+      key: "", gui: 2, kind: c ? c.kind || "club" : "club", opts: optsOf(c && c.options), saved: optsOf(c && c.options), nameTouched: !!c, bgTouched: !!c };
+    const L = (crestState && crestState.limits) || {};
+    const say = h("p", { class: "err", hidden: true });
+    const sayErr = (t) => { say.textContent = t || ""; say.hidden = !t; };
+
+    // the picture
+    const fileIn = h("input", { type: "file", accept: "image/*", "aria-label": "Pick a logo" });
+    const thumb = h("img", { alt: "", hidden: true });
+    const dropText = h("span", null, h("b", null, c ? "Drop a new picture, or keep this one" : "Drop a logo here"),
+      h("small", null, "or click to pick one. PNG, JPG, WebP, GIF or SVG: the page makes it a PNG."));
+    const drop = h("label", { class: "crest-drop" }, fileIn, thumb, dropText);
+    if (c) {
+      thumb.src = `/api/crests/source?id=${encodeURIComponent(c.id)}`;
+      thumb.hidden = false;
+      thumb.addEventListener("error", () => { thumb.hidden = true; }, { once: true });
+    }
+    async function take(file) {
+      sayErr("");
+      const got = await crestFile(file);
+      if (got.error) return sayErr(got.error);
+      if (up !== crestUp) return;
+      if (up.src) URL.revokeObjectURL(up.src);
+      up.file = got.blob;
+      up.src = URL.createObjectURL(got.blob);
+      thumb.src = up.src;
+      thumb.hidden = false;
+      up.opts.crop = "";
+      cropIns.forEach((x) => { x.value = ""; });
+      if (!c && !dIn.value.trim() && file.name) {
+        // a first guess at the name from the file's: "red-lions_logo-final.png" is Red Lions
+        const guess = file.name.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ")
+          .replace(/\b(logo|crest|badge|emblem|icon|final|new|copy|v?\d+|\d+px)\b/gi, " ").replace(/\s+/g, " ").trim()
+          .replace(/\b\p{Ll}/gu, (x) => x.toUpperCase());
+        dIn.value = guess.slice(0, L.display || 32);
+        syncName();
+      }
+      soon(true);
+    }
+    fileIn.addEventListener("change", () => fileIn.files[0] && take(fileIn.files[0]));
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("is-over"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("is-over"));
+    drop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      drop.classList.remove("is-over");
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) take(f);
+    });
+
+    // the choices: a few up front, the rest under More
+    const set = (k, v) => { up.opts[k] = v; soon(); };
+    const fit = seg([["contain", "Whole logo"], ["cover", "Fill the space"]], up.opts.fit, (v) => set("fit", v), "Fit");
+    const pickColour = h("input", { type: "color", value: /^#[0-9a-f]{6}$/i.test(up.opts.bg) ? up.opts.bg : "#ffffff", "aria-label": "Background colour to take off" });
+    const bgNow = () => (/^#/.test(up.opts.bg) ? "pick" : up.opts.bg);
+    const bg = seg([["auto", "Auto"], ["off", "Keep it"], ["pick", "Take off a colour"]], bgNow(), (v) => {
+      up.bgTouched = true;
+      pickColour.hidden = v !== "pick";
+      set("bg", v === "pick" ? pickColour.value : v);
+    }, "Background");
+    pickColour.hidden = bgNow() !== "pick";
+    pickColour.addEventListener("input", () => { up.bgTouched = true; set("bg", pickColour.value); });
+    const kind = seg([["club", "Club"], ["nation", "Nation"]], up.kind, (v) => {
+      up.kind = v;
+      // a flag's field touches every edge: start a nation with the background kept
+      if (v === "nation" && !up.bgTouched) { bg.set("off"); pickColour.hidden = true; set("bg", "off"); }
+    }, "Kind");
+    const pixel = h("input", { type: "checkbox", checked: up.opts.resample === "pixel" || null });
+    pixel.addEventListener("change", () => set("resample", pixel.checked ? "pixel" : "smooth"));
+    const trim = h("input", { type: "checkbox", checked: up.opts.trim !== false && up.opts.trim !== "false" || null });
+    trim.addEventListener("change", () => set("trim", trim.checked));
+    const tolOut = h("b", null, String(up.opts.tol));
+    const tol = h("input", { type: "range", min: 0, max: 128, value: up.opts.tol, "aria-label": "How close a colour counts as the background" });
+    tol.addEventListener("input", () => { tolOut.textContent = tol.value; set("tol", Number(tol.value)); });
+    const colors = h("select", { class: "input", style: "width:auto", "aria-label": "Colours" },
+      [["0", "As many as it has"], ["32", "32"], ["16", "16"], ["8", "8"]].map(([v, t]) => h("option", { value: v, selected: String(up.opts.colors) === v || null }, t)));
+    colors.addEventListener("change", () => set("colors", Number(colors.value)));
+    const cropVals = String(up.opts.crop || "").split(",");
+    const cropIns = ["x", "y", "w", "h"].map((k, i) => h("input", { class: "input", type: "number", min: 0, placeholder: k, value: cropVals[i] || "", "aria-label": `Crop ${k}` }));
+    const cropNow = () => {
+      const v = cropIns.map((x) => x.value.trim());
+      set("crop", v.every((x) => /^\d+$/.test(x)) ? v.join(",") : "");
+    };
+    cropIns.forEach((x) => x.addEventListener("change", cropNow));
+    const useKept = h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => {
+      const t = up.last && up.last.detected && up.last.detected.trim;
+      if (!t) return;
+      cropIns.forEach((x, i) => { x.value = t[i]; });
+      cropNow();
+    } }, "Start from what's kept");
+    const opt = (label, ...kids) => h("div", { class: "crest-opt" }, h("span", null, label), kids);
+    const more = h("details", { class: "crest-more" }, h("summary", null, "More"),
+      h("div", { class: "crest-opts", style: "margin-top:0" },
+        opt("Tolerance", tol, tolOut),
+        opt("Colours", colors),
+        opt("Trim", h("label", { class: "check" }, trim, "Cut off empty edges")),
+        opt("Crop", h("div", { class: "crest-crop" }, cropIns), useKept)));
+
+    // what it looks like in game
+    const gui = seg([["2", "GUI scale 2"], ["4", "GUI scale 4"]], up.gui, (v) => { up.gui = Number(v); paint(); }, "GUI scale");
+    const prev = h("div", { class: "crest-prev" });
+    const info = h("div", { class: "crest-info" });
+    const warns = h("div");
+
+    // the names, the club and saving
+    const dIn = h("input", { class: "input", maxlength: L.display || 32, value: c ? c.display || "" : "", placeholder: "Red Lions", autocomplete: "off" });
+    const nIn = h("input", { class: "input", maxlength: L.name || 40, value: c ? c.name || "" : "", placeholder: "red_lions", autocomplete: "off", spellcheck: "false" });
+    const syncName = () => { if (!up.nameTouched) nIn.value = slugOf(dIn.value); };
+    dIn.addEventListener("input", () => { syncName(); paint(); });
+    nIn.addEventListener("input", () => { up.nameTouched = true; });
+    const pre = clubId || (c && c.pending && c.pending.club) || "";
+    const club = h("select", { class: "input" }, h("option", { value: "" }, "No club yet"),
+      clubs.map((x) => h("option", { value: x.id, selected: x.id === pre || null }, x.name)));
+    const rIn = h("input", { class: "input", maxlength: 120, placeholder: c ? "New picture" : "Red Lions' crest", autocomplete: "off" });
+    const saveBtn = h("button", { class: "btn", type: "button", onclick: () => save() }, c ? "Save changes" : "Save crest");
+    const field = (label, input, hint) => h("label", { class: "field" }, h("span", null, label), input, hint ? h("small", null, hint) : null);
+
+    function soon(now) {
+      if (!up.file && !up.id) return;
+      clearTimeout(up.timer);
+      up.pending = true;
+      paint();
+      up.timer = setTimeout(preview, now ? 0 : 400);
+    }
+
+    async function preview() {
+      if (up !== crestUp) return;
+      const seq = ++up.seq;
+      if (up.ctl) up.ctl.abort();
+      const ctl = up.ctl = new AbortController();
+      let out;
+      try {
+        const res = await fetch(`/api/crests/preview?${crestQuery(true)}`, { method: "POST", credentials: "same-origin", signal: ctl.signal,
+          headers: { "X-MCS-Admin": "1", "Content-Type": "application/octet-stream" }, body: up.file || undefined });
+        if (res.status === 401) { location.href = "/"; return; }
+        out = await res.json().catch(() => ({ ok: false, error: `The dashboard answered ${res.status}.` }));
+      } catch {
+        if (ctl.signal.aborted) return;
+        out = { ok: false, error: "The dashboard can't be reached. Check your connection." };
+      }
+      if (up !== crestUp || seq !== up.seq) return;   // a newer one is on its way
+      // one picture at a time on the server: try once more after a moment
+      if (!out.ok && out.status === 503 && !up.retried) { up.retried = true; up.timer = setTimeout(preview, 1500); return; }
+      up.retried = false;
+      up.pending = false;
+      up.last = out.ok ? out : null;
+      up.error = out.ok ? "" : out.error || "That didn't work.";
+      paint();
+    }
+
+    /** The query for a preview or save: the choices (all of them, when the picture is to be made again). */
+    function crestQuery(picture, extra) {
+      const q = new URLSearchParams();
+      if (up.id) q.set("id", up.id);
+      if (picture) {
+        const o = up.opts;
+        for (const k of ["fit", "bg", "tol", "colors", "resample"]) q.set(k, String(o[k]));
+        q.set("trim", String(o.trim !== false && o.trim !== "false"));
+        if (o.crop) q.set("crop", o.crop);
+      }
+      for (const [k, v] of Object.entries(extra || {})) if (v !== "" && v != null) q.set(k, v);
+      return q.toString();
+    }
+
+    function card(title, stage, note) {
+      return h("div", { class: "crest-card" }, h("h3", null, title), h("div", { class: "crest-stage" }, stage), note ? h("small", null, note) : null);
+    }
+
+    function paint() {
+      if (up !== crestUp) return;
+      const r = up.last;
+      saveBtn.disabled = up.busy || null;
+      if (!r) {
+        prev.replaceChildren(up.error ? errorBox(up.error) : empty(up.pending ? "Making the preview…" : "Drop a logo to see it the way the game draws it."));
+        info.replaceChildren();
+        warns.replaceChildren();
+        return;
+      }
+      const dpr = Math.min(4, Math.max(1, window.devicePixelRatio || 1));
+      const g = up.gui;
+      const u = `--u:${g / dpr}px`;
+      // true pixel size: a picture's pixels land on whole screen pixels, sharp on any display
+      const px = (x, k = 1) => (x && x.png ? h("img", { class: "px", src: png64(x), alt: "", style: `width:${x.width * k / dpr}px;height:${x.height * k / dpr}px` }) : null);
+      const pick = (where) => r.renders && r.renders[where] && (r.renders[where][g] || r.renders[where][String(g)]);
+      const cl = clubs.find((x) => x.id === club.value);
+      const name = dIn.value.trim() || (cl && cl.name) || "Your club";
+      const colour = cl && HEX.test(cl.colorHex || "") ? cl.colorHex : "#ffff55";
+      prev.replaceChildren(
+        card("Chat, tab, name tags", h("div", { class: "mc-chat", style: u }, px(pick("chat")), h("b", { style: `color:${colour}` }, name), h("span", null, ": gg")), `${(r.sizes && r.sizes.chat) || 10} px tall, also the match bar`),
+        card("Scorebug", h("div", { class: "mc-bug", style: u }, px(pick("scorebug")), h("b", null, "2 : 1")), `${(r.sizes && r.sizes.scorebug) || 12} px tall`),
+        card("Menus", h("div", { class: "mc-slot", style: u }, px(r.images && r.images.tile, g)), `${(r.sizes && r.sizes.tile) || 16} px tile`),
+        card("Club page", h("div", { class: "mc-big", style: u }, px(r.images && r.images.big, g)), `${(r.sizes && r.sizes.big) || 32} px`),
+        card("Celebration", px(r.images && r.images.chat, 2 * dpr), `${(r.sizes && r.sizes.celebration) || 64} px, in the world`));
+      const d = r.detected || {};
+      const res = r.result || {};
+      info.replaceChildren(...[
+        res.width ? h("span", null, `${res.width} × ${res.height} px`) : null,
+        res.colors ? h("span", null, plural(res.colors, "colour")) : null,
+        d.background ? h("span", null, h("i", { class: "swatch", style: `background:${d.background}` }), d.removed ? ` ${d.background} taken off` : ` ${d.background} edge kept`) : null,
+        r.room ? h("span", null, `${r.room.used} of ${r.room.slots} crest spots used`) : null,
+      ].filter(Boolean));
+      warns.replaceChildren(...(r.warnings || []).map((w) => h("p", { class: "note", style: "margin:.6rem 0 0" }, String(w))));
+    }
+
+    async function save() {
+      sayErr("");
+      const picture = !!up.file || (!!c && !sameOpts(up.opts, up.saved));
+      const v = { display: dIn.value.trim(), name: nIn.value.trim().replace(/^:+|:+$/g, ""), reason: rIn.value.trim() };
+      if (!c && !up.file) return sayErr("Drop a picture first.");
+      if (!v.name) return sayErr("Give it a name.");
+      if (!v.reason) return sayErr("Give a reason.");
+      if (picture && (up.pending || !up.last)) return sayErr(up.error ? `Fix the preview first: ${up.error}` : "Wait for the preview.");
+      // one key per save: a save that timed out can be pressed again safely
+      up.key = up.key || keyId();
+      const q = crestQuery(picture, { key: up.key, name: v.name, display: v.display, kind: up.kind, club: club.value, reason: v.reason,
+        expect: picture ? up.last.result && up.last.result.sha256 : "" });
+      up.busy = true;
+      saveBtn.textContent = "Saving…";
+      paint();
+      let out;
+      try {
+        const res = await fetch(`/api/crests/save?${q}`, { method: "POST", credentials: "same-origin",
+          headers: { "X-MCS-Admin": "1", "Content-Type": "application/octet-stream" }, body: (picture && up.file) || undefined });
+        if (res.status === 401) { location.href = "/"; return; }
+        out = await res.json().catch(() => ({ ok: false, error: `The dashboard answered ${res.status}.`, lost: true }));
+      } catch {
+        out = { ok: false, error: "No answer came back. It may have saved: press Save again, it's safe.", lost: true };
+      }
+      up.busy = false;
+      saveBtn.textContent = c ? "Save changes" : "Save crest";
+      if (up !== crestUp) return;
+      if (!out.ok) {
+        // a refusal is final: a fresh key next time; a lost answer keeps it, so a resend can't save twice
+        if (!out.lost && out.status !== 502 && out.status !== 503) up.key = "";
+        paint();
+        return sayErr(out.error || "That didn't work.");
+      }
+      const extra = out.assign && out.assign.message && !String(out.message || "").includes(out.assign.message) ? ` ${out.assign.message}` : "";
+      toast(`${out.message || "Saved."}${extra}`);
+      crests(clubId);
+    }
+
+    const panelEl = panel(c ? `Replacing ${crestCode(c)}` : "Upload a crest", [
+      h("div", { class: "crest-up" },
+        h("div", null, drop,
+          h("div", { class: "crest-opts" },
+            opt("Kind", kind),
+            opt("Fit", fit),
+            opt("Background", bg, pickColour),
+            opt("Pixel art", h("label", { class: "check" }, pixel, "Keep hard pixel edges")),
+            more)),
+        h("div", null, h("div", { class: "panel-head", style: "margin:0 0 .6rem" }, h("small", null, "In game"), gui), prev, info, warns,
+          h("div", { class: "crest-save" },
+            h("div", { class: "form-row" }, field("Name players see", dIn), field("Crest name", nIn, "For chat, like :red_lions:")),
+            h("div", { class: "form-row" }, field("Wear it on", club, "The club switches over once players have it."), field("Reason", rIn)),
+            say, buttons(saveBtn)))),
+    ], { aside: c ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => crests(clubId) }, "New crest instead") : null });
+    club.addEventListener("change", paint);
+    paint();
+    if (c) soon(true);
+    return panelEl;
+  }
+
+  async function crestBuild(st) {
+    const r = await formDialog({ title: `Build ${plural(st.held, "crest")} into the pack?`, okLabel: "Build the pack",
+      text: st.pack && st.pack.stale ? "The pack is waiting for push-pack already, so menus are plain already. This adds the waiting crests to it."
+        : "Building the pack makes every painted menu plain for everyone until Brenn runs push-pack. Push it when no game is on. Build now?",
+      fields: [reasonField("New club crests")],
+      submit: (v) => call("POST", "/crests/build", { reason: v.reason }) });
+    if (r) { toast(r.message || "Building the pack."); crests(); }
+  }
+
+  async function crestDelete(c, clubId) {
+    const worn = (c.usedBy || []).map((x) => x.name).join(", ");
+    const r = await formDialog({ title: `Delete ${crestCode(c)}?`, okLabel: "Delete", bad: true,
+      text: `It leaves the crest pickers now${c.inPack ? ", and the pack when the pack is built" : ""}. Old match pages still show it.`,
+      fields: [...(worn ? [{ name: "detach", type: "checkbox", label: `Take it off ${worn}. They'll have no crest.` }] : []), reasonField()],
+      submit: (v, inputs) => (worn && !inputs.detach.checked ? { ok: false, error: `${worn} wears it. Tick the box to take it off.` }
+        : call("POST", "/crests/delete", { id: c.id, code: crestCode(c), detach: !!worn, reason: v.reason })) });
+    if (r) { toast(r.message || "Deleted."); crests(clubId); }
+  }
+
+  async function crestLive(c, clubId) {
+    const r = await formDialog({ title: `Players have ${crestCode(c)}?`, okLabel: "Mark it live",
+      text: "Only when you know players already have this picture, because the pack they get wasn't built here. Clubs waiting for it wear it straight away.",
+      fields: [reasonField()],
+      submit: (v) => call("POST", "/crests/live", { id: c.id, code: crestCode(c), reason: v.reason }) });
+    if (r) { toast(r.message || "Marked live."); crests(clubId); }
+  }
+
+  function crestRow(c, onEdit, clubId) {
+    const [label, cls] = CREST_PILL[c.status] || [c.status, ""];
+    const worn = (c.usedBy || []).map((x) => x.name);
+    return h("div", { class: "row" },
+      h("div", { class: "row-main" },
+        h("div", { class: "row-title" }, c.png ? h("img", { class: "crest-master", src: png64(c), alt: "" }) : null, c.display || c.name,
+          h("span", { class: "tag" }, crestCode(c)), h("span", { class: `tag ${cls}` }, label), c.kind === "nation" ? h("span", { class: "tag" }, "Nation") : null),
+        h("div", { class: "row-sub" }, h("span", null, crestSays(c)),
+          worn.length ? h("span", null, `Worn by ${worn.join(", ")}`) : null,
+          c.pending ? h("span", null, `${c.pending.name} wears it once it's live`) : null,
+          c.updated ? h("span", null, `Changed ${ago(c.updated)}`) : null)),
+      c.status === "retired" ? h("span") : h("div", { class: "row-actions" },
+        h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => onEdit(c) }, "Replace"),
+        c.status === "built" ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: () => crestLive(c, clubId) }, "Players have it") : null,
+        h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => crestDelete(c, clubId) }, "Delete")));
+  }
+
+  let crestState = null;   // the last clubs/crest/list
+
+  async function crests(clubId) {
+    const seq = pageSeq;
+    clubId = clubId || "";
+    // drawn again after a save or a build: the last drawing's poll and uploader stop first
+    if (leave) { leave(); leave = null; }
+    const owner = ME && ME.role === "owner";
+    const buildBtn = h("button", { class: "btn", type: "button", disabled: true }, "Build the pack");
+    const top = pageHead("Clubs", "Crests", "Upload a club's logo and see it the way the game draws it. Save it, then build it into the pack when you're ready.", owner ? buildBtn : null);
+    main.replaceChildren(top, h("div", { class: "loading" }, "Loading crests…"));
+    const [r, cl] = await Promise.all([call("GET", "/crests/list"), clubMeta ? clubMeta : call("GET", "/clubs/list")]);
+    if (seq !== pageSeq) return;
+    if (cl && cl.ok) clubMeta = cl;
+    if (r.httpStatus === 404) return main.replaceChildren(top, needsUpdate("Uploading crests"));
+    if (!r.ok) return main.replaceChildren(top, errorBox(r.error));
+    const clubs = ((clubMeta && clubMeta.clubs) || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    const staleBox = h("div");
+    const listBox = h("div");
+    let upEl = null;
+    const edit = (c) => {
+      const next = crestUploader(clubs, clubId, c);
+      upEl.replaceWith(next);
+      upEl = next;
+      upEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    function draw(st) {
+      crestState = st;
+      const items = st.items || [];
+      buildBtn.textContent = st.held ? `Build the pack (${st.held})` : "Build the pack";
+      buildBtn.disabled = !st.held || null;
+      buildBtn.onclick = () => crestBuild(st);
+      staleBox.replaceChildren(...[
+        st.pack && st.pack.stale ? panel(null, staleNote()) : null,
+        st.loadFailed ? panel(null, errorBox("Crests couldn't be read on the server, so uploads are off until it's fixed.")) : null,
+        (st.notes || []).length ? panel(null, st.notes.map((n) => h("p", { class: "note", style: "margin:.2rem 0" }, String(n)))) : null,
+      ].filter(Boolean));
+      listBox.replaceChildren(panel("Uploaded crests", items.length ? h("div", { class: "rows" }, items.map((c) => crestRow(c, edit, clubId)))
+        : empty("None yet. Drop a logo above."), { aside: st.room ? h("small", null, `${st.room.used} of ${st.room.slots} spots used`) : null }));
+    }
+    draw(r);
+    upEl = owner && !r.loadFailed ? crestUploader(clubs, clubId, null) : h("div");
+    const forClub = clubs.find((x) => x.id === clubId);
+    main.replaceChildren(...[top,
+      forClub ? h("p", { class: "note", style: "margin:0 0 .9rem" }, `For ${forClub.name}: it switches over once players have the new pack.`) : null,
+      staleBox, upEl, listBox].filter(Boolean));
+
+    // while a build runs: look again every 3 s, for a minute at most
+    let polls = 0;
+    let timer = 0;
+    const building = (st) => (st.pack && st.pack.building) || (st.items || []).some((x) => x.status === "building");
+    const poll = async () => {
+      const next = await call("GET", "/crests/list");
+      if (seq !== pageSeq) return;
+      if (next.ok) draw(next);
+      if (next.ok && building(next) && ++polls < 20) timer = setTimeout(poll, 3000);
+    };
+    if (building(r)) timer = setTimeout(poll, 3000);
+    leave = () => { clearTimeout(timer); crestStop(); };
   }
 
   /* ── Cups (owners): sign-ups, the draw, calling matches, results ─ */
@@ -2111,7 +2548,7 @@
 
   /* ── the router ───────────────────────────────────────────────── */
 
-  const ROUTES = { "": home, fixtures, matches, clubs: clubAdmin, cups, ranked, reports, tiers, players, wallet, bows, settings, server, maint, activity };
+  const ROUTES = { "": home, fixtures, matches, clubs: clubAdmin, crests, cups, ranked, reports, tiers, players, wallet, bows, settings, server, maint, activity };
 
   // A page rises in when it's opened. The first click or key inside it ends that, so
   // the redraws a button causes (a tab, a save, a move) don't replay the animation.
@@ -2130,10 +2567,11 @@
     const page = ROUTES[name] ? name : "";
     $$("[data-route]").forEach((a) => (a.dataset.route === page ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
     if (tierState && tierState.dirty && page !== "tiers") toast("Your tier list changes aren't saved yet: they're still there in Tier list.");
-    // #/players/<uuid or name> is a player's page; #/clubs/<id> a club's; #/cups/<id> an old cup
+    // #/players/<uuid or name> is a player's page; #/clubs/<id> a club's; #/cups/<id> an old cup;
+    // #/crests/<club id> the crest uploader for that club
     if (page === "players" && arg) profile(decodeURIComponent(arg));
     else if (page === "settings") settings(arg);
-    else if (page === "clubs" || page === "cups") ROUTES[page](arg ? decodeURIComponent(arg) : "");
+    else if (page === "clubs" || page === "cups" || page === "crests") ROUTES[page](arg ? decodeURIComponent(arg) : "");
     else ROUTES[page]();
     main.focus({ preventScroll: true });
     window.scrollTo(0, 0);

@@ -46,11 +46,12 @@ const LOG_TTL = 90 * 86400;             // activity kept 90 days
 const PLUGIN_TIMEOUT_MS = 12000;
 const WIPE_TIMEOUT_MS = 25000;          // a match wipe can take the plugin ~15 s
 const RECOUNT_TIMEOUT_MS = 75000;       // the small-games recount waits up to 60 s on the server
+const CREST_TIMEOUT_MS = 30000;         // a crest preview or save decodes and scales a picture
 
 const SECURITY = {
   "Content-Security-Policy": [
     "default-src 'self'",
-    "img-src 'self' data: https://mc-heads.net https://minotar.net https://cdn.discordapp.com https://mcsoccer.net https://api.mcsoccer.net",
+    "img-src 'self' data: blob: https://mc-heads.net https://minotar.net https://cdn.discordapp.com https://mcsoccer.net https://api.mcsoccer.net",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src https://fonts.gstatic.com",
     "script-src 'self'",
@@ -806,6 +807,32 @@ async function api(request, env, s, path) {
       const kind = ["club", "nation", "symbol"].includes(q.get("kind")) ? q.get("kind") : undefined;
       return pass(await plugin(env, "GET", "/discord/admin/clubs/crests", { q: clean(q.get("q"), 40), kind }));
     }
+
+    /* uploaded crests (docs/admin-api.md "Club crests (uploads)"): the reads and the writes without
+       a picture; preview and save carry one, so they go through crestUpload() */
+    case "GET /crests/list":
+      return pass(await plugin(env, "GET", "/discord/admin/clubs/crest/list", { retired: q.get("retired") === "true" ? "true" : undefined }));
+    case "GET /crests/show": {
+      const id = crestId(q.get("id"));
+      if (!id) return fail(400, "Which crest?");
+      return pass(await plugin(env, "GET", "/discord/admin/clubs/crest/show", { id }));
+    }
+    case "POST /crests/build":
+    case "POST /crests/delete":
+    case "POST /crests/live": {
+      if (s.role !== "owner") return fail(403, "Only owners can change crests.");
+      const op = path.slice("/crests/".length);
+      const p = { reason: clean(input.reason, 120), by: by(s) };
+      if (!p.reason) return fail(400, "Give a reason.");
+      const id = crestId(input.id);
+      if (id) p.id = id;
+      else if (op !== "build") return fail(400, "Which crest?");
+      if (op === "delete" && input.detach === true) p.detach = "true";
+      if (op === "delete" && input.build === true) p.build = "true";
+      const r = await plugin(env, "POST", `/discord/admin/clubs/crest/${op}`, p, CREST_TIMEOUT_MS);
+      const what = op === "build" ? "built crests into the pack" : op === "delete" ? "deleted a crest" : "marked a crest live";
+      return done(r, what, `${id ? `${clean(input.code, 44) || id}: ` : ""}${p.reason}`);
+    }
     case "GET /cups/list":
       return pass(await plugin(env, "GET", "/discord/admin/cups/list"));
     case "GET /cups/show": {
@@ -904,6 +931,63 @@ async function bowUpload(request, env, s) {
   return json(r.ok ? { ok: true } : { ok: false, error: r.body.error }, r.ok ? 200 : 400);
 }
 
+/** An uploaded crest's id: its codepoint in hex, U+F000 to U+F3FF ("f000"), or "". */
+function crestId(v) {
+  const x = clean(v, 8).toLowerCase();
+  return /^f[0-3][0-9a-f]{2}$/.test(x) ? x : "";
+}
+
+// what a crest preview or save may pass on, each with its longest value
+const CREST_OPTIONS = { fit: 8, crop: 40, trim: 5, bg: 8, tol: 3, colors: 2, resample: 6 };
+const CREST_SAVE = { reason: 120, key: 59, name: 42, display: 32, kind: 6, aliases: 210, club: 64, expect: 64, build: 5 };
+
+/**
+ * A crest preview or save: POST /api/crests/<preview|save>?<options> with the picture (or nothing,
+ * to re-run the saved one) as the raw body. Owners only. A preview changes nothing, so it isn't in
+ * the activity log; a save is.
+ */
+async function crestUpload(request, env, s, op) {
+  if (s.role !== "owner") return fail(403, "Only owners can change crests.");
+  const q = new URL(request.url).searchParams;
+  const p = { by: by(s) };
+  const take = (k, n) => { const v = clean(q.get(k), n); if (v) p[k] = v; };
+  for (const [k, n] of Object.entries(CREST_OPTIONS)) take(k, n);
+  if (op === "save") for (const [k, n] of Object.entries(CREST_SAVE)) take(k, n);
+  const id = crestId(q.get("id"));
+  if (id) p.id = id;
+  if (op === "save" && !p.reason) return fail(400, "Give a reason.");
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  if (bytes.length > 4 * 1024 * 1024) return fail(413, "Over 4 MB. Use a smaller file.");
+  if (!bytes.length && !id) return fail(400, "Drop a picture first.");
+  const send = bytes.length ? { type: "application/octet-stream", body: bytes } : null;
+  const r = await plugin(env, "POST", `/discord/admin/clubs/crest/${op}`, p, CREST_TIMEOUT_MS, send);
+  if (op === "save") {
+    const c = (r.body && r.body.crest) || {};
+    await log(env, { id: s.id, name: s.name }, "saved a crest",
+      `${c.code || `:${p.name || c.name || id}:`}${p.club ? ` for ${p.club}` : ""}: ${p.reason}${r.ok ? "" : ` (refused: ${r.body.error})`}`, r.ok);
+  }
+  // the server's own status rides along, so the page can tell "busy, try again" from a refusal
+  return r.ok ? json({ ok: true, ...(r.body || {}) })
+    : json({ ok: false, error: r.body.error, status: r.status }, r.status >= 400 && r.status < 500 ? 400 : 502);
+}
+
+/** An uploaded crest's original picture, for its thumbnail when it's replaced (signed-in only). */
+async function crestSource(env, raw) {
+  const id = crestId(raw);
+  if (!id) return respond("no such crest", 404);
+  const u = new URL(env.ORIGIN.replace(/\/+$/, "") + "/discord/admin/clubs/crest/source");
+  u.searchParams.set("id", id);
+  const headers = await authHeaders(env, "GET", u, null);
+  try {
+    const r = await fetch(u.href, { headers, signal: AbortSignal.timeout(PLUGIN_TIMEOUT_MS) });
+    const type = r.headers.get("Content-Type") || "";
+    if (!r.ok || !/^image\/(png|jpeg)/.test(type)) return respond("no such crest", 404);
+    return respond(r.body, 200, { "Content-Type": type.startsWith("image/png") ? "image/png" : "image/jpeg", "Cache-Control": "no-store" });
+  } catch {
+    return respond("the game server isn't answering", 502);
+  }
+}
+
 /** A bow skin frame's image, for the dashboard's previews (signed-in only). */
 async function bowTexture(env, path) {
   const m = path.match(/^\/bows\/tex\/([a-z0-9_-]{1,40})\/([0-3])\.png$/);
@@ -955,6 +1039,13 @@ export default {
           const origin = request.headers.get("Origin");
           if (request.headers.get("X-MCS-Admin") !== "1" || (origin && origin !== HOST)) return fail(403, "Refused.");
           return bowUpload(request, env, s);
+        }
+        // and a crest's: its picture goes as the body, the same way
+        if (method === "GET" && sub === "/crests/source") return crestSource(env, url.searchParams.get("id"));
+        if (method === "POST" && (sub === "/crests/preview" || sub === "/crests/save")) {
+          const origin = request.headers.get("Origin");
+          if (request.headers.get("X-MCS-Admin") !== "1" || (origin && origin !== HOST)) return fail(403, "Refused.");
+          return crestUpload(request, env, s, sub.slice("/crests/".length));
         }
         return api(request, env, s, sub);
       }

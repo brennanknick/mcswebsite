@@ -1,5 +1,5 @@
 // Local test bench for the admin dashboard (never deployed).
-//   node tools/admin/dev.mjs [--port=8799] [--cup=running|signup|live] [--ranked=live|busy]
+//   node tools/admin/dev.mjs [--port=8799] [--cup=running|signup|live] [--ranked=live|busy] [--crests=bench|real]
 // Runs worker.js in Node on http://localhost:<port> (this PC only) with an in-memory KV, and
 // signs you in as a TEST owner at /__login (Discord's real sign-in can't come back to
 // localhost). Reads (GET) go to the real game server, signed with its admin secret when that
@@ -334,8 +334,109 @@ function stage3Write(p, q) {
   return null;
 }
 
-async function pluginBench(req, url) {
+// Uploaded club crests (docs/admin-api.md "Club crests (uploads)"): a pretend store, used unless
+// --crests=real. The bench can't scale pictures, so a preview sends the dropped picture back as every
+// size: the page's flow and layout can be tried here; real previews need the game server.
+const CREST_MODE = flag("crests", "bench");
+const benchPack = { building: false, built: "c56bc24fb33db696bcfd342a1d0fdbfa1d282f6b", sent: "c56bc24fb33db696bcfd342a1d0fdbfa1d282f6b", stale: false };
+const crestOpts = { fit: "contain", crop: null, trim: true, bg: "auto", tol: 24, colors: 0, resample: "smooth" };
+const benchCrests = [
+  { id: "f000", character: "", crest: "f000", code: ":red_lions:", name: "red_lions", display: "Red Lions", kind: "club", aliases: [], rev: 1, liveRev: 1, packRev: 1,
+    inPack: true, held: false, status: "live", width: 37, height: 11, sha256: "a1", options: { ...crestOpts }, source: { type: "png", width: 37, height: 11, bytes: 400 },
+    usedBy: [{ id: "red_lions", name: "Red Lions" }], pending: null, created: Date.now() - 864e5, updated: Date.now() - 864e5, png: null },
+  { id: "f001", character: "", crest: "f001", code: null, name: "blue_bears", display: "Blue Bears", kind: "club", aliases: [], rev: 1, liveRev: 0, packRev: 0,
+    inPack: false, held: true, status: "held", width: 37, height: 11, sha256: "b2", options: { ...crestOpts, bg: "off" }, source: { type: "png", width: 37, height: 11, bytes: 400 },
+    usedBy: [], pending: { club: "blue_bears", name: "Blue Bears", since: Date.now() - 3600e3, by: "dashboard:karl" }, created: Date.now() - 3600e3, updated: Date.now() - 3600e3, png: null },
+];
+const crestPics = new Map();   // id -> the last picture saved, for show and source
+function crestList() {
+  for (const c of benchCrests) if (!c.png) c.png = (crestPics.get(c.id) || SAMPLE_PNG).toString("base64");
+  return { ok: true, range: { first: "f000", last: "f3ff" }, limits: { bytes: 4194304, side: 4096, minSide: 16, name: 40, display: 32, aliases: 5, colors: [2, 64], tol: [0, 128], width: 70, height: 40 },
+    room: { slots: 128, used: benchCrests.filter((c) => c.status !== "retired").length, codesLeft: 1024 - benchCrests.length }, pack: benchPack,
+    held: benchCrests.filter((c) => c.held).length, loadFailed: false, notes: [], items: benchCrests.filter((c) => c.status !== "retired").slice().reverse() };
+}
+function crestBench(method, p, q, body) {
+  if (CREST_MODE === "real" || !p.startsWith("/discord/admin/clubs/crest/")) return null;
+  const op = p.slice("/discord/admin/clubs/crest/".length);
+  const ok = (o) => ({ status: 200, body: JSON.stringify({ ok: true, ...o }) });
+  const bad = (status, error) => ({ status, body: JSON.stringify({ ok: false, error }) });
+  const find = (id) => benchCrests.find((c) => c.id === id && c.status !== "retired");
+  if (method === "GET") {
+    if (op === "list") return { status: 200, body: JSON.stringify(crestList()) };
+    if (op === "source") return find(q.get("id")) ? { status: 200, body: crestPics.get(q.get("id")) || SAMPLE_PNG, type: "image/png" } : bad(404, "no such crest");
+    return null;
+  }
+  console.log(`  (bench) pretend crest ${op} ${q}`);
+  if (op === "preview") {
+    const pic = body && body.length ? body : find(q.get("id")) ? crestPics.get(q.get("id")) || SAMPLE_PNG : null;
+    if (!pic) return bad(400, "send the picture as the body");
+    const img = (w, h) => ({ png: pic.toString("base64"), width: w, height: h });
+    const scales = (w, h) => Object.fromEntries([1, 2, 3, 4].map((g) => [g, img(w * g, h * g)]));
+    return ok({ source: { type: "png", width: 512, height: 512, bytes: pic.length, decoded: [512, 512] },
+      detected: { background: q.get("bg") === "off" ? null : "#ffffff", removed: q.get("bg") !== "off", trim: [40, 32, 432, 448], pixelArt: q.get("resample") === "pixel" },
+      result: { width: 34, height: 40, colors: q.get("colors") && q.get("colors") !== "0" ? Number(q.get("colors")) : 57, sha256: crypto.createHash("sha256").update(pic).update(q.toString()).digest("hex") },
+      images: { chat: img(34, 40), tile: img(16, 16), big: img(32, 32) }, renders: { chat: scales(9, 10), scorebug: scales(10, 12) },
+      sizes: { chat: 10, tab: 10, nameTag: 10, bar: 10, scorebug: 12, tile: 16, big: 32, celebration: 64 }, room: crestList().room,
+      warnings: q.get("fit") === "cover" ? [] : ["Wide logo: it will look small. Try fit=cover or a crop."], pack: benchPack });
+  }
+  if (op === "save") {
+    const name = String(q.get("name") || "").replace(/^:+|:+$/g, "").toLowerCase();
+    if (!name) return bad(400, "give name=");
+    if (benchCrests.some((c) => c.name === name && c.id !== q.get("id") && c.status !== "retired")) return bad(409, `The name :${name}: is taken by ${name}.`);
+    let c = q.get("id") ? find(q.get("id")) : null;
+    if (q.get("id") && !c) return bad(404, "no such crest");
+    const created = !c;
+    const picture = !!(body && body.length) || ["fit", "bg", "tol", "colors", "resample", "trim", "crop"].some((k) => q.has(k));
+    if (created) {
+      const id = (0xf000 + benchCrests.length).toString(16);
+      c = { id, character: String.fromCharCode(0xf000 + benchCrests.length), crest: id, code: null, aliases: [], rev: 0, liveRev: 0, packRev: 0, inPack: false, held: false,
+        status: "held", width: 34, height: 40, options: { ...crestOpts }, source: null, usedBy: [], pending: null, created: Date.now() };
+      benchCrests.push(c);
+    }
+    Object.assign(c, { name, display: q.get("display") || name, kind: q.get("kind") || "club", updated: Date.now() });
+    if (picture) {
+      if (body && body.length) crestPics.set(c.id, body);
+      Object.assign(c, { rev: c.rev + 1, held: true, status: "held", sha256: q.get("expect") || "x", png: null });
+    }
+    const club = q.get("club");
+    if (club) c.pending = { club, name: club, since: Date.now(), by: q.get("by") };
+    const code = c.code || `:${name}:`;
+    const message = !picture ? `Saved ${code}.` : c.liveRev ? `Saved ${code}. The pack keeps the old picture until this one is built in.` : `Saved ${code}. It goes in the pack when the pack is built.`;
+    const assign = club ? { club, state: "pending", message: `${club} switches over once it's built and players have it.` } : { club: null, state: "none", message: "" };
+    return ok({ repeat: false, created, changed: true, message: club ? `${message} ${assign.message}` : message, crest: c, assign, pack: benchPack, warnings: [] });
+  }
+  if (op === "build") {
+    const held = benchCrests.filter((c) => c.held && (!q.get("id") || c.id === q.get("id")));
+    if (!held.length) return ok({ changed: false, message: "Nothing is waiting for the pack.", released: [], held: 0, pack: benchPack });
+    for (const c of held) Object.assign(c, { held: false, inPack: true, packRev: c.rev, status: "building" });
+    Object.assign(benchPack, { building: true, stale: true });
+    // a few seconds later the zip is built: the page's poll sees "Run push-pack"
+    setTimeout(() => { for (const c of held) if (c.status === "building") c.status = "built"; benchPack.building = false; }, 5000);
+    return ok({ changed: true, message: `Building the pack: ${held.map((c) => c.code || `:${c.name}:`).join(" and ")} in. Every painted menu is plain until scripts/push-pack.sh runs; run it when no game is on.`,
+      released: held, held: benchCrests.filter((c) => c.held).length, pack: benchPack });
+  }
+  if (op === "delete") {
+    const c = find(q.get("id"));
+    if (!c) return bad(404, "no such crest");
+    if (c.usedBy.length && q.get("detach") !== "true") return bad(409, `${c.usedBy[0].name} wears it. Send detach=true to clear its flag.`);
+    const detached = c.usedBy;
+    Object.assign(c, { status: "retired", held: c.inPack, usedBy: [], code: null });
+    return ok({ repeat: false, message: `Retired :${c.name}:.${detached.length ? ` ${detached.map((x) => x.name).join(", ")} has no flag now.` : ""}${c.inPack ? " It leaves the pack when the pack is built." : ""}`, detached, crest: c, pack: benchPack });
+  }
+  if (op === "live") {
+    const c = find(q.get("id"));
+    if (!c) return bad(404, "no such crest");
+    if (c.status !== "built") return bad(409, "It isn't built yet.");
+    Object.assign(c, { status: "live", liveRev: c.rev, code: `:${c.name}:` });
+    return ok({ message: `Marked :${c.name}: live.`, crest: c, pack: benchPack });
+  }
+  return null;
+}
+
+async function pluginBench(req, url, sent) {
   const p = url.pathname.replace(/^\/__plugin/, "");
+  const crest = crestBench(req.method, p, url.searchParams, sent);
+  if (crest) return crest;
   if (req.method === "GET") {
     const made = stage3Read(p, url);
     if (made) return made;
@@ -414,8 +515,9 @@ async function handle(req, res) {
       return res.end(read(url.pathname.slice(1)));
     }
     if (url.pathname.startsWith("/__plugin/")) {
-      if (req.method !== "GET") await new Promise((ok) => { req.resume(); req.on("end", ok); });
-      const r = await pluginBench(req, url);
+      // a write's body: kept for the crest store (a preview sends the picture back)
+      const sent = req.method === "GET" ? null : await new Promise((ok) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => ok(Buffer.concat(c))); });
+      const r = await pluginBench(req, url, sent);
       res.writeHead(r.status, { "Content-Type": r.type || "application/json" });
       return res.end(r.body);
     }
