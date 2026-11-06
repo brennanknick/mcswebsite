@@ -45,6 +45,7 @@ const RECHECK_MS = 10 * 60 * 1000;      // the Discord role, looked at again eve
 const LOG_TTL = 90 * 86400;             // activity kept 90 days
 const PLUGIN_TIMEOUT_MS = 12000;
 const WIPE_TIMEOUT_MS = 25000;          // a match wipe can take the plugin ~15 s
+const RESTORE_TIMEOUT_MS = 40000;       // a fixture restore waits up to 30 s for match history
 const RECOUNT_TIMEOUT_MS = 75000;       // the small-games recount waits up to 60 s on the server
 const CREST_TIMEOUT_MS = 30000;         // a crest preview or save decodes and scales a picture
 
@@ -884,6 +885,59 @@ async function api(request, env, s, path) {
       if (p.dry) return pass(r);
       const b = r.body || {};
       return done(r, "took small games off careers", `${b.games ?? "?"} games, ${b.careers ?? "?"} players: ${p.reason}`);
+    }
+
+    /* the league table: staff adjustments, a manual order, and restoring a stopped fixture game
+       (docs/admin-api.md "League"); owners only, like every write */
+    case "GET /league/standings":
+      return pass(await plugin(env, "GET", "/discord/admin/league/standings", { competition: clean(q.get("competition"), 40) || undefined }));
+    case "GET /league/restorable":
+      return pass(await plugin(env, "GET", "/discord/admin/league/restorable"));
+    case "POST /league/adjust": {
+      if (s.role !== "owner") return fail(403, "Only owners can change the table.");
+      const p = { competition: clean(input.competition, 40), team: clean(input.team, 80), reason: clean(input.reason, 120), by: by(s) };
+      if (!p.team || !p.reason) return fail(400, "Give a club and a reason.");
+      for (const k of ["points", "won", "drawn", "lost", "goalsFor", "goalsAgainst"]) {
+        const n = Number(input[k] || 0);
+        if (!Number.isInteger(n) || Math.abs(n) > 99) return fail(400, "Each change is a whole number, at most 99 either way.");
+        if (n) p[k] = n;
+      }
+      const r = await plugin(env, "POST", "/discord/admin/league/adjust", p);
+      return done(r, "adjusted the league table", `${clean(input.name, 40) || p.team}: ${(r.body && r.body.message) || ""} ${p.reason}`.trim());
+    }
+    case "POST /league/unadjust": {
+      if (s.role !== "owner") return fail(403, "Only owners can change the table.");
+      const p = { id: clean(input.id, 20), reason: clean(input.reason, 120), by: by(s) };
+      if (!/^adj-\d{1,9}$/.test(p.id) || !p.reason) return fail(400, "Pick an adjustment and give a reason.");
+      const r = await plugin(env, "POST", "/discord/admin/league/unadjust", p);
+      return done(r, "took out a table adjustment", `${p.id}: ${p.reason}`);
+    }
+    case "POST /league/order": {
+      if (s.role !== "owner") return fail(403, "Only owners can change the table.");
+      const teams = Array.isArray(input.teams) ? input.teams.map((t) => clean(t, 80)).filter((t) => t && !t.includes(",")) : [];
+      const p = { competition: clean(input.competition, 40), teams: teams.join(","), reason: clean(input.reason, 120), by: by(s) };
+      if (!teams.length || teams.length > 64 || !p.reason) return fail(400, "Give the order and a reason.");
+      const r = await plugin(env, "POST", "/discord/admin/league/order", p);
+      return done(r, "set the league table's order by hand", `${p.competition || "table"}: ${p.reason}`);
+    }
+    case "POST /league/unorder": {
+      if (s.role !== "owner") return fail(403, "Only owners can change the table.");
+      const p = { competition: clean(input.competition, 40), reason: clean(input.reason, 120), by: by(s) };
+      if (!p.reason) return fail(400, "Give a reason.");
+      const r = await plugin(env, "POST", "/discord/admin/league/unorder", p);
+      return done(r, "put the league table back in its usual order", `${p.competition || "table"}: ${p.reason}`);
+    }
+    case "POST /league/restore": {
+      if (s.role !== "owner") return fail(403, "Only owners can restore a game.");
+      const p = { id: clean(input.id, 20), match: clean(input.match, 64), winner: input.winner === "home" || input.winner === "away" ? input.winner : "",
+        reason: clean(input.reason, 120), by: by(s) };
+      if (!/^\d{1,9}$/.test(p.id) || !/^\d{8}-\d{6}-[A-Za-z0-9_-]{1,40}$/.test(p.match) || !p.winner) return fail(400, "Pick the fixture, its game and the winner.");
+      if (!p.reason) return fail(400, "Give a reason.");
+      // a preview unless this is the go-ahead; dry=1 wins over confirm, so a preview can never restore
+      if (input.confirm === true) p.confirm = "1"; else p.dry = 1;
+      const r = await plugin(env, "POST", "/discord/admin/league/restore", p, RESTORE_TIMEOUT_MS);
+      if (p.dry) return pass(r);
+      return done(r, "restored a stopped fixture game as its result", `fixture ${p.id} (${p.match}) to ${p.winner}: ${p.reason}`);
     }
 
     /* bow skins: the game server's bow panel, through its admin routes */

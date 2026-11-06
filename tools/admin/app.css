@@ -554,3 +554,15 @@ select.input option { background: #101914; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ── standings ───────────────────────────────────────────────────── */
+
+.league td { white-space: nowrap; }
+.league tr.is-adjusted td:first-child { box-shadow: inset 3px 0 0 var(--warn), inset 0 1px 0 rgba(255, 255, 255, .05); }
+.league .fchip { width: 19px; height: 19px; font-size: 10.5px; font-style: normal; }
+.auto-pos { margin-left: .35rem; font-size: 11px; font-weight: 700; color: var(--text-faint); }
+.order-list { display: grid; gap: 2px; max-height: 360px; overflow-y: auto; scrollbar-width: thin; }
+.order-item { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; align-items: center; gap: .55rem; min-height: 40px; padding: .25rem .5rem; background: var(--dark); clip-path: var(--notch); }
+.order-pos { font-variant-numeric: tabular-nums; text-align: right; color: var(--accent); }
+.order-moves { display: inline-flex; gap: 4px; }
+.order-moves .btn { min-width: 34px; padding: .2rem .4rem; }

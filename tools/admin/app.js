@@ -2531,6 +2531,178 @@
 
   /* ── Activity ─────────────────────────────────────────────────── */
 
+  /* ── Standings: the league table's adjustments, manual order, restores ── */
+  // docs/admin-api.md "League". Adjustments sit on top of the games; a manual order replaces the
+  // sort until it's cleared. The site and the in-game boards read the same table.
+
+  let leagueComp = "";
+  const NUMS = [["points", "Pts"], ["won", "W"], ["drawn", "D"], ["lost", "L"], ["goalsFor", "GF"], ["goalsAgainst", "GA"]];
+  const signed = (n) => (n > 0 ? `+${n}` : String(n));
+  const adjText = (a) => NUMS.filter(([k]) => a[k]).map(([k, l]) => `${signed(a[k])} ${l}`).join(", ") || "nothing";
+  // a table side's crest: a pack glyph (private use) is an image, anything else its character
+  function sideLabel(club, size = 22) {
+    const f = (club && club.flag) || "";
+    const cp = f ? f.codePointAt(0) : 0;
+    const pua = cp >= 0xe000 && cp <= 0xf8ff;
+    return h("span", { class: "cname" }, f ? crestMark(pua ? cp.toString(16) : null, f, pua ? "club" : "symbol", size) : null,
+      h("b", null, (club && club.name) || "?"));
+  }
+  const formPips = (form) => h("span", { class: "fchips", style: "margin:0;flex-wrap:nowrap" },
+    (form || []).map((x) => h("i", { class: `fchip is-${x === "W" ? "w" : x === "D" ? "d" : "l"}`, title: x === "W" ? "Won" : x === "D" ? "Drew" : "Lost" }, x)));
+
+  async function standings() {
+    const seq = pageSeq;
+    const top = pageHead("Champions League", "Standings", "The table as the site, the boards and the League Table menu show it. Adjustments go on top of the games; a manual order replaces the sort until you clear it.");
+    main.replaceChildren(top, h("div", { class: "loading" }, "Loading…"));
+    const [r, rs] = await Promise.all([call("GET", "/league/standings"), call("GET", "/league/restorable")]);
+    if (seq !== pageSeq) return;
+    if (!r.ok) return main.replaceChildren(top, r.httpStatus === 404 ? h("p", { class: "note" }, "The game server needs the update with the league tools (league-tools) before this page works.") : errorBox(r.error));
+    const tables = r.tables || [];
+    if (!tables.length) return main.replaceChildren(top, panel(null, empty("No fixtures booked, so there's no table yet.")));
+    const t = tables.find((x) => x.competition === leagueComp) || tables[0];
+    leagueComp = t.competition;
+    const adjustments = (r.adjustments || []).filter((a) => a.competition.toLowerCase().replace(/\s+/g, " ") === t.competition.toLowerCase().replace(/\s+/g, " "));
+    const rows = t.rows || [];
+    const redraw = () => standings();
+    const head = pageHead("Champions League", t.competition, top.querySelector("p:not(.kicker)").textContent, [
+      tables.length > 1 ? h("div", { class: "tabs" }, tables.map((x) => h("button", { type: "button", "aria-pressed": String(x === t), onclick: () => { leagueComp = x.competition; redraw(); } }, x.competition))) : null,
+      h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await setOrder(t)) redraw(); } }, t.manualOrder ? "Change the order" : "Set the order by hand"),
+      t.manualOrder ? h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await clearOrder(t)) redraw(); } }, "Back to auto order") : null]);
+    const o = t.order;
+    main.replaceChildren(head, ...[
+      t.manualOrder ? h("p", { class: "note" }, h("b", null, "Manual order. "), `Set by ${byName(o && o.by) || "staff"}${o && o.at ? ` ${ago(o.at)}` : ""}${o && o.reason ? `: ${o.reason}` : ""}. `,
+        "The site and the boards show this order, flagged as set by staff. The faint number is where the points alone would put each club.") : null,
+      panel("Table", rows.length ? h("div", { class: "table-wrap" }, h("table", { class: "ladder league" },
+        h("thead", null, h("tr", null, h("th", { class: "num" }, "#"), h("th", null, "Club"),
+          ["P", "W", "D", "L", "GF", "GA", "GD", "Pts"].map((x) => h("th", { class: "num" }, x)), h("th", null, "Form"), h("th"))),
+        h("tbody", null, rows.map((x) => h("tr", { class: x.adjustment ? "is-adjusted" : null },
+          h("td", { class: "num" }, h("b", null, String(x.position)), x.autoPosition != null && x.autoPosition !== x.position ? h("small", { class: "auto-pos", title: "Where the points alone put them" }, String(x.autoPosition)) : null),
+          h("td", null, h("span", { class: "who-cell" }, sideLabel(x.club), x.adjustment ? h("span", { class: "tag is-warn", title: "Staff adjustment, already in the numbers" }, adjText(x.adjustment)) : null)),
+          [x.played, x.won, x.drawn, x.lost, x.goalsFor, x.goalsAgainst].map((n) => h("td", { class: "num" }, String(n))),
+          h("td", { class: "num" }, signed(x.goalDifference)), h("td", { class: "num" }, h("b", null, String(x.points))),
+          h("td", null, formPips(x.form)),
+          h("td", { class: "num" }, h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: async () => { if (await adjustRow(t, x)) redraw(); } }, "Adjust"))))))) : empty("No clubs yet."),
+      { i: 0, aside: h("small", null, `${plural(rows.length, "club")} · win 3, draw 1 · ties: GD, goals, head to head`) }),
+      h("div", { class: "grid" },
+        panel("Adjustments", adjustments.length ? h("div", { class: "rows" }, adjustments.map((a) => h("div", { class: "row" },
+          h("div", { class: "row-main" },
+            h("div", { class: "row-title" }, a.teamName || a.team, h("span", { class: "tag is-warn" }, a.text || adjText(a))),
+            h("div", { class: "row-sub" }, h("span", null, a.reason), h("span", null, `${byName(a.by)} · ${ago(a.at)}`), h("span", null, a.id))),
+          h("div", { class: "row-actions" }, h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: async () => { if (await removeAdjust(a)) redraw(); } }, "Take out")))))
+          : empty("None. The table is exactly what the games give."), { i: 1 }),
+        restorePanel(rs, redraw, 2)),
+      panel("Changes", (r.audit || []).length ? h("div", { class: "rows" }, r.audit.slice(0, 30).map((a) => h("div", { class: "row" },
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, byName(a.by) || "?", h("span", { class: "vs" }, { adjust: "adjusted", unadjust: "took out an adjustment", order: "set the order", unorder: "cleared the order" }[a.action] || a.action), a.competition),
+          h("div", { class: "row-sub" }, h("span", null, `${fmtWhen(a.at)} (${ago(a.at)})`), a.detail ? h("span", null, a.detail) : null, h("span", null, a.reason))),
+        h("span"))))
+        : empty("Nobody has changed the table by hand."), { i: 3 }),
+    ].filter(Boolean));
+  }
+
+  function restorePanel(rs, redraw, i) {
+    const text = "A fixture a referee stopped goes back on the schedule and its game doesn't count. Restoring makes that game the result: won by forfeit, the real score and every stat kept. /fixtures void undoes it.";
+    if (!rs || !rs.ok) return panel("Restore a stopped game", [h("p", null, text), rs && rs.httpStatus === 404 ? h("p", { class: "note" }, "Needs the league tools update on the game server.") : errorBox((rs && rs.error) || "Couldn't load.")], { i });
+    const list = rs.fixtures || [];
+    return panel("Restore a stopped game", [h("p", null, text),
+      rs.historyReady === false ? h("p", { class: "note" }, "Match history is still loading. Give it a minute.") : null,
+      list.length ? h("div", { class: "rows" }, list.flatMap((f) => (f.games || []).map((g) => h("div", { class: "row" },
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, h("span", { class: "tag" }, `#${f.id}`), f.home.name, h("b", { class: "score" }, `${g.score.home} – ${g.score.away}`), f.away.name,
+            h("span", { class: "tag is-bad" }, g.outcome), g.small ? h("span", { class: "tag", title: "2 or fewer a side at kickoff: careers won't change" }, "Small") : null),
+          h("div", { class: "row-sub" }, h("span", null, f.label ? `${f.competition} · ${f.label}` : f.competition), h("span", null, `${fmtWhen(g.startedAt)}`), h("span", null, g.id))),
+        h("div", { class: "row-actions" }, h("button", { class: "btn btn-sm", type: "button", onclick: async () => { if (await restoreGame(f, g)) redraw(); } }, "Restore"))))))
+        : empty("No stopped fixture games waiting.")], { i });
+  }
+
+  async function restoreGame(f, g) {
+    let asked = null;
+    const lead = g.score.home > g.score.away ? "home" : g.score.away > g.score.home ? "away" : "";
+    const r = await formDialog({ title: `Restore fixture #${f.id}`, okLabel: "Show what happens",
+      text: `${f.home.name} ${g.score.home} – ${g.score.away} ${f.away.name}, stopped. Pick who it goes to by forfeit. First a look at what it does: nothing changes yet.`,
+      fields: [{ name: "winner", type: "select", label: "Winner by forfeit", required: true, value: lead,
+        options: [{ value: "", label: "Pick a side" }, { value: "home", label: `${f.home.name} (home)` }, { value: "away", label: `${f.away.name} (away)` }] },
+      reasonField(`${lead === "home" ? f.away.name : f.home.name} forfeited mid-match`)],
+      submit: (v) => {
+        if (!v.winner) return { ok: false, error: "Pick who wins." };
+        asked = { winner: v.winner, reason: v.reason };
+        return call("POST", "/league/restore", { id: f.id, match: g.id, winner: v.winner, reason: v.reason });
+      } });
+    if (!r || !asked) return false;
+    const done = await formDialog({ title: `Give it to ${r.winnerName}?`, okLabel: "Restore it",
+      text: h("div", { class: "form" }, h("p", null, r.message || ""), h("div", { class: "form-row" },
+        stat(`${r.score.home} – ${r.score.away}`, "score as played"), stat(r.players ?? 0, "players get the game"), stat(r.mvp || "None", "MVP"))),
+      submit: () => call("POST", "/league/restore", { id: f.id, match: g.id, winner: asked.winner, reason: asked.reason, confirm: true }) });
+    if (done) toast(done.message || "Restored.");
+    return !!done;
+  }
+
+  async function adjustRow(t, x) {
+    const name = (x.club && x.club.name) || x.key;
+    const r = await formDialog({ title: `Adjust ${name}`, okLabel: "Add it",
+      text: "Added on top of what the games give, and shown on the site as a staff change. A win, draw or loss added counts as a game played but gives no points by itself: add the points too if you mean them. Use minus to take away.",
+      fields: [{ type: "row", fields: NUMS.slice(0, 3).map(([k, l]) => ({ name: k, label: l === "Pts" ? "Points" : l === "W" ? "Won" : "Drawn", type: "number", value: 0, min: -99, max: 99 })) },
+        { type: "row", fields: NUMS.slice(3).map(([k, l]) => ({ name: k, label: l === "L" ? "Lost" : l === "GF" ? "Goals for" : "Goals against", type: "number", value: 0, min: -99, max: 99 })) },
+        reasonField("Points deduction for a no-show")],
+      onopen: (inputs) => {
+        const out = h("p", { class: "row-sub", "data-preview": true });
+        inputs.reason.closest(".field").before(out);
+        const show = () => {
+          const d = Object.fromEntries(NUMS.map(([k]) => [k, parseInt(inputs[k].value, 10) || 0]));
+          const won = x.won + d.won, drawn = x.drawn + d.drawn, lost = x.lost + d.lost, gf = x.goalsFor + d.goalsFor, ga = x.goalsAgainst + d.goalsAgainst;
+          out.textContent = `After: P${won + drawn + lost} W${won} D${drawn} L${lost} · ${gf}-${ga} (${signed(gf - ga)}) · ${x.points + d.points} pts`;
+        };
+        NUMS.forEach(([k]) => inputs[k].addEventListener("input", show));
+        show();
+      },
+      submit: (v) => {
+        const body = { competition: t.competition, team: x.key, name, reason: v.reason };
+        for (const [k] of NUMS) {
+          const n = Number(v[k] || 0);
+          if (!Number.isInteger(n) || Math.abs(n) > 99) return { ok: false, error: "Each change is a whole number, at most 99 either way." };
+          body[k] = n;
+        }
+        if (NUMS.every(([k]) => !body[k])) return { ok: false, error: "That changes nothing." };
+        return call("POST", "/league/adjust", body);
+      } });
+    if (r) toast(r.message || "Adjusted.");
+    return !!r;
+  }
+
+  async function removeAdjust(a) {
+    const r = await formDialog({ title: `Take out ${a.text || adjText(a)} for ${a.teamName || a.team}?`, okLabel: "Take it out", bad: true,
+      text: `Added by ${byName(a.by)} ${ago(a.at)}: ${a.reason}`, fields: [reasonField("Added by mistake")],
+      submit: (v) => call("POST", "/league/unadjust", { id: a.id, reason: v.reason }) });
+    if (r) toast(r.message || "Taken out.");
+    return !!r;
+  }
+
+  async function setOrder(t) {
+    const list = (t.rows || []).map((x) => ({ key: x.key, club: x.club, auto: x.autoPosition ?? x.position }));
+    const box = h("div", { class: "order-list" });
+    const draw = () => box.replaceChildren(...list.map((x, i) => h("div", { class: "order-item" },
+      h("b", { class: "order-pos" }, String(i + 1)), sideLabel(x.club, 20),
+      x.auto !== i + 1 ? h("small", { class: "auto-pos", title: "Where the points put them" }, `was ${x.auto}`) : h("span"),
+      h("span", { class: "order-moves" },
+        h("button", { class: "btn btn-dark btn-sm", type: "button", disabled: i === 0 || null, "aria-label": "Up", onclick: () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; draw(); } }, "▲"),
+        h("button", { class: "btn btn-dark btn-sm", type: "button", disabled: i === list.length - 1 || null, "aria-label": "Down", onclick: () => { [list[i + 1], list[i]] = [list[i], list[i + 1]]; draw(); } }, "▼")))));
+    draw();
+    const r = await formDialog({ title: "Set the order by hand", okLabel: "Use this order",
+      text: h("div", { class: "form" }, h("p", null, "Top first. While it's set, the table uses exactly this order everywhere, flagged as set by staff, until you go back to auto. Clubs booked later go underneath."), box),
+      fields: [reasonField("Head to head decided by the league")],
+      submit: (v) => call("POST", "/league/order", { competition: t.competition, teams: list.map((x) => x.key), reason: v.reason }) });
+    if (r) toast(r.message || "Order set.");
+    return !!r;
+  }
+
+  async function clearOrder(t) {
+    const r = await formDialog({ title: "Back to auto order?", okLabel: "Go back to auto",
+      text: "The table goes back to sorting by points, goal difference, goals and head to head. Adjustments stay.", fields: [reasonField("Tiebreak settled")],
+      submit: (v) => call("POST", "/league/unorder", { competition: t.competition, reason: v.reason }) });
+    if (r) toast(r.message || "Back to auto.");
+    return !!r;
+  }
+
   function activityRow(a) {
     return h("div", { class: "row" },
       h("div", { class: "row-main" },
@@ -2548,7 +2720,7 @@
 
   /* ── the router ───────────────────────────────────────────────── */
 
-  const ROUTES = { "": home, fixtures, matches, clubs: clubAdmin, crests, cups, ranked, reports, tiers, players, wallet, bows, settings, server, maint, activity };
+  const ROUTES = { "": home, fixtures, standings, matches, clubs: clubAdmin, crests, cups, ranked, reports, tiers, players, wallet, bows, settings, server, maint, activity };
 
   // A page rises in when it's opened. The first click or key inside it ends that, so
   // the redraws a button causes (a tab, a save, a move) don't replay the animation.

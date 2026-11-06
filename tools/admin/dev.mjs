@@ -1,5 +1,5 @@
 // Local test bench for the admin dashboard (never deployed).
-//   node tools/admin/dev.mjs [--port=8799] [--cup=running|signup|live] [--ranked=live|busy] [--crests=bench|real]
+//   node tools/admin/dev.mjs [--port=8799] [--cup=running|signup|live] [--ranked=live|busy] [--crests=bench|real] [--league=bench|real]
 // Runs worker.js in Node on http://localhost:<port> (this PC only) with an in-memory KV, and
 // signs you in as a TEST owner at /__login (Discord's real sign-in can't come back to
 // localhost). Reads (GET) go to the real game server, signed with its admin secret when that
@@ -433,10 +433,115 @@ function crestBench(method, p, q, body) {
   return null;
 }
 
+// The league routes (docs/admin-api.md "League"): a pretend table, used unless --league=real. The
+// Champions League as it stood before fixture 17 was restored, with that stopped game waiting.
+const LEAGUE_MODE = flag("league", "bench");
+const leagueClubs = {
+  atletico_madrid: { name: "Atletico Madrid", flag: "", g: [2, 2, 0, 0, 51, 27], form: ["W", "W"] },
+  barcelona: { name: "Barcelona", flag: "", g: [2, 2, 0, 0, 40, 18], form: ["W", "W"] },
+  manchester_united: { name: "Manchester United", flag: "", g: [2, 1, 0, 1, 30, 33], form: ["W", "L"] },
+  psg: { name: "PSG", flag: "", g: [2, 1, 0, 1, 9, 12], form: ["W", "L"] },
+  real_madrid: { name: "Real Madrid", flag: "", g: [2, 0, 1, 1, 26, 30], form: ["L", "D"] },
+  arsenal: { name: "Arsenal", flag: "", g: [2, 0, 1, 1, 19, 33], form: ["L", "D"] },
+  liverpool: { name: "Liverpool", flag: "", g: [2, 0, 1, 1, 13, 15], form: ["L", "D"] },
+  tottenham: { name: "Tottenham", flag: "", g: [2, 0, 1, 1, 22, 42], form: ["L", "D"] },
+};
+const league = { next: 1, adjustments: [], order: null, audit: [], restored: false };
+const LG17 = { id: "20261102-021625-warsaw", outcome: "STOPPED", score: { home: 8, away: 20 }, startedAt: Date.parse("2026-11-02T02:16:25Z"), endedAt: Date.parse("2026-11-02T02:35:10Z"), small: false };
+function leagueRows(withOrder) {
+  const rows = Object.entries(leagueClubs).map(([key, c]) => {
+    const [played, won, drawn, lost, goalsFor, goalsAgainst] = c.g;
+    const r = { key, club: { id: key, name: c.name, flag: c.flag, color: "#ffffff" }, played, won, drawn, lost, goalsFor, goalsAgainst, points: won * 3 + drawn, form: c.form.slice(-5) };
+    const adj = { points: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 };
+    for (const a of league.adjustments) if (a.team === key) for (const k of Object.keys(adj)) adj[k] += a[k];
+    for (const k of Object.keys(adj)) r[k] += adj[k];
+    r.played += adj.won + adj.drawn + adj.lost;
+    r.goalDifference = r.goalsFor - r.goalsAgainst;
+    if (Object.values(adj).some(Boolean)) r.adjustment = adj;
+    return r;
+  });
+  rows.sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor || a.key.localeCompare(b.key));
+  rows.forEach((r, i) => { r.position = i + 1; });
+  if (!withOrder || !league.order) return rows;
+  const auto = Object.fromEntries(rows.map((r) => [r.key, r.position]));
+  const by = Object.fromEntries(rows.map((r) => [r.key, r]));
+  const out = [...league.order.teams.filter((k) => by[k]).map((k) => by[k]), ...rows.filter((r) => !league.order.teams.includes(r.key))];
+  out.forEach((r, i) => { r.position = i + 1; r.autoPosition = auto[r.key]; });
+  return out;
+}
+function leagueAudit(by, action, team, detail, reason) {
+  league.audit.unshift({ at: Date.now(), by, action, competition: "Champions League", ...(team ? { team } : {}), ...(detail ? { detail } : {}), reason });
+}
+function leagueBench(method, p, q) {
+  if (LEAGUE_MODE === "real" || !p.startsWith("/discord/admin/league/")) return null;
+  const op = p.slice("/discord/admin/league/".length);
+  const ok = (o) => ({ status: 200, body: JSON.stringify({ ok: true, ...o }) });
+  const bad = (status, error) => ({ status, body: JSON.stringify({ ok: false, error }) });
+  const nm = (k) => (leagueClubs[k] || {}).name || k;
+  if (method === "GET" && op === "standings") {
+    const rows = leagueRows(true);
+    return ok({ defaultCompetition: "Champions League", adjustMax: 99, tables: [{ competition: "Champions League", manualOrder: !!league.order, adjusted: rows.some((r) => r.adjustment),
+      ...(league.order ? { order: league.order } : {}), rows }],
+      adjustments: league.adjustments.map((a) => ({ ...a, text: ["points", "won", "drawn", "lost", "goalsFor", "goalsAgainst"].filter((k) => a[k]).map((k) => `${a[k] > 0 ? "+" : ""}${a[k]} ${{ points: "pts", won: "W", drawn: "D", lost: "L", goalsFor: "GF", goalsAgainst: "GA" }[k]}`).join(", ") })),
+      audit: league.audit.slice(0, 100) });
+  }
+  if (method === "GET" && op === "restorable") return ok({ historyReady: true, fixtures: league.restored ? [] : [{ id: "17", competition: "Champions League", label: "Week 3", kickoff: Date.parse("2026-11-02T02:00:00Z"),
+    home: { id: "real_madrid", name: "Real Madrid" }, away: { id: "arsenal", name: "Arsenal" }, games: [LG17] }] });
+  if (method !== "POST") return bad(405, "POST only");
+  console.log(`  (bench) pretend league ${op} ${q}`);
+  const by = q.get("by"), reason = q.get("reason");
+  if (op === "adjust") {
+    const team = q.get("team");
+    if (!leagueClubs[team]) return bad(400, `${team} isn't in the Champions League table.`);
+    const a = { id: `adj-${league.next++}`, competition: "Champions League", team, teamName: nm(team), reason, by, at: Date.now() };
+    for (const k of ["points", "won", "drawn", "lost", "goalsFor", "goalsAgainst"]) a[k] = Number(q.get(k) || 0);
+    league.adjustments.push(a);
+    const row = leagueRows(false).find((r) => r.key === team);
+    if (["won", "drawn", "lost", "goalsFor", "goalsAgainst"].some((k) => row[k] < 0)) { league.adjustments.pop(); return bad(400, `That would take ${nm(team)} below zero.`); }
+    leagueAudit(by, "adjust", team, a.id, reason);
+    return ok({ message: `Adjusted ${nm(team)} in the Champions League table (bench).` });
+  }
+  if (op === "unadjust") {
+    const i = league.adjustments.findIndex((a) => a.id === q.get("id"));
+    if (i < 0) return bad(404, `There's no adjustment ${q.get("id")}.`);
+    const [a] = league.adjustments.splice(i, 1);
+    leagueAudit(by, "unadjust", a.team, `${a.id} taken out`, reason);
+    return ok({ message: `Took out ${a.id} for ${a.teamName}.` });
+  }
+  if (op === "order") {
+    const teams = (q.get("teams") || "").split(",").filter(Boolean);
+    if (teams.length !== Object.keys(leagueClubs).length || new Set(teams).size !== teams.length || teams.some((t) => !leagueClubs[t])) return bad(400, `Put all ${Object.keys(leagueClubs).length} sides in the order (${teams.length} given).`);
+    league.order = { teams, reason, by, at: Date.now() };
+    leagueAudit(by, "order", null, teams.join(", "), reason);
+    return ok({ message: "The Champions League table is in your order now, until it's cleared." });
+  }
+  if (op === "unorder") {
+    if (!league.order) return bad(400, "That table isn't in a manual order.");
+    league.order = null;
+    leagueAudit(by, "unorder", null, null, reason);
+    return ok({ message: "The Champions League table goes by the numbers again." });
+  }
+  if (op === "restore") {
+    if (league.restored) return bad(409, "That fixture already has a result.");
+    const w = q.get("winner");
+    const winnerName = w === "home" ? "Real Madrid" : "Arsenal";
+    const base = { fixture: "17", match: LG17.id, label: "Real Madrid 8-20 Arsenal", score: LG17.score, winner: w, winnerName, players: 8, mvp: "ArsenalStriker" };
+    if (q.get("dry") || q.get("confirm") !== "1") return ok({ dry: true, ...base, message: `Restore Real Madrid 8-20 Arsenal as fixture 17's result, won by ${winnerName} by forfeit? The score and every stat stand, 8 players get the game, MVP ArsenalStriker.` });
+    league.restored = true;
+    const tally = (c, win, gf, ga) => { c.g[0]++; c.g[win ? 1 : 3]++; c.g[4] += gf; c.g[5] += ga; c.form.push(win ? "W" : "L"); };
+    tally(leagueClubs.real_madrid, w === "home", 8, 20);
+    tally(leagueClubs.arsenal, w === "away", 20, 8);
+    return ok({ dry: false, ...base, message: `Restored: Gave Real Madrid v Arsenal to ${winnerName} by forfeit, 8-20. Stats kept; 8 players got the game. /fixtures void 17 undoes it.` });
+  }
+  return bad(404, "no such endpoint");
+}
+
 async function pluginBench(req, url, sent) {
   const p = url.pathname.replace(/^\/__plugin/, "");
   const crest = crestBench(req.method, p, url.searchParams, sent);
   if (crest) return crest;
+  const lg = leagueBench(req.method, p, url.searchParams);
+  if (lg) return lg;
   if (req.method === "GET") {
     const made = stage3Read(p, url);
     if (made) return made;
