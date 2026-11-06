@@ -2601,7 +2601,7 @@
   }
 
   function restorePanel(rs, redraw, i) {
-    const text = "A fixture a referee stopped goes back on the schedule and its game doesn't count. Restoring makes that game the result: won by forfeit, the real score and every stat kept. /fixtures void undoes it.";
+    const text = "A fixture a referee stopped goes back on the schedule and its game doesn't count. Restoring makes that game the result: won by forfeit, the real score and every stat kept. In game, /fixtures void takes it back (the game goes back to stopped, stats kept) so it can be restored again.";
     if (!rs || !rs.ok) return panel("Restore a stopped game", [h("p", null, text), rs && rs.httpStatus === 404 ? h("p", { class: "note" }, "Needs the league tools update on the game server.") : errorBox((rs && rs.error) || "Couldn't load.")], { i });
     const list = rs.fixtures || [];
     return panel("Restore a stopped game", [h("p", null, text),
@@ -2620,8 +2620,8 @@
     const lead = g.score.home > g.score.away ? "home" : g.score.away > g.score.home ? "away" : "";
     const r = await formDialog({ title: `Restore fixture #${f.id}`, okLabel: "Show what happens",
       text: `${f.home.name} ${g.score.home} – ${g.score.away} ${f.away.name}, stopped. Pick who it goes to by forfeit. First a look at what it does: nothing changes yet.`,
-      fields: [{ name: "winner", type: "select", label: "Winner by forfeit", required: true, value: lead,
-        options: [{ value: "", label: "Pick a side" }, { value: "home", label: `${f.home.name} (home)` }, { value: "away", label: `${f.away.name} (away)` }] },
+      fields: [{ name: "winner", type: "select", label: "Winner by forfeit", required: true, value: lead, hint: lead ? "Suggested: the side that was ahead. Check before you go on." : null,
+        options: [{ value: "", label: "Pick a side" }, { value: "home", label: `${f.home.name} (home${lead === "home" ? ", suggested: ahead" : ""})` }, { value: "away", label: `${f.away.name} (away${lead === "away" ? ", suggested: ahead" : ""})` }] },
       reasonField(`${lead === "home" ? f.away.name : f.home.name} forfeited mid-match`)],
       submit: (v) => {
         if (!v.winner) return { ok: false, error: "Pick who wins." };
