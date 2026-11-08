@@ -434,7 +434,10 @@ function crestBench(method, p, q, body) {
 }
 
 // The league routes (docs/admin-api.md "League"): a pretend table, used unless --league=real. The
-// Champions League as it stood before fixture 17 was restored, with that stopped game waiting.
+// Champions League as it stood before fixture 17 was restored, with that stopped game waiting. Duck's
+// 11-06 case is in it too: Tottenham were replaced by Newcastle, Tottenham were deleted from the clubs
+// (so they're missing from `clubs`, but still have a row from their fixtures), Newcastle sit on nothing
+// with Duck's adjustment patching Tottenham's games onto them. Replace, remove and undo work on it.
 const LEAGUE_MODE = flag("league", "bench");
 const leagueClubs = {
   atletico_madrid: { name: "Atletico Madrid", flag: "", g: [2, 2, 0, 0, 51, 27], form: ["W", "W"] },
@@ -443,17 +446,61 @@ const leagueClubs = {
   psg: { name: "PSG", flag: "", g: [2, 1, 0, 1, 9, 12], form: ["W", "L"] },
   real_madrid: { name: "Real Madrid", flag: "", g: [2, 0, 1, 1, 26, 30], form: ["L", "D"] },
   arsenal: { name: "Arsenal", flag: "", g: [2, 0, 1, 1, 19, 33], form: ["L", "D"] },
-  liverpool: { name: "Liverpool", flag: "", g: [2, 0, 1, 1, 13, 15], form: ["L", "D"] },
-  tottenham: { name: "Tottenham", flag: "", g: [2, 0, 1, 1, 22, 42], form: ["L", "D"] },
+  liverpool: { name: "Liverpool", flag: "", g: [2, 0, 1, 1, 9, 10], form: ["L", "D"] },
+  tottenham: { name: "Tottenham", flag: "", g: [2, 0, 1, 1, 22, 42], form: ["L", "D"], deleted: true },
+  newcastle: { name: "Newcastle", flag: "", g: [0, 0, 0, 0, 0, 0], form: [] },
 };
-const league = { next: 1, adjustments: [], order: null, audit: [], restored: false };
+const league = { next: 2, adjustments: [{ id: "adj-1", competition: "Champions League", team: "newcastle", teamName: "Newcastle",
+  points: 1, won: 0, drawn: 1, lost: 1, goalsFor: 22, goalsAgainst: 42, reason: "Tottenham's games until there's a fix", by: "dashboard:duck (1)", at: Date.parse("2026-11-06T18:00:00Z") }],
+  order: null, audit: [], restored: false, changes: [], nextChange: 1 };
+// the fixtures the replace/remove previews list (the table numbers above are the bench's truth)
+const DAY = 864e5;
+const benchFixtures = [
+  { id: "8", label: "Week 1", state: "FINISHED", home: "tottenham", away: "atletico_madrid", score: { home: 13, away: 33 }, kickoff: Date.parse("2026-10-14T01:00:00Z") },
+  { id: "7", label: "Week 1", state: "FINISHED", home: "liverpool", away: "psg", score: { home: 0, away: 1 }, kickoff: Date.parse("2026-10-15T01:00:00Z") },
+  { id: "15", label: "Week 2", state: "FINISHED", home: "liverpool", away: "tottenham", score: { home: 9, away: 9 }, kickoff: Date.parse("2026-10-23T01:00:00Z") },
+  { id: "16", label: "Week 2", state: "FINISHED", home: "psg", away: "barcelona", score: { home: 8, away: 12 }, kickoff: Date.parse("2026-10-24T01:00:00Z") },
+  { id: "21", label: "Week 4", state: "SCHEDULED", home: "tottenham", away: "arsenal", kickoff: Date.now() + 2 * DAY },
+  { id: "22", label: "Week 4", state: "SCHEDULED", home: "newcastle", away: "psg", kickoff: Date.now() + 3 * DAY },
+  { id: "23", label: "Week 5", state: "SCHEDULED", home: "newcastle", away: "tottenham", kickoff: Date.now() + 9 * DAY },
+];
 const LG17 = { id: "20261102-021625-warsaw", outcome: "STOPPED", score: { home: 8, away: 20 }, startedAt: Date.parse("2026-11-02T02:16:25Z"), endedAt: Date.parse("2026-11-02T02:35:10Z"), small: false };
-function leagueRows(withOrder) {
-  const rows = Object.entries(leagueClubs).map(([key, c]) => {
-    const [played, won, drawn, lost, goalsFor, goalsAgainst] = c.g;
-    const r = { key, club: { id: key, name: c.name, flag: c.flag, color: "#ffffff" }, played, won, drawn, lost, goalsFor, goalsAgainst, points: won * 3 + drawn, form: c.form.slice(-5) };
+// where a side's games count now: followed through every active replacement
+function benchKey(k, changes = league.changes) {
+  for (let i = 0; i < 32; i++) {
+    const c = changes.find((x) => x.active && x.kind === "replace" && x.from.key === k);
+    if (!c) return k;
+    k = c.to.id;
+  }
+  return k;
+}
+function benchRemoved(k, changes = league.changes) {
+  return changes.find((x) => x.active && x.kind === "remove" && x.from.key === benchKey(k, changes));
+}
+function leagueRows(withOrder, changes = league.changes, adjustments = league.adjustments) {
+  const g = Object.fromEntries(Object.entries(leagueClubs).map(([k, c]) => [k, { g: [...c.g], form: [...c.form] }]));
+  for (const [k, c] of Object.entries(g)) {
+    const to = benchKey(k, changes);
+    if (to !== k && g[to]) { c.g.forEach((n, i) => { g[to].g[i] += n; }); g[to].form.push(...c.form); }
+  }
+  for (const rm of changes.filter((x) => x.active && x.kind === "remove" && x.voidGames)) {
+    for (const f of benchFixtures.filter((x) => x.state === "FINISHED")) {
+      const hk = benchKey(f.home, changes), ak = benchKey(f.away, changes);
+      const opp = hk === rm.from.key ? ak : ak === rm.from.key ? hk : null;
+      if (!opp || !g[opp]) continue;
+      const mine = opp === hk ? f.score.home : f.score.away, theirs = opp === hk ? f.score.away : f.score.home;
+      const o = g[opp].g;
+      o[0]--; o[mine > theirs ? 1 : mine === theirs ? 2 : 3]--; o[4] -= mine; o[5] -= theirs;
+    }
+  }
+  const live = Object.entries(leagueClubs).filter(([k]) => benchKey(k, changes) === k && !benchRemoved(k, changes));
+  const rows = live.map(([key, c]) => {
+    const [played, won, drawn, lost, goalsFor, goalsAgainst] = g[key].g;
+    const r = { key, club: { id: key, name: c.name, flag: c.flag, color: "#ffffff" }, played, won, drawn, lost, goalsFor, goalsAgainst, points: won * 3 + drawn, form: g[key].form.slice(-5) };
+    const replaces = changes.filter((x) => x.active && x.kind === "replace" && benchKey(x.from.key, changes) === key).map((x) => ({ key: x.from.key, name: x.from.name, change: x.id }));
+    if (replaces.length) r.replaces = replaces;
     const adj = { points: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 };
-    for (const a of league.adjustments) if (a.team === key) for (const k of Object.keys(adj)) adj[k] += a[k];
+    for (const a of adjustments) if (benchKey(a.team, changes) === key) for (const k of Object.keys(adj)) adj[k] += a[k];
     for (const k of Object.keys(adj)) r[k] += adj[k];
     r.played += adj.won + adj.drawn + adj.lost;
     r.goalDifference = r.goalsFor - r.goalsAgainst;
@@ -465,7 +512,8 @@ function leagueRows(withOrder) {
   if (!withOrder || !league.order) return rows;
   const auto = Object.fromEntries(rows.map((r) => [r.key, r.position]));
   const by = Object.fromEntries(rows.map((r) => [r.key, r]));
-  const out = [...league.order.teams.filter((k) => by[k]).map((k) => by[k]), ...rows.filter((r) => !league.order.teams.includes(r.key))];
+  const named = [...new Set(league.order.teams.map((k) => benchKey(k, changes)))];
+  const out = [...named.filter((k) => by[k]).map((k) => by[k]), ...rows.filter((r) => !named.includes(r.key))];
   out.forEach((r, i) => { r.position = i + 1; r.autoPosition = auto[r.key]; });
   return out;
 }
@@ -478,11 +526,18 @@ function leagueBench(method, p, q) {
   const ok = (o) => ({ status: 200, body: JSON.stringify({ ok: true, ...o }) });
   const bad = (status, error) => ({ status, body: JSON.stringify({ ok: false, error }) });
   const nm = (k) => (leagueClubs[k] || {}).name || k;
+  const adjText = (a) => ["points", "won", "drawn", "lost", "goalsFor", "goalsAgainst"].filter((k) => a[k]).map((k) => `${a[k] > 0 ? "+" : ""}${a[k]} ${{ points: "pts", won: "W", drawn: "D", lost: "L", goalsFor: "GF", goalsAgainst: "GA" }[k]}`).join(", ");
+  const active = league.changes.filter((x) => x.active);
   if (method === "GET" && op === "standings") {
     const rows = leagueRows(true);
     return ok({ defaultCompetition: "Champions League", adjustMax: 99, tables: [{ competition: "Champions League", manualOrder: !!league.order, adjusted: rows.some((r) => r.adjustment),
-      ...(league.order ? { order: league.order } : {}), rows }],
-      adjustments: league.adjustments.map((a) => ({ ...a, text: ["points", "won", "drawn", "lost", "goalsFor", "goalsAgainst"].filter((k) => a[k]).map((k) => `${a[k] > 0 ? "+" : ""}${a[k]} ${{ points: "pts", won: "W", drawn: "D", lost: "L", goalsFor: "GF", goalsAgainst: "GA" }[k]}`).join(", ") })),
+      ...(league.order ? { order: league.order } : {}),
+      replaced: active.filter((x) => x.kind === "replace").map((x) => ({ change: x.id, key: x.from.key, name: x.from.name, by: benchKey(x.from.key), byName: nm(benchKey(x.from.key)), at: x.at })),
+      removed: active.filter((x) => x.kind === "remove").map((x) => ({ change: x.id, key: x.from.key, name: x.from.name, voidGames: x.voidGames, at: x.at })),
+      rows }],
+      adjustments: league.adjustments.map((a) => ({ ...a, text: adjText(a) })),
+      changes: [...league.changes].reverse(),
+      clubs: Object.entries(leagueClubs).filter(([, c]) => !c.deleted).map(([id, c]) => ({ id, name: c.name, color: "#ffffff", flag: c.flag })).sort((a, b) => a.name.localeCompare(b.name)),
       audit: league.audit.slice(0, 100) });
   }
   if (method === "GET" && op === "restorable") return ok({ historyReady: true, fixtures: league.restored ? [] : [{ id: "17", competition: "Champions League", label: "Week 3", kickoff: Date.parse("2026-11-02T02:00:00Z"),
@@ -521,6 +576,7 @@ function leagueBench(method, p, q) {
     leagueAudit(by, "unorder", null, null, reason);
     return ok({ message: "The Champions League table goes by the numbers again." });
   }
+  if (op === "replace" || op === "remove" || op === "undo") return sideBench(op, q, by, reason, ok, bad, nm, adjText);
   if (op === "restore") {
     if (league.restored) return bad(409, "That fixture already has a result.");
     const w = q.get("winner");
@@ -534,6 +590,100 @@ function leagueBench(method, p, q) {
     return ok({ dry: false, ...base, message: `Restored: Gave Real Madrid v Arsenal to ${winnerName} by forfeit, 8-20. Stats kept; 8 players got the game. /fixtures void 17 undoes it.` });
   }
   return bad(404, "no such endpoint");
+}
+
+// replace / remove / undo on the pretend league, answering the plugin's shape (docs/admin-api.md)
+function sideBench(op, q, by, reason, ok, bad, nm, adjText) {
+  const confirm = q.get("confirm") === "1" && !q.get("dry");
+  const rowKeys = leagueRows(false).map((r) => r.key);
+  const fx = (f, after) => {
+    const o = { id: f.id, label: f.label, kickoff: f.kickoff, state: f.state, home: { id: f.home, name: nm(f.home) }, away: { id: f.away, name: nm(f.away) },
+      text: f.score ? `${nm(f.home)} ${f.score.home}-${f.score.away} ${nm(f.away)}` : `${nm(f.home)} vs ${nm(f.away)}` };
+    if (f.score) o.score = f.score;
+    if (f.state === "FINISHED") {
+      const hk = benchKey(f.home, after), ak = benchKey(f.away, after);
+      const rm = after.find((x) => x.active && x.kind === "remove" && x.voidGames && (x.from.key === hk || x.from.key === ak));
+      o.countsInTable = hk !== ak && !rm;
+    }
+    return o;
+  };
+  const adjOut = (a, cleared) => ({ id: a.id, competition: a.competition, team: a.team, teamName: a.teamName, text: adjText(a), reason: a.reason, by: a.by, at: a.at, cleared });
+  const before = leagueRows(true);
+  let plan;
+  if (op === "replace") {
+    const from = q.get("from"), to = q.get("to");
+    if (!rowKeys.includes(from)) return bad(400, `${from} isn't in the Champions League table.`);
+    if (!leagueClubs[to] || leagueClubs[to].deleted) return bad(400, `There's no club called ${to}.`);
+    if (from === to) return bad(400, "That's the same club.");
+    if (benchKey(to) !== to) return bad(400, `${nm(to)} was replaced in the Champions League already. Take that back first.`);
+    if (benchRemoved(to)) return bad(400, `${nm(to)} was taken out of the Champions League. Take that back first.`);
+    const mine = (f) => benchKey(f.home) === from || benchKey(f.away) === from;
+    const played = benchFixtures.filter((f) => f.state === "FINISHED" && mine(f));
+    const sched = benchFixtures.filter((f) => f.state === "SCHEDULED" && mine(f));
+    const vsTo = (f) => [benchKey(f.home), benchKey(f.away)].includes(to);
+    const related = league.adjustments.filter((a) => [from, to].includes(benchKey(a.team)));
+    const clear = (q.get("clear") || "").split(",").filter(Boolean);
+    for (const id of clear) if (!related.some((a) => a.id === id)) return bad(400, `${id} isn't an adjustment of ${nm(from)} or ${nm(to)}.`);
+    const draft = { id: "chg-new", kind: "replace", competition: "Champions League", from: { key: from, name: nm(from), color: "#ffffff", flag: "" },
+      to: { id: to, name: nm(to), color: "#ffffff", flag: "" }, active: true };
+    plan = { kind: "replace", draft, played, switching: sched.filter((f) => !vsTo(f)), cancelling: sched.filter(vsTo), related, clearing: related.filter((a) => clear.includes(a.id)) };
+    plan.trialAdjust = league.adjustments.filter((a) => !clear.includes(a.id));
+    plan.message = `Replace ${nm(from)} with ${nm(to)} in the Champions League? ${played.length} games played count for ${nm(to)}, ${plan.switching.length} fixtures to play switch to ${nm(to)}`
+      + (plan.cancelling.length ? `, ${plan.cancelling.length} between them cancelled` : "") + (plan.clearing.length ? `, ${plan.clearing.length} adjustments cleared` : "") + ". Match records stay as played.";
+  } else if (op === "remove") {
+    const team = q.get("team"), voidGames = q.get("voidGames") === "1";
+    if (!rowKeys.includes(team)) return bad(400, `${team} isn't in the Champions League table.`);
+    const mine = (f) => benchKey(f.home) === team || benchKey(f.away) === team;
+    const draft = { id: "chg-new", kind: "remove", competition: "Champions League", from: { key: team, name: nm(team), color: "#ffffff", flag: "" }, voidGames, active: true };
+    plan = { kind: "remove", draft, played: benchFixtures.filter((f) => f.state === "FINISHED" && mine(f)), switching: [], cancelling: benchFixtures.filter((f) => f.state === "SCHEDULED" && mine(f)),
+      related: league.adjustments.filter((a) => benchKey(a.team) === team), clearing: [], trialAdjust: league.adjustments };
+    plan.message = `Take ${nm(team)} out of the Champions League? Its ${plan.played.length} games played ${voidGames ? "come out of the table for everyone" : "still count for the clubs it played"}, ${plan.cancelling.length} fixtures to play are cancelled. Match records stay as played.`;
+  } else {
+    const c = league.changes.find((x) => x.id === q.get("id"));
+    if (!c) return bad(404, `There's no change ${q.get("id")}.`);
+    if (!c.active) return bad(400, `${c.id} was already taken back.`);
+    const later = league.changes.find((x) => x.active && x.kind === "replace" && c.kind === "replace" && x.from.key === c.to.id && x.at > c.at);
+    if (later) return bad(400, `Take back ${later.id} first: it came after, about ${c.to.name}.`);
+    plan = { kind: "undo", change: c, played: [], staying: [], switching: benchFixtures.filter((f) => (c._switched || []).some((w) => w.fixture === f.id)),
+      cancelling: benchFixtures.filter((f) => (c._cancelled || []).includes(f.id) && f.state === "CANCELLED"), related: [], clearing: c.cleared.filter((a) => !league.adjustments.some((x) => x.id === a.id)) };
+    plan.draft = c;
+    plan.trialAdjust = [...league.adjustments, ...plan.clearing];
+    plan.message = `Take back ${c.id} (${c.kind === "replace" ? `${c.to.name} replacing ${c.from.name}` : `taking ${c.from.name} out`} in the Champions League)? `
+      + `${c.kind === "replace" ? `${c.from.name}'s played games count for it again` : `${c.from.name} is back in the table`}`
+      + (plan.switching.length ? `, ${plan.switching.length} fixtures to play switch back` : "") + (plan.cancelling.length ? `, ${plan.cancelling.length} back on` : "")
+      + (plan.clearing.length ? `, ${plan.clearing.length} adjustments come back` : "") + ".";
+  }
+  const afterChanges = op === "undo" ? league.changes.map((x) => (x.id === plan.change.id ? { ...x, active: false } : x)) : [...league.changes, plan.draft];
+  const body = { dry: !confirm, kind: plan.kind, competition: "Champions League", message: plan.message, from: { key: plan.draft.from.key, name: plan.draft.from.name } };
+  if (plan.draft.to) body.to = plan.draft.to;
+  if (plan.kind === "remove") body.voidGames = plan.draft.voidGames;
+  body.played = plan.played.map((f) => fx(f, afterChanges));
+  body.switching = plan.switching.map((f) => fx(f, afterChanges));
+  body.cancelling = plan.cancelling.map((f) => fx(f, afterChanges));
+  body.staying = [];
+  body.adjustments = (plan.kind === "undo" ? plan.clearing : plan.related).map((a) => adjOut(a, plan.clearing.includes(a)));
+  const strip = (r) => ({ position: r.position, key: r.key, name: r.club.name, played: r.played, won: r.won, drawn: r.drawn, lost: r.lost, goalsFor: r.goalsFor, goalsAgainst: r.goalsAgainst, goalDifference: r.goalDifference, points: r.points });
+  body.table = { before: before.map(strip), after: leagueRows(true, afterChanges, plan.trialAdjust).map(strip) };
+  if (plan.kind === "undo") body.change = plan.change;
+  if (!confirm) return ok(body);
+  // make it
+  if (plan.kind === "undo") {
+    const c = plan.change;
+    for (const w of c._switched || []) { const f = benchFixtures.find((x) => x.id === w.fixture); if (f && f.state === "SCHEDULED") f[w.home ? "home" : "away"] = w.was; }
+    for (const id of c._cancelled || []) { const f = benchFixtures.find((x) => x.id === id); if (f && f.state === "CANCELLED") f.state = "SCHEDULED"; }
+    league.adjustments.push(...plan.clearing);
+    Object.assign(c, { active: false, undoneAt: Date.now(), undoneBy: by, undoReason: reason });
+    leagueAudit(by, "undo", c.from.key, `${c.id} taken back`, reason);
+    return ok({ ...body, dry: false, change: c, message: `Took back ${c.id}.` });
+  }
+  const c = { ...plan.draft, id: `chg-${league.nextChange++}`, reason, by, at: Date.now(), switched: plan.switching.length, cancelled: plan.cancelling.length,
+    cleared: plan.clearing.map((a) => ({ ...a, text: adjText(a) })), _switched: [], _cancelled: [] };
+  for (const f of plan.switching) { const home = f.home === c.from.key; c._switched.push({ fixture: f.id, home, was: f[home ? "home" : "away"] }); f[home ? "home" : "away"] = c.to.id; }
+  for (const f of plan.cancelling) { f.state = "CANCELLED"; c._cancelled.push(f.id); }
+  league.adjustments = league.adjustments.filter((a) => !plan.clearing.includes(a));
+  league.changes.push(c);
+  leagueAudit(by, plan.kind, c.from.key, `${c.id}: ${plan.message}`, reason);
+  return ok({ ...body, dry: false, change: c, message: `${plan.kind === "replace" ? `Replaced ${c.from.name} with ${c.to.name}` : `Took ${c.from.name} out`}. Undo with ${c.id}. (bench)` });
 }
 
 async function pluginBench(req, url, sent) {

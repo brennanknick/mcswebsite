@@ -2567,7 +2567,11 @@
     const head = pageHead("Champions League", t.competition, top.querySelector("p:not(.kicker)").textContent, [
       tables.length > 1 ? h("div", { class: "tabs" }, tables.map((x) => h("button", { type: "button", "aria-pressed": String(x === t), onclick: () => { leagueComp = x.competition; redraw(); } }, x.competition))) : null,
       h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await setOrder(t)) redraw(); } }, t.manualOrder ? "Change the order" : "Set the order by hand"),
-      t.manualOrder ? h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await clearOrder(t)) redraw(); } }, "Back to auto order") : null]);
+      t.manualOrder ? h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await clearOrder(t)) redraw(); } }, "Back to auto order") : null,
+      h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await replaceClub(t, r.clubs || [])) redraw(); } }, "Replace a club"),
+      h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await removeClub(t, r.clubs || [])) redraw(); } }, "Remove a club")]);
+    const clubIds = new Set((r.clubs || []).map((c) => c.id));
+    const changes = (r.changes || []).filter((c) => c.competition.toLowerCase().replace(/\s+/g, " ") === t.competition.toLowerCase().replace(/\s+/g, " "));
     const o = t.order;
     main.replaceChildren(head, ...[
       t.manualOrder ? h("p", { class: "note" }, h("b", null, "Manual order. "), `Set by ${byName(o && o.by) || "staff"}${o && o.at ? ` ${ago(o.at)}` : ""}${o && o.reason ? `: ${o.reason}` : ""}. `,
@@ -2577,7 +2581,9 @@
           ["P", "W", "D", "L", "GF", "GA", "GD", "Pts"].map((x) => h("th", { class: "num" }, x)), h("th", null, "Form"), h("th"))),
         h("tbody", null, rows.map((x) => h("tr", { class: x.adjustment ? "is-adjusted" : null },
           h("td", { class: "num" }, h("b", null, String(x.position)), x.autoPosition != null && x.autoPosition !== x.position ? h("small", { class: "auto-pos", title: "Where the points alone put them" }, String(x.autoPosition)) : null),
-          h("td", null, h("span", { class: "who-cell" }, sideLabel(x.club), x.adjustment ? h("span", { class: "tag is-warn", title: "Staff adjustment, already in the numbers" }, adjText(x.adjustment)) : null)),
+          h("td", null, h("span", { class: "who-cell" }, sideLabel(x.club), x.adjustment ? h("span", { class: "tag is-warn", title: "Staff adjustment, already in the numbers" }, adjText(x.adjustment)) : null,
+            (x.replaces || []).map((w) => h("span", { class: "tag is-good", title: `${w.name}'s games count for this club (${w.change})` }, `Replaces ${w.name}`)),
+            r.clubs && x.club && x.club.id && !clubIds.has(x.club.id) ? h("span", { class: "tag is-bad", title: "Deleted from the clubs, but still in fixtures. Replace or remove it." }, "Deleted club") : null)),
           [x.played, x.won, x.drawn, x.lost, x.goalsFor, x.goalsAgainst].map((n) => h("td", { class: "num" }, String(n))),
           h("td", { class: "num" }, signed(x.goalDifference)), h("td", { class: "num" }, h("b", null, String(x.points))),
           h("td", null, formPips(x.form)),
@@ -2591,12 +2597,24 @@
           h("div", { class: "row-actions" }, h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: async () => { if (await removeAdjust(a)) redraw(); } }, "Take out")))))
           : empty("None. The table is exactly what the games give."), { i: 1 }),
         restorePanel(rs, redraw, 2)),
+      panel("Replaced and removed clubs", changes.length ? h("div", { class: "rows" }, changes.map((c) => h("div", { class: c.active ? "row" : "row is-undone" },
+        h("div", { class: "row-main" },
+          h("div", { class: "row-title" }, h("span", { class: "tag" }, c.id), c.from.name,
+            c.kind === "replace" ? [h("span", { class: "vs" }, "replaced by"), c.to.name] : h("span", { class: "vs" }, c.voidGames ? "removed, games voided" : "removed, games kept for opponents"),
+            c.active ? null : h("span", { class: "tag" }, "Taken back")),
+          h("div", { class: "row-sub" }, h("span", null, c.reason), h("span", null, `${byName(c.by)} · ${ago(c.at)}`),
+            c.switched ? h("span", null, `${plural(c.switched, "fixture")} switched`) : null, c.cancelled ? h("span", null, `${c.cancelled} cancelled`) : null,
+            (c.cleared || []).length ? h("span", null, `cleared ${c.cleared.map((a) => `${a.id} (${a.text})`).join(", ")}`) : null,
+            c.active ? null : h("span", null, `taken back by ${byName(c.undoneBy)} ${ago(c.undoneAt)}: ${c.undoReason}`))),
+        h("div", { class: "row-actions" }, c.active ? h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: async () => { if (await undoChange(c)) redraw(); } }, "Take back") : null))))
+        : empty("None. When a club is replaced mid-season, or drops out, do it here rather than deleting the club."), { i: 3,
+          aside: h("small", null, "Played games and match records are never rewritten") }),
       panel("Changes", (r.audit || []).length ? h("div", { class: "rows" }, r.audit.slice(0, 30).map((a) => h("div", { class: "row" },
         h("div", { class: "row-main" },
-          h("div", { class: "row-title" }, byName(a.by) || "?", h("span", { class: "vs" }, { adjust: "adjusted", unadjust: "took out an adjustment", order: "set the order", unorder: "cleared the order" }[a.action] || a.action), a.competition),
+          h("div", { class: "row-title" }, byName(a.by) || "?", h("span", { class: "vs" }, { adjust: "adjusted", unadjust: "took out an adjustment", order: "set the order", unorder: "cleared the order", replace: "replaced a club", remove: "removed a club", undo: "took back a club change" }[a.action] || a.action), a.competition),
           h("div", { class: "row-sub" }, h("span", null, `${fmtWhen(a.at)} (${ago(a.at)})`), a.detail ? h("span", null, a.detail) : null, h("span", null, a.reason))),
         h("span"))))
-        : empty("Nobody has changed the table by hand."), { i: 3 }),
+        : empty("Nobody has changed the table by hand."), { i: 4 }),
     ].filter(Boolean));
   }
 
@@ -2634,6 +2652,130 @@
         stat(`${r.score.home} – ${r.score.away}`, "score as played"), stat(r.players ?? 0, "players get the game"), stat(r.mvp || "None", "MVP"))),
       submit: () => call("POST", "/league/restore", { id: f.id, match: g.id, winner: asked.winner, reason: asked.reason, confirm: true }) });
     if (done) toast(done.message || "Restored.");
+    return !!done;
+  }
+
+  /* replacing or removing a club (Duck, 2026-11-06): a preview first, then the go-ahead */
+
+  // what a replace/remove/undo touches, and the table before and after (docs/admin-api.md)
+  function sidesPreview(res) {
+    const fxList = (title, fs, hint) => (fs && fs.length ? h("div", { class: "sides-block" },
+      h("p", { class: "sides-head" }, h("b", null, title), hint ? h("small", null, hint) : null),
+      h("div", { class: "rows" }, fs.map((f) => h("div", { class: "row" }, h("div", { class: "row-main" },
+        h("div", { class: "row-title" }, h("span", { class: "tag" }, `#${f.id}`), f.text,
+          f.countsInTable === false ? h("span", { class: "tag is-bad", title: "Left out of the table" }, "Won't count") : null),
+        h("div", { class: "row-sub" }, f.label ? h("span", null, f.label) : null, h("span", null, fmtWhen(f.kickoff)))))))) : null);
+    const before = Object.fromEntries((res.table && res.table.before || []).map((x) => [x.key, x]));
+    const after = (res.table && res.table.after) || [];
+    const afterKeys = new Set(after.map((x) => x.key));
+    const gone = Object.values(before).filter((x) => !afterKeys.has(x.key));
+    const delta = (now, was) => (was == null || now === was ? null : h("small", { class: now > was ? "diff-up" : "diff-down" }, signed(now - was)));
+    const tbl = h("div", { class: "table-wrap" }, h("table", { class: "ladder league sides-diff" },
+      h("thead", null, h("tr", null, h("th", { class: "num" }, "#"), h("th", null, "Club"), ["P", "GD", "Pts"].map((x) => h("th", { class: "num" }, x)))),
+      h("tbody", null,
+        after.map((x) => {
+          const b = before[x.key];
+          const moved = !b || b.position !== x.position || b.points !== x.points || b.played !== x.played || b.goalDifference !== x.goalDifference;
+          return h("tr", { class: moved ? "is-moved" : null },
+            h("td", { class: "num" }, h("b", null, String(x.position)), b && b.position !== x.position ? h("small", { class: "auto-pos" }, `was ${b.position}`) : null),
+            h("td", null, x.name, b ? null : h("span", { class: "tag is-good" }, "New line")),
+            h("td", { class: "num" }, String(x.played), delta(x.played, b && b.played)),
+            h("td", { class: "num" }, signed(x.goalDifference), delta(x.goalDifference, b && b.goalDifference)),
+            h("td", { class: "num" }, h("b", null, String(x.points)), delta(x.points, b && b.points)));
+        }),
+        gone.map((x) => h("tr", { class: "is-gone" }, h("td", { class: "num" }, String(x.position)), h("td", null, x.name, h("span", { class: "tag" }, "Off the table")),
+          h("td", { class: "num" }, String(x.played)), h("td", { class: "num" }, signed(x.goalDifference)), h("td", { class: "num" }, String(x.points)))))));
+    return h("div", { class: "form" },
+      h("p", null, res.message || ""),
+      fxList("Played", res.played, res.kind === "replace" ? `They stay as played and count for ${res.to && res.to.name}.` : res.kind === "remove" ? (res.voidGames ? "Left out of the table for everyone." : "Still count for the clubs they played.") : null),
+      fxList(res.kind === "undo" ? "Switch back" : "Switch to the new club", res.switching),
+      fxList(res.kind === "undo" ? "Back on" : "Cancelled", res.cancelling),
+      fxList("Stay with the new club", res.staying, "Played since the change."),
+      h("div", { class: "sides-block" }, h("p", { class: "sides-head" }, h("b", null, "The table after"), h("small", null, "Highlighted lines change.")), tbl));
+  }
+
+  async function replaceClub(t, clubs) {
+    const rows = t.rows || [];
+    if (!rows.length) { toast("No clubs in the table."); return false; }
+    let asked = null;
+    const first = await formDialog({ title: "Replace a club", okLabel: "Show what happens",
+      text: "Every fixture of the old club in this competition, played and still to play, counts for the new one. Played games keep saying who played them; fixtures still to play switch to the new club. A club deleted from the clubs still shows here while it has fixtures. Nothing changes until the next step.",
+      fields: [
+        { name: "from", type: "select", label: "Club being replaced", required: true, value: "",
+          options: [{ value: "", label: "Pick a club" }, ...rows.map((x) => ({ value: x.key, label: `${(x.club && x.club.name) || x.key}${x.played ? ` (${plural(x.played, "game")})` : ""}` }))] },
+        { name: "to", type: "select", label: "Club taking its place", required: true, value: "",
+          options: [{ value: "", label: "Pick a club" }, ...clubs.map((c) => ({ value: c.id, label: c.name }))] },
+        reasonField("Tottenham dropped out, Newcastle took their place")],
+      submit: (v) => {
+        if (!v.from || !v.to) return { ok: false, error: "Pick both clubs." };
+        if (v.from === v.to) return { ok: false, error: "That's the same club." };
+        asked = { competition: t.competition, from: v.from, to: v.to, reason: v.reason,
+          fromName: ((rows.find((x) => x.key === v.from) || {}).club || {}).name, toName: (clubs.find((c) => c.id === v.to) || {}).name };
+        return call("POST", "/league/replace", asked);
+      } });
+    if (!first || !asked) return false;
+    const clear = new Set();
+    const area = h("div");
+    area.replaceChildren(sidesPreview(first));
+    const adj = first.adjustments || [];
+    const checks = adj.length ? h("div", { class: "sides-block" },
+      h("p", { class: "sides-head" }, h("b", null, "Adjustments on these clubs"), h("small", null, "Tick the ones that were patching this. Nothing is cleared unless ticked, and an undo brings them back.")),
+      adj.map((a) => {
+        const box = h("input", { type: "checkbox" });
+        box.addEventListener("change", async () => {
+          if (box.checked) clear.add(a.id); else clear.delete(a.id);
+          const again = await call("POST", "/league/replace", { ...asked, clear: [...clear] });
+          if (again.ok) area.replaceChildren(sidesPreview(again));
+        });
+        return h("label", { class: "check sides-check" }, box, h("span", null, `${a.teamName || a.team}: ${a.text}`, h("small", null, ` ${a.id} · ${a.reason}`)));
+      })) : null;
+    const done = await formDialog({ title: `Replace ${asked.fromName || asked.from} with ${asked.toName || asked.to}?`, okLabel: "Replace it",
+      text: h("div", { class: "form" }, checks, area),
+      submit: () => call("POST", "/league/replace", { ...asked, clear: [...clear], confirm: true }) });
+    if (done) toast(done.message || "Replaced.");
+    return !!done;
+  }
+
+  async function removeClub(t) {
+    const rows = t.rows || [];
+    if (!rows.length) { toast("No clubs in the table."); return false; }
+    let asked = null;
+    const first = await formDialog({ title: "Remove a club", okLabel: "Show what happens",
+      text: "The club disappears from the table and its fixtures still to play are cancelled. Nothing changes until the next step.",
+      fields: [
+        { name: "team", type: "select", label: "Club", required: true, value: "",
+          options: [{ value: "", label: "Pick a club" }, ...rows.map((x) => ({ value: x.key, label: `${(x.club && x.club.name) || x.key}${x.played ? ` (${plural(x.played, "game")})` : ""}` }))] },
+        { name: "mode", type: "select", label: "Its played games", value: "keep",
+          hint: "Keep: the clubs it played keep those wins, draws and goals (usual when a club drops out mid-season). Void: those games come out of the table for everyone, as if never played.",
+          options: [{ value: "keep", label: "Keep them for the clubs it played" }, { value: "void", label: "Void them from the table" }] },
+        reasonField("Dropped out of the league")],
+      submit: (v) => {
+        if (!v.team) return { ok: false, error: "Pick a club." };
+        asked = { competition: t.competition, team: v.team, voidGames: v.mode === "void", reason: v.reason,
+          name: ((rows.find((x) => x.key === v.team) || {}).club || {}).name };
+        return call("POST", "/league/remove", asked);
+      } });
+    if (!first || !asked) return false;
+    const adj = first.adjustments || [];
+    const done = await formDialog({ title: `Take ${asked.name || asked.team} out?`, okLabel: "Take them out", bad: true,
+      text: h("div", { class: "form" }, sidesPreview(first),
+        adj.length ? h("p", { class: "note" }, `Their adjustments (${adj.map((a) => `${a.id}: ${a.text}`).join(", ")}) stop counting with them and come back on an undo.`) : null),
+      submit: () => call("POST", "/league/remove", { ...asked, confirm: true }) });
+    if (done) toast(done.message || "Taken out.");
+    return !!done;
+  }
+
+  async function undoChange(c) {
+    let asked = null;
+    const what = c.kind === "replace" ? `${c.to.name} replacing ${c.from.name}` : `taking ${c.from.name} out`;
+    const first = await formDialog({ title: `Take back ${c.id}?`, okLabel: "Show what happens",
+      text: `${what}, by ${byName(c.by)} ${ago(c.at)}: ${c.reason}. Nothing changes until the next step.`,
+      fields: [reasonField("Done by mistake")],
+      submit: (v) => { asked = { id: c.id, reason: v.reason }; return call("POST", "/league/undo", asked); } });
+    if (!first || !asked) return false;
+    const done = await formDialog({ title: `Take back ${c.id}?`, okLabel: "Take it back", text: sidesPreview(first),
+      submit: () => call("POST", "/league/undo", { ...asked, confirm: true }) });
+    if (done) toast(done.message || "Taken back.");
     return !!done;
   }
 

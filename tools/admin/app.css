@@ -566,3 +566,19 @@ select.input option { background: #101914; }
 .order-pos { font-variant-numeric: tabular-nums; text-align: right; color: var(--accent); }
 .order-moves { display: inline-flex; gap: 4px; }
 .order-moves .btn { min-width: 34px; padding: .2rem .4rem; }
+
+/* replacing / removing a club: the preview (Standings) */
+.sides-block { display: grid; gap: .45rem; }
+.sides-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; margin: .2rem 0 0; }
+.sides-head small { color: var(--text-faint); }
+.sides-check { align-items: flex-start; font-weight: 600; }
+.sides-check small { color: var(--text-faint); font-weight: 500; }
+.sides-diff tr.is-moved td { background: rgba(255, 255, 255, .045); }
+.sides-diff tr.is-gone td { color: var(--text-faint); text-decoration: line-through; text-decoration-color: rgba(255, 255, 255, .25); }
+.sides-diff .diff-up, .sides-diff .diff-down { margin-left: .3rem; font-weight: 800; }
+.sides-diff .diff-up { color: var(--good, #4ade80); }
+.sides-diff .diff-down { color: var(--bad); }
+.sides-diff .tag { margin-left: .45rem; }
+.row.is-undone { opacity: .55; }
+/* a dialog taller than the window (the replace preview) scrolls inside its box */
+.dlg-box { max-height: calc(100dvh - 36px); overflow-y: auto; overscroll-behavior: contain; }

@@ -927,6 +927,41 @@ async function api(request, env, s, path) {
       const r = await plugin(env, "POST", "/discord/admin/league/unorder", p);
       return done(r, "put the league table back in its usual order", `${p.competition || "table"}: ${p.reason}`);
     }
+    /* replacing a side with another club, or taking one out, and taking either back (Duck, 2026-11-06);
+       each a preview unless this is the go-ahead: dry=1 wins over confirm, so a preview never changes anything */
+    case "POST /league/replace": {
+      if (s.role !== "owner") return fail(403, "Only owners can change the table.");
+      const clear = Array.isArray(input.clear) ? input.clear.map((x) => clean(x, 20)).filter((x) => /^adj-\d{1,9}$/.test(x)).slice(0, 64) : [];
+      const p = { competition: clean(input.competition, 40), from: clean(input.from, 80), to: clean(input.to, 80), reason: clean(input.reason, 120), by: by(s) };
+      if (clear.length) p.clear = clear.join(",");
+      if (!p.from || !p.to) return fail(400, "Pick the club being replaced and the club taking its place.");
+      if (!p.reason) return fail(400, "Give a reason.");
+      if (input.confirm === true) p.confirm = "1"; else p.dry = 1;
+      const r = await plugin(env, "POST", "/discord/admin/league/replace", p);
+      if (p.dry) return pass(r);
+      return done(r, "replaced a club in the league", `${clean(input.fromName, 40) || p.from} by ${clean(input.toName, 40) || p.to}: ${p.reason}`);
+    }
+    case "POST /league/remove": {
+      if (s.role !== "owner") return fail(403, "Only owners can change the table.");
+      const p = { competition: clean(input.competition, 40), team: clean(input.team, 80), reason: clean(input.reason, 120), by: by(s) };
+      if (input.voidGames === true) p.voidGames = 1;
+      if (!p.team) return fail(400, "Pick the club to take out.");
+      if (!p.reason) return fail(400, "Give a reason.");
+      if (input.confirm === true) p.confirm = "1"; else p.dry = 1;
+      const r = await plugin(env, "POST", "/discord/admin/league/remove", p);
+      if (p.dry) return pass(r);
+      return done(r, "took a club out of the league", `${clean(input.name, 40) || p.team}${p.voidGames ? " (its games voided)" : ""}: ${p.reason}`);
+    }
+    case "POST /league/undo": {
+      if (s.role !== "owner") return fail(403, "Only owners can change the table.");
+      const p = { id: clean(input.id, 20), reason: clean(input.reason, 120), by: by(s) };
+      if (!/^chg-\d{1,9}$/.test(p.id)) return fail(400, "Pick the change to take back.");
+      if (!p.reason) return fail(400, "Give a reason.");
+      if (input.confirm === true) p.confirm = "1"; else p.dry = 1;
+      const r = await plugin(env, "POST", "/discord/admin/league/undo", p);
+      if (p.dry) return pass(r);
+      return done(r, "took back a league club change", `${p.id}: ${p.reason}`);
+    }
     case "POST /league/restore": {
       if (s.role !== "owner") return fail(403, "Only owners can restore a game.");
       const p = { id: clean(input.id, 20), match: clean(input.match, 64), winner: input.winner === "home" || input.winner === "away" ? input.winner : "",
