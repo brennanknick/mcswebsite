@@ -1510,7 +1510,7 @@
           actionRow("Name", c.name, edit("Rename", renameClub)),
           actionRow("Colour", inline(swatch(c.colorHex), c.color ? nice(c.color) : "None"), edit("Change", colourClub)),
           actionRow("Gradient", grad.length >= 2 ? inline(gradBar(grad), grad.join(" ")) : "Off", edit("Change", gradientClub)),
-          actionRow("League", inline(leagueChip(leagueOf(leaguesNow, c.league), c.league), c.league || "Champions League"), edit("Move", leagueClub)),
+          actionRow("League", ((l) => inline(leagueChip(l, c.league), (l && l.name) || c.league || "Champions League"))(leagueOf(leaguesNow, c.league) || leaguesNow.find((x) => x.default)), edit("Move", leagueClub)),
           actionRow("Short name", c.shortName || "None, the full name is used", edit("Change", shortClub)),
           actionRow("Code", `${c.codeShown || "?"}${c.code ? "" : ", made from the name"}`, edit("Change", codeClub)),
           actionRow("Crest", c.flag ? inline(crestMark(c.crest, c.flag, c.flagKind), c.flagName || c.flagCode || "") : "None", edit("Change", crestClub),
@@ -2653,7 +2653,7 @@
             h("div", { class: "row-sub" }, h("span", null, a.reason), h("span", null, `${byName(a.by)} · ${ago(a.at)}`), h("span", null, a.id))),
           h("div", { class: "row-actions" }, h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: async () => { if (await removeAdjust(a)) redraw(); } }, "Take out")))))
           : empty("None. The table is exactly what the games give."), { i: 1 }),
-        restorePanel(rs, redraw, 2)),
+        restorePanel(rs && rs.ok ? { ...rs, fixtures: (rs.fixtures || []).filter((f) => sameComp(f.competition, t.competition)) } : rs, redraw, 2)),
       panel("Replaced and removed clubs", changes.length ? h("div", { class: "rows" }, changes.map((c) => h("div", { class: c.active ? "row" : "row is-undone" },
         h("div", { class: "row-main" },
           h("div", { class: "row-title" }, h("span", { class: "tag" }, c.id), c.from.name,
