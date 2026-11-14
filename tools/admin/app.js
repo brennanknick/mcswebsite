@@ -118,6 +118,7 @@
         if (f.type === "select") {
           input = h("select", { class: "input", name: f.name, required: f.required || null },
             (f.options || []).map((o) => h("option", { value: o.value, selected: String(o.value) === String(f.value ?? "") || null }, o.label)));
+          if (f.onchange) input.addEventListener("change", () => f.onchange(input.value, inputs));
         } else if (f.type === "checkbox") {
           input = h("input", { type: "checkbox", name: f.name, checked: f.value ? true : null });
           inputs[f.name] = input;
@@ -234,6 +235,25 @@
     clubsCache = r.ok ? r.clubs : [];
     return clubsCache;
   }
+  // The leagues (2026-11-10: the Rising League beside the Champions League), from league/standings. A game
+  // server from before leagues has no list: then it's the clubs' own leagues, else just the Champions League.
+  let leaguesCache = null;
+  async function leagues() {
+    if (leaguesCache) return leaguesCache;
+    const r = await call("GET", "/league/standings");
+    let list = r.ok && Array.isArray(r.leagues) ? r.leagues : [];
+    if (!list.length) {
+      const names = [...new Set((await clubs()).map((c) => c.league).filter(Boolean))];
+      list = (names.length ? names : ["Champions League"]).map((n, i) => ({ name: n, short: n.split(/\s+/).map((w) => w[0]).join("").toUpperCase(), default: i === 0 }));
+    }
+    leaguesCache = list;
+    return list;
+  }
+  const sameComp = (a, b) => String(a || "").toLowerCase().replace(/\s+/g, " ").trim() === String(b || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const leagueOf = (list, name) => list.find((l) => sameComp(l.name, name) || sameComp(l.short, name));
+  // a league's tag, in its colour: CL gold, RL teal
+  const leagueChip = (l, name) => h("span", { class: "tag league-tag", style: l && l.color ? `--lc:${l.color}` : null, title: (l && l.name) || name || "" },
+    (l && l.short) || name || "?");
   async function pitches() {
     if (pitchesCache) return pitchesCache;
     const r = await call("GET", "/pitches");
@@ -334,8 +354,20 @@
 
   async function clubOptions() {
     const cs = await clubs();
-    return cs.map((c) => ({ value: c.id, label: c.name }));
+    return cs.map((c) => ({ value: c.id, label: c.league ? `${c.name}  (${c.league})` : c.name }));
   }
+  /** The competition picker: every league, then "Another competition" for a one-off cup name typed below. */
+  function competitionFields(list, value) {
+    const known = leagueOf(list, value);
+    const opts = [...list.map((l) => ({ value: l.name, label: `${l.name} (${l.short})` })), { value: "__other", label: "Another competition…" }];
+    return [
+      { name: "competition", type: "select", label: "Competition", options: opts, value: known ? known.name : value ? "__other" : (list.find((l) => l.default) || list[0]).name,
+        onchange: (_, inputs) => { const other = inputs.competition.value === "__other"; $("[data-field=otherComp]", dlg).hidden = !other; inputs.otherComp.required = other; } },
+      { name: "otherComp", label: "Competition name", value: known ? "" : value || "", maxlength: 60, placeholder: "Summer Cup", hidden: !!known || !value },
+    ];
+  }
+  const competitionOf = (v) => (v.competition === "__other" ? v.otherComp : v.competition);
+  const confirmField = { name: "confirm", type: "checkbox", label: "Book it even if the clubs are in different leagues" };
   async function pitchOptions() {
     const ps = await pitches();
     return [{ value: "", label: "Not picked yet" }, ...ps.map((p) => ({ value: p.id, label: p.name }))];
@@ -357,46 +389,59 @@
   }
 
   async function bookFixture() {
-    const [co, po] = await Promise.all([clubOptions(), pitchOptions()]);
+    const [co, po, lg, cs] = await Promise.all([clubOptions(), pitchOptions(), leagues(), clubs()]);
     if (!co.length) return toast("The game server's clubs couldn't be loaded.", true);
+    const clubLeague = (id) => { const c = cs.find((x) => x.id === id); return c && c.league; };
+    // Picking the home club picks its league, until someone picks a competition themselves.
+    let picked = false;
+    const follow = (_, inputs) => {
+      if (picked) return;
+      const l = leagueOf(lg, clubLeague(inputs.home.value));
+      if (l) inputs.competition.value = l.name;
+    };
     const r = await formDialog({
       title: "Book a fixture", okLabel: "Book it",
       fields: [
         { type: "row", fields: [
-          { name: "home", type: "select", label: "Home", options: co, value: co[0].value, required: true },
+          { name: "home", type: "select", label: "Home", options: co, value: co[0].value, required: true, onchange: follow },
           { name: "away", type: "select", label: "Away", options: co, value: (co[1] || co[0]).value, required: true }] },
         ...timeFields(null),
-        { type: "row", fields: [
-          { name: "label", label: "Label", placeholder: "Week 2", maxlength: 60 },
-          { name: "competition", label: "Competition", value: "Champions League", maxlength: 60 }] },
+        { name: "label", label: "Label", placeholder: "Week 2", maxlength: 60 },
+        ...competitionFields(lg, clubLeague(co[0].value) || "").map((f) => (f.name === "competition"
+          ? { ...f, onchange: (x, inputs) => { picked = true; f.onchange(x, inputs); } } : f)),
         { name: "pitch", type: "select", label: "Pitch", options: po, value: "" },
         { name: "knockout", type: "checkbox", label: "Knockout (a draw goes to a shootout)" },
+        confirmField,
       ],
       submit: async (v) => {
         const kickoff = kickoffOf(v);
         if (!(kickoff > Date.now())) return { ok: false, error: "Pick a time in the future." };
         if (v.home === v.away) return { ok: false, error: "Pick two different clubs." };
-        return call("POST", "/fixtures/create", { home: v.home, away: v.away, kickoff, tbd: v.tbd, label: v.label, competition: v.competition, pitch: v.pitch, knockout: v.knockout });
+        const competition = competitionOf(v);
+        if (!competition) return { ok: false, error: "Name the competition." };
+        return call("POST", "/fixtures/create", { home: v.home, away: v.away, kickoff, tbd: v.tbd, label: v.label, competition, pitch: v.pitch, knockout: v.knockout, confirm: v.confirm });
       },
     });
     if (r) { toast("Booked. It's announced in the Discord."); fixtures(); }
   }
 
   async function editFixture(f) {
-    const po = await pitchOptions();
+    const [po, lg] = await Promise.all([pitchOptions(), leagues()]);
     const r = await formDialog({
       title: `Edit ${f.home.name} vs ${f.away.name}`,
       fields: [
         ...timeFields(f),
-        { type: "row", fields: [
-          { name: "label", label: "Label", value: f.label || "", maxlength: 60 },
-          { name: "competition", label: "Competition", value: f.competition || "", maxlength: 60 }] },
+        { name: "label", label: "Label", value: f.label || "", maxlength: 60 },
+        ...competitionFields(lg, f.competition || ""),
         { name: "pitch", type: "select", label: "Pitch", options: po, value: f.pitchId || "" },
+        confirmField,
       ],
       submit: async (v) => {
         const kickoff = kickoffOf(v);
         if (!(kickoff > Date.now())) return { ok: false, error: "Pick a time in the future." };
-        const body = { id: f.id, kickoff, tbd: v.tbd, label: v.label, competition: v.competition };
+        const competition = competitionOf(v);
+        if (!competition) return { ok: false, error: "Name the competition." };
+        const body = { id: f.id, kickoff, tbd: v.tbd, label: v.label, competition, confirm: v.confirm };
         if (v.pitch) body.pitch = v.pitch;
         return call("POST", "/fixtures/edit", body);
       },
@@ -1445,7 +1490,7 @@
     const seq = pageSeq;
     const back = h("a", { class: "btn btn-dark", href: "#/clubs" }, "All clubs");
     main.replaceChildren(pageHead("Clubs", "Club", null, back), h("div", { class: "loading" }, "Loading…"));
-    const [r, meta] = await Promise.all([call("GET", `/clubs/show?club=${encodeURIComponent(id)}`), clubMeta || call("GET", "/clubs/list")]);
+    const [r, meta, leaguesNow] = await Promise.all([call("GET", `/clubs/show?club=${encodeURIComponent(id)}`), clubMeta || call("GET", "/clubs/list"), leagues()]);
     if (seq !== pageSeq) return;
     if (meta && meta.ok) clubMeta = meta;
     if (!r.ok) return main.replaceChildren(main.firstChild, errorBox(r.error));
@@ -1465,6 +1510,7 @@
           actionRow("Name", c.name, edit("Rename", renameClub)),
           actionRow("Colour", inline(swatch(c.colorHex), c.color ? nice(c.color) : "None"), edit("Change", colourClub)),
           actionRow("Gradient", grad.length >= 2 ? inline(gradBar(grad), grad.join(" ")) : "Off", edit("Change", gradientClub)),
+          actionRow("League", inline(leagueChip(leagueOf(leaguesNow, c.league), c.league), c.league || "Champions League"), edit("Move", leagueClub)),
           actionRow("Short name", c.shortName || "None, the full name is used", edit("Change", shortClub)),
           actionRow("Code", `${c.codeShown || "?"}${c.code ? "" : ", made from the name"}`, edit("Change", codeClub)),
           actionRow("Crest", c.flag ? inline(crestMark(c.crest, c.flag, c.flagKind), c.flagName || c.flagCode || "") : "None", edit("Change", crestClub),
@@ -1483,7 +1529,7 @@
           h("div", { class: "stats-2" }, stat(`#${st.position}`, "in the table"), stat(st.points, st.points === 1 ? "point" : "points"),
             stat(`${st.won}-${st.drawn}-${st.lost}`, "won, drawn, lost"), stat(`${st.goalDifference > 0 ? "+" : ""}${st.goalDifference}`, "goal difference")),
           (st.form || []).length ? h("p", { class: "fchips" }, h("span", { class: "row-sub" }, "Form"), st.form.map((x) => h("span", { class: `fchip is-${String(x).toLowerCase()}` }, x))) : null,
-        ], { i: 2, aside: h("a", { href: "https://mcsoccer.net/champions-league/", target: "_blank", rel: "noopener" }, "Table") }) : null,
+        ], { i: 2, aside: h("a", { href: `https://mcsoccer.net/${String(st.competition || "Champions League").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}/`, target: "_blank", rel: "noopener" }, "Table") }) : null,
         panel("Fixtures", fixtures.length ? h("div", { class: "rows" }, fixtures.map((f) => fixtureRow(f, false))) : empty("No fixtures."), { i: 3, aside: h("a", { href: "#/fixtures" }, "All fixtures") })),
       owner ? panel("Delete this club", [h("p", null, "It's gone for good: its members leave it, and fixtures it's booked in can't be played."),
         buttons(h("button", { class: "btn btn-bad btn-sm", type: "button", onclick: () => deleteClub(c) }, "Delete club"))], { i: 4 }) : null,
@@ -1525,6 +1571,15 @@
       fields: [{ name: "gradient", label: "Colours", value: (c.gradient || []).join(" "), placeholder: "#004D98 #A50044", hint: "2 to 5 hex colours, left to right. Empty for none." }],
       onopen: (inputs) => { show(inputs.gradient.value); inputs.gradient.addEventListener("input", () => show(inputs.gradient.value)); },
       params: (v) => ({ gradient: v.gradient.replace(/,/g, " ").replace(/\s+/g, " ").trim() || "off" }) });
+  }
+
+  async function leagueClub(c) {
+    const lg = await leagues();
+    const now = leagueOf(lg, c.league) || lg.find((l) => l.default) || lg[0];
+    return clubEdit(c, "league", { title: `Move ${c.name} to another league`,
+      text: "Its fixtures stay as they are: games already played stay in their table. If it has fixtures still to play in its old league, you'll be told how many, to move or cancel them.",
+      fields: [{ name: "league", type: "select", label: "League", options: lg.map((l) => ({ value: l.name, label: `${l.name} (${l.short})` })), value: now.name }],
+      params: (v) => (sameComp(v.league, now.name) ? { ok: false, error: `${c.name} is already in the ${now.name}.` } : { league: v.league }) });
   }
 
   const shortClub = (c) => clubEdit(c, "short", { title: `${c.name}'s short name`,
@@ -2564,8 +2619,10 @@
     const adjustments = (r.adjustments || []).filter((a) => a.competition.toLowerCase().replace(/\s+/g, " ") === t.competition.toLowerCase().replace(/\s+/g, " "));
     const rows = t.rows || [];
     const redraw = () => standings();
-    const head = pageHead("Champions League", t.competition, top.querySelector("p:not(.kicker)").textContent, [
-      tables.length > 1 ? h("div", { class: "tabs" }, tables.map((x) => h("button", { type: "button", "aria-pressed": String(x === t), onclick: () => { leagueComp = x.competition; redraw(); } }, x.competition))) : null,
+    const lgs = r.leagues || [];
+    const head = pageHead(lgs.length > 1 ? "Leagues" : "Champions League", t.competition, top.querySelector("p:not(.kicker)").textContent, [
+      tables.length > 1 ? h("div", { class: "tabs league-tabs" }, tables.map((x) => h("button", { type: "button", "aria-pressed": String(x === t), style: x.color ? `--lc:${x.color}` : null,
+        onclick: () => { leagueComp = x.competition; redraw(); } }, x.short ? h("b", { class: "league-dot" }, x.short) : null, x.competition))) : null,
       h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await setOrder(t)) redraw(); } }, t.manualOrder ? "Change the order" : "Set the order by hand"),
       t.manualOrder ? h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await clearOrder(t)) redraw(); } }, "Back to auto order") : null,
       h("button", { class: "btn btn-dark", type: "button", onclick: async () => { if (await replaceClub(t, r.clubs || [])) redraw(); } }, "Replace a club"),
@@ -2587,7 +2644,7 @@
           [x.played, x.won, x.drawn, x.lost, x.goalsFor, x.goalsAgainst].map((n) => h("td", { class: "num" }, String(n))),
           h("td", { class: "num" }, signed(x.goalDifference)), h("td", { class: "num" }, h("b", null, String(x.points))),
           h("td", null, formPips(x.form)),
-          h("td", { class: "num" }, h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: async () => { if (await adjustRow(t, x)) redraw(); } }, "Adjust"))))))) : empty("No clubs yet."),
+          h("td", { class: "num" }, h("button", { class: "btn btn-dark btn-sm", type: "button", onclick: async () => { if (await adjustRow(t, x)) redraw(); } }, "Adjust"))))))) : empty(t.short ? `No ${t.competition} fixtures yet. Book one on Fixtures and its clubs show here.` : "No clubs yet."),
       { i: 0, aside: h("small", null, `${plural(rows.length, "club")} · win 3, draw 1 · ties: GD, goals, head to head`) }),
       h("div", { class: "grid" },
         panel("Adjustments", adjustments.length ? h("div", { class: "rows" }, adjustments.map((a) => h("div", { class: "row" },

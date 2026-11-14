@@ -245,6 +245,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .tabs button { min-height: 36px; padding: 0 .9rem; font-weight: 700; color: var(--text); background: var(--dark); border: 0; border-top: 2px solid var(--dark-hi); border-bottom: 2px solid var(--dark-lo); cursor: pointer; }
 .tabs button[aria-pressed="true"] { color: #fff; background: var(--btn); border-top-color: var(--btn-hi); border-bottom-color: var(--btn-lo); }
+/* leagues (2026-11-10): each wears its own colour, CL gold, RL teal */
+.league-tabs button { display: inline-flex; align-items: center; gap: .5rem; }
+.league-tabs button[aria-pressed="true"] { box-shadow: inset 0 -3px 0 var(--lc, transparent); }
+.league-dot { min-width: 1.9rem; padding: 0 .3rem; font-size: .72rem; line-height: 1.35rem; text-align: center; color: #0b1210; background: var(--lc, #888); clip-path: var(--px-dot, none); }
+.tag.league-tag { color: #0b1210; background: var(--lc, var(--dark-hi)); font-weight: 800; letter-spacing: .04em; }
 
 /* ── forms ───────────────────────────────────────────────────────── */
 

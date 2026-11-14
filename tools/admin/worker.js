@@ -105,7 +105,7 @@ const SCOPE = /^(pitch:[A-Za-z0-9_-]{1,64}|server|sounds|ranks|crates|cosmetics)
 const LINE = /^[A-Za-z0-9_-]{1,64}$/;
 const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 /** The clubs' and cups' writes (docs/admin-api.md, "Clubs" and "Cups"): POST /clubs/<op>, /cups/<op>. */
-const CLUB_OPS = ["create", "rename", "color", "gradient", "short", "code", "flag", "logo", "add", "remove", "delete"];
+const CLUB_OPS = ["create", "rename", "color", "gradient", "short", "code", "flag", "logo", "add", "remove", "delete", "league"];
 const CUP_OPS = ["create", "configure", "draw", "redraw", "start", "win", "void", "rename", "swap", "remove", "cancel"];
 
 /* ── sessions ──────────────────────────────────────────────────────── */
@@ -454,7 +454,9 @@ async function api(request, env, s, path) {
     if (op === "create" || op === "rename") {
       bad = need("name", 32, "Give the club a name.");
       if (op === "create" && input.flag) p.flag = clean(input.flag, 64);
-    } else if (op === "color") bad = need("color", 20, "Pick a colour.");
+      if (op === "create" && input.league) p.league = clean(input.league, 40);
+    } else if (op === "league") bad = need("league", 40, "Pick a league.");
+    else if (op === "color") bad = need("color", 20, "Pick a colour.");
     else if (op === "gradient") bad = need("gradient", 60, "Give 2 to 5 hex colours, or off.");
     else if (op === "short") bad = need("short", 8, "Give a short name, or off.");
     else if (op === "code") bad = need("code", 8, "Give a code, or off.");
@@ -473,8 +475,9 @@ async function api(request, env, s, path) {
     const b = r.body || {};
     const name = (b.club && b.club.name) || (b.before && b.before.name) || clean(input.clubName, 32) || club || p.name;
     const what = { create: "made a club", rename: "renamed a club", color: "changed a club's colour", gradient: "changed a club's gradient", short: "changed a club's short name",
-      code: "changed a club's code", flag: "changed a club's crest", logo: "changed a club's logo", add: "added a club member", remove: "took a member out of a club", delete: "deleted a club" }[op];
-    const value = { rename: p.name, color: p.color, gradient: p.gradient, short: p.short, code: p.code, flag: p.flag, add: clean(input.name, 16) || p.id, remove: clean(input.name, 16) || p.id }[op];
+      code: "changed a club's code", flag: "changed a club's crest", logo: "changed a club's logo", add: "added a club member", remove: "took a member out of a club", delete: "deleted a club",
+      league: "moved a club to another league" }[op];
+    const value = { rename: p.name, league: p.league, color: p.color, gradient: p.gradient, short: p.short, code: p.code, flag: p.flag, add: clean(input.name, 16) || p.id, remove: clean(input.name, 16) || p.id }[op];
     return done(r, what, `${name}${value ? ` (${value})` : ""}${p.force ? ", forced" : ""}: ${p.reason}`);
   }
 
@@ -558,7 +561,8 @@ async function api(request, env, s, path) {
       const p = {
         home: clean(input.home, 64), away: clean(input.away, 64), kickoff: Math.round(Number(input.kickoff) || 0),
         label: clean(input.label, 60), competition: clean(input.competition, 60), pitch: clean(input.pitch, 64),
-        tbd: input.tbd ? "true" : undefined, knockout: input.knockout ? "true" : undefined, by: by(s),
+        tbd: input.tbd ? "true" : undefined, knockout: input.knockout ? "true" : undefined,
+        confirm: input.confirm === true ? "1" : undefined, by: by(s),
       };
       if (!ID.test(p.home) || !ID.test(p.away) || p.home === p.away) return fail(400, "Pick two different clubs.");
       if (!(p.kickoff > Date.now())) return fail(400, "Pick a time in the future.");
@@ -580,6 +584,7 @@ async function api(request, env, s, path) {
       if (input.tbd != null) p.tbd = input.tbd ? "true" : "false";
       for (const k of ["home", "away", "pitch"]) if (input[k]) p[k] = clean(input[k], 64);
       for (const k of ["label", "competition"]) if (input[k] != null) p[k] = clean(input[k], 60);
+      if (input.confirm === true) p.confirm = "1";
       const r = await plugin(env, "POST", "/discord/fixtures/edit", p);
       return done(r, "edited a fixture", `#${id}`);
     }
