@@ -17,6 +17,7 @@
 - [Rules](https://mcsoccer.net/rules/): how matches work, positions, tackling, scoring, set pieces and every game mode
 - [Match history](https://mcsoccer.net/matches/): every match played, full match reports, player pages and leaderboards
 - [Champions League](https://mcsoccer.net/champions-league/): club fixtures, the league table, live scores and results
+- [Rising League](https://mcsoccer.net/rising-league/): the second club league, with its own fixtures, table, live scores and results
 - [Tier list](https://mcsoccer.net/tiers/): the best MCS players, tier by tier
 - [Store](https://mcsoccer.net/store/): Sapphires for cosmetics, sold through PayNow
 - [Crate odds](https://mcsoccer.net/crates/): every crate's contents and exact odds

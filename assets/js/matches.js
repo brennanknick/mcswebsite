@@ -47,9 +47,19 @@
   const staleNote = $("[data-mh-stale]");
   const searchSlot = $("[data-mh-search]");
 
-  // champions-league/ runs this script too, with data-mh-league: fixtures only, nothing else
+  // champions-league/ and rising-league/ run this script too, with data-mh-league: fixtures only,
+  // nothing else. Its value names the competition the page shows (blank = the Champions League).
   const LEAGUE = main.hasAttribute("data-mh-league");
-  const LEAGUE_URL = "../champions-league/";
+  const DEFAULT_LEAGUE = "Champions League";
+  // competition names match ignoring case and spacing (plugin docs/fixtures.md)
+  const compKey = (s) => (typeof s === "string" ? s : "").toLowerCase().replace(/\s+/g, "");
+  const LEAGUE_NAME = (main.getAttribute("data-mh-league") || "").trim() || DEFAULT_LEAGUE;
+  const LEAGUE_KEY = compKey(LEAGUE_NAME);
+  // each league with a page of its own; any other competition (a one-off cup name) lives on the
+  // default league's page, as every fixture did before there were two leagues
+  const LEAGUE_PAGES = { championsleague: "champions-league/", risingleague: "rising-league/" };
+  const leagueUrl = (name) => "../" + (LEAGUE_PAGES[compKey(name)] || LEAGUE_PAGES.championsleague);
+  const LEAGUE_URL = leagueUrl(DEFAULT_LEAGUE);
   const CLUB_RE = /^[a-z0-9_-]{1,40}$/i;
   {
     const q = new URLSearchParams(location.search);
@@ -673,7 +683,12 @@
       return { view: "fixtures", club: CLUB_RE.test(club) ? club : "" };
     }
     if (q.has("m")) return { view: "match", id: str(q.get("m")).trim() };
-    if (q.has("p")) return { view: "player", uuid: str(q.get("p")).trim().toLowerCase(), mode: modeParam(q.get("mode")), page: pageParam(q.get("page")) };
+    if (q.has("p")) {
+      // comp: a competition's slug ("cl", "rl"), "all", or none for the player's main league
+      const comp = str(q.get("comp")).trim().toLowerCase();
+      return { view: "player", uuid: str(q.get("p")).trim().toLowerCase(), mode: modeParam(q.get("mode")), page: pageParam(q.get("page")),
+        comp: /^[a-z0-9]{1,40}$/.test(comp) ? comp : "" };
+    }
     const tab = q.get("tab");
     if (tab === "leaders") {
       const stat = str(q.get("stat")).toLowerCase();
@@ -709,6 +724,7 @@
       case "match": q.set("m", r.id); break;
       case "player":
         q.set("p", r.uuid);
+        if (r.comp) q.set("comp", r.comp);
         if (r.mode) q.set("mode", r.mode);
         if (r.page > 1) q.set("page", r.page);
         break;
@@ -741,7 +757,11 @@
     const s = q.toString();
     const tail = s ? "?" + s : "";
     // fixtures live on the league page and everything else in match history: each links to the other
-    if (r.view === "fixtures") return (LEAGUE ? "./" : LEAGUE_URL) + tail;
+    // (r.comp: the competition whose page it is, when that may not be this one)
+    if (r.view === "fixtures") {
+      const page = r.comp ? leagueUrl(r.comp) : LEAGUE ? null : LEAGUE_URL;
+      return (!page || (LEAGUE && page === leagueUrl(LEAGUE_NAME)) ? "./" : page) + tail;
+    }
     return (LEAGUE ? "../matches/" : "./") + tail;
   }
   const toMatch = (id, number) => h("a", { href: href({ view: "match", id }), "data-go": true, state: number ? { number } : null });
@@ -871,7 +891,7 @@
       // bring what's changing into view: a player's match list when only
       // its page changed, the tabs and filters everywhere else
       const anchor = r.view === "player"
-        ? (prev.mode === r.mode && $(".mh-pl-games", view)) || view
+        ? (prev.mode === r.mode && prev.comp === r.comp && $(".mh-pl-games", view)) || view
         : tabs.hidden ? view : tabs;
       const top = anchor.getBoundingClientRect().top;
       if (top < 0) window.scrollTo({ top: window.scrollY + top - 110, behavior: reduceMotion ? "auto" : "smooth" });
@@ -1408,7 +1428,7 @@
     const hero = h("section", { class: "mh-hero", "aria-labelledby": "mh-hero-title", style: { "--red": vivid(red.color), "--blue": vivid(blue.color) } },
       h("div", { class: "mh-hero-top" },
         fixtureRec(rec)
-          ? h("a", { class: "mh-back", href: href({ view: "fixtures" }) }, icon("tri"), leagueName(rec))
+          ? h("a", { class: "mh-back", href: href({ view: "fixtures", comp: leagueName(rec) }) }, icon("tri"), leagueName(rec))
           : h("a", { class: "mh-back", href: S.lastList, "data-go": true }, icon("tri"), "Match history"),
         h("span", { class: "mh-hero-when" }, F.full.format(new Date(num(rec.startedAt))))),
       h("h1", { class: "mh-hero-title visually-hidden", id: "mh-hero-title" },
@@ -1427,7 +1447,7 @@
         h("li", null, modeTag(rec.mode, rec.knockout, rec.queue)),
         uncountedTag(rec) ? h("li", null, uncountedTag(rec)) : null,
         // side names alone can't prove a fixture (doc 4.15); the source and tournament can
-        fixtureRec(rec) ? h("li", null, h("a", { class: "mh-tag is-league", href: href({ view: "fixtures" }) }, leagueName(rec))) : null,
+        fixtureRec(rec) ? h("li", null, h("a", { class: "mh-tag is-league", href: href({ view: "fixtures", comp: leagueName(rec) }) }, leagueName(rec))) : null,
         eloAverages(rec) ? h("li", { class: "mh-elo-avg" }, "Avg Elo " + eloAverages(rec).RED + " v " + eloAverages(rec).BLUE) : null,
         h("li", null, str(obj(rec.field).name) || "Unknown pitch"),
         h("li", null, rulesLine(rec)),
@@ -2140,8 +2160,37 @@
   async function viewPlayer(r, token) {
     if (!UUID_RE.test(r.uuid)) throw new ApiError("notfound");
     const tiersReady = loadTiers();
-    const d = await get("/players/" + r.uuid, { page: r.page, size: 20 }, 30000);
+    // A competition view lists that competition's games from their newest 50 (the API can't
+    // filter a player's list), so a page that may show one asks for 50 at once
+    const wide = r.comp !== "all" && !r.mode && (r.page <= 1 || r.comp !== "");
+    const d = await get("/players/" + r.uuid, wide ? { page: 1, size: 50 } : { page: r.page, size: 20 }, 30000);
     if (token !== S.token) return null;
+    // byCompetition (2026-11-14): their counted fixture games per competition. Missing on a server
+    // from before, or for someone with no counted fixture game: then the page is as it always was
+    const byComp = obj(d.byCompetition);
+    const compNames = Object.keys(byComp).filter((k) => k.trim() && num(obj(byComp[k]).games) > 0);
+    const leagues = compNames.length
+      ? await get("/fixtures", null, 60000).then((x) => leaguesOf(Array.isArray(x) ? null : x)).catch(() => [])
+      : [];
+    if (token !== S.token) return null;
+    const order = leagues.concat(KNOWN_LEAGUES).map((l) => compKey(l.name));
+    const comps = compNames.map((k) => {
+      const L = leagueInfo(k, leagues);
+      const slug = compKey(L ? L.short : k).replace(/[^a-z0-9]/g, "").slice(0, 40) || "comp";
+      return { key: k, name: L ? L.name : k, slug, color: (L && L.color) || "", t: byComp[k],
+        rank: L ? order.indexOf(compKey(L.name)) : 99 };
+    }).sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name))
+      .filter((c, i, list) => list.findIndex((x) => x.slug === c.slug) === i);
+    // the league they've played the most fixture games in, the first league on a tie
+    const mainComp = comps.reduce((best, c) => (!best || num(c.t.games) > num(best.t.games) ? c : best), null);
+    const C = !comps.length || r.comp === "all" || r.mode ? null
+      : comps.find((c) => c.slug === r.comp) || (r.comp || r.page > 1 ? null : mainComp);
+    const allComp = comps.length ? "all" : "";
+    if (!C && wide) {
+      // fetched for a competition view that isn't one: show the usual first page of 20
+      const g0 = obj(d.games);
+      d.games = Object.assign({}, g0, { items: arr(g0.items).slice(0, 20), size: 20, page: 1, pages: Math.ceil(num(g0.total) / 20) });
+    }
     const rankedLines = rankedOf(d);
     // their place on each ladder they play in (the profile has only the Elo)
     const places = await Promise.all(rankedLines.map(([q]) =>
@@ -2153,7 +2202,7 @@
     const me = obj(d.player);
     const byMode = obj(d.byMode);
     const all = d.totals && typeof d.totals === "object" ? d.totals : null;
-    const t = r.mode ? byMode[r.mode] || null : all;
+    const t = C ? C.t : r.mode ? byMode[r.mode] || null : all;
     const name = nameOf(me.name ? me : all || me);
     // the ladder can have a newer name than their newest record (doc 3)
     const ladderName = places.map((p) => p && p.name).find((n) => n && n !== name) || null;
@@ -2164,7 +2213,7 @@
 
     // club is the same in every mode (doc 3); form and last played are per mode
     const club = (all && all.club) || null;
-    const src = r.mode ? t : all;
+    const src = C || r.mode ? t : all;
     const form = arr(src && src.form);
     const modes = [["", "All"]].concat(["MATCH", "SCRIM", "QUICK"].filter((m) => byMode[m]).map((m) => [m, modeName(m)]));
 
@@ -2193,6 +2242,7 @@
             tierChip(tier),
             gifted > 0 ? h("span", { class: "mh-tag mh-gifted", title: "Ranks they've gifted to other players" }, icon("gift"), "Gifted " + gifted) : null,
             arr(d.badges).includes("champions_league") || isCL(r.uuid) ? clChip() : null,
+            arr(d.badges).includes("rising_league") ? h("span", { class: "mh-tag mh-cl is-rl" }, icon("star"), "Rising League") : null,
             clubChip(club),
             src ? h("span", { class: "mh-dim" }, "Last played " + ago(num(src.lastPlayed))) : null,
             ladderName ? h("span", { class: "mh-dim" }, "On the ranked ladder as " + ladderName) : null),
@@ -2202,10 +2252,25 @@
           t ? headline(t) : null)));
 
     const out = [hero];
-    if (rankedLines.length) out.push(rankedCard(rankedLines, places, num(games.page || r.page) > 1 ? [] : arr(games.items)));
+    if (rankedLines.length && !C) out.push(rankedCard(rankedLines, places, num(games.page || r.page) > 1 ? [] : arr(games.items)));
+
+    // Champions League / Rising League / All games: their main league needs no ?comp=
+    if (comps.length) {
+      const cur = C ? C.slug : "all";
+      out.push(h("div", { class: "mh-seg mh-comp", role: "group", "aria-label": "Competition" },
+        comps.map((c) => [c.slug === mainComp.slug ? "" : c.slug, c.name, c.color, c.slug]).concat([["all", "All games", "", "all"]])
+          .map(([v, text, color, slug]) => h("a", {
+            href: href({ view: "player", uuid: r.uuid, comp: v }), "data-go": true, "data-focus": "pcomp:" + slug,
+            "aria-current": slug === cur ? "true" : null, style: color ? { "--lc": color } : null,
+          }, text))));
+    }
+    if (C) {
+      out.push(totalsGrid(t, C.name, "Their " + C.name + " games that reached a result."));
+      return out.concat(compGames(r, C, games));
+    }
 
     if (modes.length > 2 || r.mode) {
-      out.push(segmented("Mode", modes, r.mode, (v) => href({ view: "player", uuid: r.uuid, mode: v }), "pmode"));
+      out.push(segmented("Mode", modes, r.mode, (v) => href({ view: "player", uuid: r.uuid, mode: v, comp: allComp }), "pmode"));
     }
     if (t) out.push(totalsGrid(t));
     else if (all || r.mode) out.push(h("p", { class: "mh-card mh-dim" }, `No finished ${r.mode ? modeName(r.mode).toLowerCase() + " " : ""}matches yet.`));
@@ -2228,10 +2293,25 @@
       items.length ? h("ol", { class: "mh-pg-list" }, items.map(gameRow))
         : num(games.total) > 0
           ? h("p", { class: "mh-dim" }, "That page is past the end. ",
-            h("a", { href: href({ view: "player", uuid: r.uuid, mode: r.mode, page: num(games.pages) || 1 }), "data-go": true, "data-focus": "pg:last" }, "Go to the last page"))
+            h("a", { href: href({ view: "player", uuid: r.uuid, mode: r.mode, comp: allComp, page: num(games.pages) || 1 }), "data-go": true, "data-focus": "pg:last" }, "Go to the last page"))
           : h("p", { class: "mh-dim" }, "No matches on this page."),
-      pager(num(games.page), num(games.pages), (p) => href({ view: "player", uuid: r.uuid, mode: r.mode, page: p }), "Match pages")));
+      pager(num(games.page), num(games.pages), (p) => href({ view: "player", uuid: r.uuid, mode: r.mode, comp: allComp, page: p }), "Match pages")));
     return out;
+  }
+
+  // a competition's games, from the newest page the profile brought (50): PlayerGame rows carry
+  // fixture + competition on fixture games only (compared ignoring case and spacing)
+  function compGames(r, C, games) {
+    const items = arr(games.items);
+    const mine = items.filter((g) => g.fixture === true && compKey(g.competition) === compKey(C.key));
+    const more = num(games.total) > items.length;
+    const all = h("a", { href: href({ view: "player", uuid: r.uuid, comp: "all" }), "data-go": true }, "All games");
+    return [h("section", { class: "mh-card mh-pl-games", "aria-labelledby": "mh-pg" },
+      sectionHead(h("span", { id: "mh-pg" }, C.name + " matches"),
+        mine.length ? (mine.length === 1 ? "1 match" : mine.length + " matches") + (more ? " in their last " + items.length : "") + ", newest first" : null),
+      mine.length ? h("ol", { class: "mh-pg-list" }, mine.map(gameRow))
+        : h("p", { class: "mh-dim" }, (more ? "None in their last " + items.length + " matches. " : "None listed yet. "), all),
+      mine.length && more ? h("p", { class: "mh-comp-note" }, "Older ones are under ", all, ".") : null)];
   }
 
   function headline(t) {
@@ -2249,7 +2329,7 @@
         "Their average match rating. Ratings got harsher on Oct 18, so matches before then pull it up for a while."), h("span", { class: "mh-pl-k" }, "Avg rating")));
   }
 
-  function totalsGrid(t) {
+  function totalsGrid(t, title, sub) {
     const g = num(t.games) || 1;
     const per = (v) => (num(v) / g).toFixed(2).replace(/\.?0+$/, "") || "0";
     const w = num(t.wins), d = num(t.draws), l = num(t.losses), tot = w + d + l || 1;
@@ -2261,7 +2341,7 @@
     const pk = num(t.pkScored) + num(t.pkMissed) + num(t.pkSaved);
 
     return h("section", { class: "mh-card mh-totals", "aria-labelledby": "mh-tt" },
-      sectionHead(h("span", { id: "mh-tt" }, "Career"), "From matches that reached a result."),
+      sectionHead(h("span", { id: "mh-tt" }, title || "Career"), sub || "From matches that reached a result."),
       h("div", { class: "mh-wdl-bar", role: "img", "aria-label": `${w} won, ${d} drawn, ${l} lost` },
         h("i", { class: "is-w", style: { "--w": (w / tot) * 100 + "%" } }),
         h("i", { class: "is-d", style: { "--w": (d / tot) * 100 + "%" } }),
@@ -2818,7 +2898,7 @@
     const sc = obj(f.score), pn = obj(f.pens);
     const has = (o) => o && Number.isFinite(Number(o.home)) && Number.isFinite(Number(o.away)) && o.home !== null && o.away !== null;
     return {
-      id: str(f.id), competition: str(f.competition) || "Champions League", label: str(f.label),
+      id: str(f.id), competition: str(f.competition) || DEFAULT_LEAGUE, label: str(f.label),
       home: fxClub(f.home), away: fxClub(f.away), kickoff: num(f.kickoff),
       state: ["SCHEDULED", "LIVE", "FINISHED", "CANCELLED"].includes(f.state) ? f.state : "SCHEDULED",
       score: has(f.score) ? { home: num(sc.home), away: num(sc.away) } : null,
@@ -2861,11 +2941,40 @@
   // from every finished fixture, so it is never rebuilt from the list here (that keeps a week).
   // Win 3, draw 1; a forfeit or a referee's call goes to the side it was given to. Null until
   // somebody has played: a table of noughts says nothing.
-  const LEAGUE_KEY = "championsleague";
-  const compKey = (s) => str(s).toLowerCase().replace(/\s+/g, "");
-  function tableOf(d) {
+  // The leagues (plugin 2026-11-10: "leagues" beside "fixtures"), the default first. A server from
+  // before has none: then the Champions League is the only league, and the default.
+  const KNOWN_LEAGUES = [
+    { name: "Champions League", short: "CL", color: "#F5C542", badge: "champions_league", default: true },
+    { name: "Rising League", short: "RL", color: "#3FB8AF", badge: "rising_league", default: false },
+  ];
+  function leaguesOf(d) {
+    const list = arr(obj(d).leagues).map(obj).filter((l) => str(l.name).trim()).map((l) => ({
+      name: str(l.name).trim(),
+      short: str(l.short).trim().slice(0, 6) || str(l.name).trim().split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 3),
+      color: FX_HEX.test(str(l.color)) ? str(l.color) : "",
+      badge: str(l.badge), default: l.default === true,
+    }));
+    if (!list.length) return [KNOWN_LEAGUES[0]];
+    if (!list.some((l) => l.default)) list[0].default = true;
+    return list;
+  }
+  // a league's look, from the server's list or the two we know
+  const leagueInfo = (name, leagues) => (leagues || []).concat(KNOWN_LEAGUES).find((l) => compKey(l.name) === compKey(name) || compKey(l.short) === compKey(name)) || null;
+  // does a fixture belong on this page? Its own league's, or the default league's page for a
+  // competition that is no league at all
+  function onThisPage(f, leagues) {
+    const k = compKey(f.competition);
+    if (k === LEAGUE_KEY) return true;
+    const def = leagues.find((l) => l.default) || leagues[0];
+    return compKey(def.name) === LEAGUE_KEY && !leagues.some((l) => compKey(l.name) === k);
+  }
+  const isDefaultPage = (leagues) => compKey((leagues.find((l) => l.default) || leagues[0]).name) === LEAGUE_KEY;
+
+  function tableOf(d, leagues) {
     const all = arr(obj(d).standings).map(obj);
-    const t = all.find((x) => compKey(x.competition) === LEAGUE_KEY) || all.find((x) => arr(x.rows).length) || null;
+    // a server from before the leagues has one table; only the default league's page falls back to it
+    const t = all.find((x) => compKey(x.competition) === LEAGUE_KEY) ||
+      (isDefaultPage(leagues) && !arr(obj(d).leagues).length ? all.find((x) => arr(x.rows).length) : null) || null;
     if (!t) return null;
     const rows = arr(t.rows).map(obj).map((x, i) => ({
       pos: num(x.position) || i + 1, club: fxClub(x.club),
@@ -2873,7 +2982,7 @@
       gf: num(x.goalsFor), ga: num(x.goalsAgainst), gd: num(x.goalDifference), pts: num(x.points),
       form: arr(x.form).map(str).filter((f) => f === "W" || f === "D" || f === "L").slice(-5),
     })).filter((x) => x.club.id || x.club.name !== "TBD");
-    return rows.some((x) => x.p > 0) ? { name: str(t.competition) || "Champions League", rows } : null;
+    return rows.some((x) => x.p > 0) ? { name: str(t.competition) || LEAGUE_NAME, rows } : null;
   }
 
   function tableCard(t, want) {
@@ -2931,12 +3040,22 @@
       throw e;
     });
     if (token !== S.token) return null;
-    setTitle(LEAGUE ? "Champions League" : "Fixtures");
+    setTitle(LEAGUE ? LEAGUE_NAME : "Fixtures");
+    const leagues = leaguesOf(Array.isArray(d) ? null : d);
+    const isMain = isDefaultPage(leagues);
+    // a league that hasn't started: one short line, the same with or without a server answer
+    const soon = () => note("wait", `The ${LEAGUE_NAME} starts soon`,
+      "Fixtures, the table and results show up here once the first games are booked.",
+      [arrowBtn("Join the server", { on: { click: openConnect } })]);
     if (!d) {
+      if (!isMain) return [soon()];
       return [note("off", "Fixtures are on their way",
-        "Scheduled Champions League games will be listed here: kickoff times in your own time zone, live scores and results.", [])];
+        `Scheduled ${LEAGUE_NAME} games will be listed here: kickoff times in your own time zone, live scores and results.`, [])];
     }
-    const all = (Array.isArray(d) ? d : arr(d.fixtures)).map(fxOf).filter(Boolean).filter((f) => f.state !== "CANCELLED");
+    const all = (Array.isArray(d) ? d : arr(d.fixtures)).map(fxOf).filter(Boolean)
+      .filter((f) => f.state !== "CANCELLED" && onThisPage(f, leagues))
+      // a league's games say its name as configured, however the fixture spelt it
+      .map((f) => Object.assign(f, { competition: (leagueInfo(f.competition, leagues) || f).name || f.competition }));
     const clubs = [];
     for (const f of all) for (const c of [f.home, f.away]) if (c.id && !clubs.some((x) => x.id === c.id)) clubs.push(c);
     clubs.sort((a, b) => a.name.localeCompare(b.name));
@@ -2952,9 +3071,12 @@
         segmented("Club", [["", "All clubs"]].concat(clubs.map((c) => [c.id, c.name])), want, (v) => href({ view: "fixtures", club: v }), "club")));
     }
     if (!all.length) {
-      out.push(note("wait", "No fixtures scheduled yet",
-        "When staff schedule Champions League games, they show up here with the kickoff in your own time.",
-        [arrowBtn("Join the server", { on: { click: openConnect } })]));
+      // a table can already be there (every side on 0 is no table, see tableOf)
+      const t0 = tableOf(d, leagues);
+      if (t0) out.push(tableCard(t0, want));
+      out.push(isMain ? note("wait", "No fixtures scheduled yet",
+        `When staff schedule ${LEAGUE_NAME} games, they show up here with the kickoff in your own time.`,
+        [arrowBtn("Join the server", { on: { click: openConnect } })]) : soon());
       return out;
     }
 
@@ -2974,7 +3096,7 @@
       fxRefresh(token);
     }
 
-    const table = tableOf(d);
+    const table = tableOf(d, leagues);
     if (table) out.push(tableCard(table, want));
 
     if (next.length) {

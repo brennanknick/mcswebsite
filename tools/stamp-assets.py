@@ -22,7 +22,7 @@ ASSETS = ["assets/css/site.css", "assets/js/site.js", "site.config.js",
           "favicon.ico", "assets/img/icon.svg"]
 PAGES = ["index.html", "rules/index.html", "matches/index.html", "cup/index.html", "404.html",
          "store/index.html", "store/thanks/index.html", "crates/index.html",
-         "champions-league/index.html", "tiers/index.html"]
+         "champions-league/index.html", "rising-league/index.html", "tiers/index.html"]
 
 
 def digest(rel):

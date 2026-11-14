@@ -1469,9 +1469,27 @@ code, kbd {
   .feature-render { width: 340px; }
 }
 
-/* the league link says just "League" until the bar has room for all of it */
-@media (max-width: 1399px) {
-  .nav-links .nav-league-long { display: none; }
+/* two league links: the bar says just "Champions" and "Rising" (the menu
+   drawer says "Champions League" and "Rising League" in full). With the
+   second league the links sit closer, closer again with the cup's link, so
+   every label stays on one line and clear of the address button. */
+.nav-links .nav-league-word { display: none; }
+.nav .nav-links:has(> .nav-rl) a { padding-inline: .95rem; white-space: nowrap; }
+.nav .nav-links:has(> .nav-rl):has(> .nav-cup:not([hidden])) a { padding-inline: .7rem; }
+@media (max-width: 1319px) {
+  .nav .nav-links:has(> .nav-rl) a { padding-inline: .55rem; }
+  .nav .nav-links:has(> .nav-rl):has(> .nav-cup:not([hidden])) a { padding-inline: .4rem; }
+}
+@media (max-width: 1199px) {
+  .nav .nav-links:has(> .nav-rl) a { padding-inline: .45rem; }
+  .nav .nav-links:has(> .nav-rl):has(> .nav-cup:not([hidden])) a { padding-inline: .35rem; }
+  .nav .nav-links:has(> .nav-rl) ~ .nav-cta { min-width: 0; }
+}
+@media (min-width: 992px) and (max-width: 1139px) {
+  .nav .container:has(.nav-rl) .nav-brand-text { display: none; }
+}
+@media (min-width: 992px) and (max-width: 1199px) {
+  .nav .container:has(.nav-rl):has(.nav-cup:not([hidden])) .nav-brand-text { display: none; }
 }
 
 @media (max-width: 1199px) {

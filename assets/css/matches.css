@@ -399,6 +399,7 @@
 /* the Champions League badge (a Discord role the server publishes): gold, a pixel star */
 .mh-tag.mh-cl { display: inline-flex; align-items: center; gap: .35rem; color: #ffcf6e; background: rgba(255, 190, 70, .12); box-shadow: inset 0 0 0 1px rgba(255, 207, 110, .45); }
 .mh-tag.mh-cl .mh-i { width: 11px; height: 11px; fill: currentColor; }
+.mh-tag.mh-cl.is-rl { color: #8fe6dc; background: rgba(63, 184, 175, .12); box-shadow: inset 0 0 0 1px rgba(143, 230, 220, .45); }
 /* a player's staff rank and tier: the game's own 11 px icons, kept to whole pixels */
 .mh-tag.mh-rank, .mh-tag.mh-tier { display: inline-flex; align-items: center; gap: .4rem; }
 .mh-tag.mh-rank { color: color-mix(in srgb, var(--rc) 82%, #fff); background: color-mix(in srgb, var(--rc) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 50%, transparent); }
@@ -1943,7 +1944,26 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
 .mh-st-note { margin: .9rem 0 0; font-size: 12px; color: var(--text-faint); text-align: center; }
 .mh-ev.kind-save .mh-ev-ic .mh-i, .mh-ev.kind-post .mh-ev-ic .mh-i { fill: var(--text-strong); }
 
-/* ── Champions League page (champions-league/) ───────────────────── */
+/* ── league pages (champions-league/, rising-league/) ────────────────
+   One look, the league's colour as tokens: the Champions League's gold
+   by default, the Rising League's teal under .lg-rl. */
+
+.mh-league {
+  --lg-hi: #ffe29a;               /* kicker, stars, rim highlight */
+  --lg-lo: #7a5c18;               /* rim ends */
+  --lg-ink: #1c1505;              /* text on the kicker */
+  --lg-glow: 255, 226, 150;       /* rgb of the card and emblem glows */
+}
+.mh-league.lg-rl {
+  --lg-hi: #9ff0e6;
+  --lg-lo: #1d6b66;
+  --lg-ink: #04201e;
+  --lg-glow: 63, 184, 175;
+}
+/* the title's gradient word in the league's colour */
+.lg-rl .lg-title .grad { --grad-1: #f0fffc; --grad-2: #8fe6dc; --grad-3: #3fb8af; }
+.lg-chev { fill: var(--lg-hi); animation: lg-climb 2.4s steps(4, jump-none) infinite; animation-delay: calc(var(--d) * -.8s); }
+@keyframes lg-climb { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
 .lg-head { margin: .25rem 0 2.25rem; }
 .lg-card {
@@ -1956,7 +1976,7 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   border-radius: var(--radius);
   overflow: hidden;
   background:
-    radial-gradient(28% 115% at 86% 50%, rgba(255, 226, 150, .11), transparent 70%),
+    radial-gradient(28% 115% at 86% 50%, rgba(var(--lg-glow), .11), transparent 70%),
     radial-gradient(45% 80% at 8% 0%, rgba(200, 242, 92, .08), transparent 70%),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, .018) 0 64px, transparent 64px 128px),
     rgba(2, 6, 4, .5);
@@ -1969,7 +1989,7 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   position: absolute;
   inset: 0 0 auto;
   height: 4px;
-  background: linear-gradient(90deg, #7a5c18, #ffe29a 50%, #7a5c18);
+  background: linear-gradient(90deg, var(--lg-lo), var(--lg-hi) 50%, var(--lg-lo));
 }
 .lg-text { min-width: 0; }
 .lg-kicker {
@@ -1982,8 +2002,8 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   font-weight: 800;
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: #1c1505;
-  background: #ffe29a;
+  color: var(--lg-ink);
+  background: var(--lg-hi);
   clip-path: var(--notch);
   animation: lg-rise .6s cubic-bezier(.2, .8, .2, 1) both .05s;
 }
@@ -2008,11 +2028,11 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   width: 170px;
   height: 30px;
   transform: translateX(-50%);
-  background: radial-gradient(closest-side, rgba(255, 226, 150, .16), transparent);
+  background: radial-gradient(closest-side, rgba(var(--lg-glow), .16), transparent);
 }
-.lg-emblem { width: 150px; height: 150px; overflow: visible; filter: drop-shadow(0 0 26px rgba(255, 226, 150, .22)); animation: lg-turn-in .9s cubic-bezier(.2, .8, .2, 1) both .15s; }
-.lg-orbit { fill: none; stroke: rgba(255, 226, 150, .22); stroke-width: 1; stroke-dasharray: 2 4; }
-.lg-star { fill: #ffe29a; animation: lg-twinkle 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * -.4s); }
+.lg-emblem { width: 150px; height: 150px; overflow: visible; filter: drop-shadow(0 0 26px rgba(var(--lg-glow), .22)); animation: lg-turn-in .9s cubic-bezier(.2, .8, .2, 1) both .15s; }
+.lg-orbit { fill: none; stroke: rgba(var(--lg-glow), .22); stroke-width: 1; stroke-dasharray: 2 4; }
+.lg-star { fill: var(--lg-hi); animation: lg-twinkle 3.2s ease-in-out infinite; animation-delay: calc(var(--d) * -.4s); }
 .lg-ball-w { fill: #f4f1e6; }
 .lg-ball-s { fill: #c4cac4; }
 .lg-ball-o { fill: #96a09a; }
@@ -2027,7 +2047,7 @@ a.mh-lu-name:hover { text-decoration: underline; text-underline-offset: .15em; }
   .lg-sub { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .lg-card, .lg-kicker, .lg-title, .lg-sub, .lg-emblem, .lg-star { animation: none; }
+  .lg-card, .lg-kicker, .lg-title, .lg-sub, .lg-emblem, .lg-star, .lg-chev { animation: none; }
 }
 
 /* a fixture's match report: the competition, linking back to its page */
@@ -2094,3 +2114,15 @@ a.mh-tbl-club:hover b, a.mh-tbl-club:focus-visible b { text-decoration: underlin
 
 /* a fixture booked before a time was agreed */
 .mh-fx-time.is-tbd { color: var(--accent-soft); letter-spacing: .06em; }
+
+/* a player's competition switch (Champions League / Rising League / All games):
+   the picked league lights up in its own colour (--lc, set per link) */
+.mh-seg.mh-comp a[aria-current="true"][style] {
+  color: #0b1210;
+  background: var(--lc);
+  box-shadow: inset 0 3px 0 color-mix(in srgb, var(--lc) 55%, #fff), inset 0 -3px 0 color-mix(in srgb, var(--lc) 60%, #000);
+}
+.mh-seg.mh-comp a[style]:not([aria-current="true"]) { box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--lc) 70%, transparent); }
+.mh-pl-hero + .mh-seg.mh-comp { margin-bottom: .6rem; }
+.mh-seg.mh-comp + .mh-seg { margin-bottom: 1.25rem; }
+.mh-comp-note { margin: .25rem 0 0; font-size: 13px; color: var(--text-faint); }
