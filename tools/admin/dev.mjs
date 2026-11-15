@@ -312,6 +312,12 @@ function stage3Write(p, q) {
     const id = q.get("club") || (q.get("name") || "bench club").toLowerCase().replace(/[^a-z0-9]+/g, "_");
     if (op === "delete" && q.get("confirm") !== q.get("club")) return bad(409, `Send confirm=${q.get("club")} to delete it. There's no undo.`);
     if (op === "delete") return ok({ changed: true, message: `Deleted ${id}.`, before: { id }, club: null, deleted: id });
+    if (op === "league") {
+      const to = LEAGUES.find((l) => l.name.toLowerCase() === String(q.get("league") || "").toLowerCase() || l.short.toLowerCase() === String(q.get("league") || "").toLowerCase());
+      if (!to) return bad(400, `There's no league called ${q.get("league")}. Leagues: ${LEAGUES.map((l) => l.name).join(", ")}.`);
+      return ok({ changed: true, message: `(bench) ${id} moved to the ${to.name}. 1 of its fixtures still to play is in another competition.`, fixturesElsewhere: 1,
+        before: { league: "Champions League" }, club: { id, name: id, league: to.name } });
+    }
     return ok({ changed: true, repeat: false, message: `(bench) ${op} done.`, before: {}, club: { id, name: q.get("name") || id } });
   }
   if (p === "/discord/admin/ranked/reset") return ok({ uuid: q.get("id"), name: "that player", queue: q.get("queue"), changed: true, before: {}, after: {}, message: `Reset that player's ${q.get("queue")} rating: 1000 Elo, 0 games.` });
@@ -517,8 +523,77 @@ function leagueRows(withOrder, changes = league.changes, adjustments = league.ad
   out.forEach((r, i) => { r.position = i + 1; r.autoPosition = auto[r.key]; });
   return out;
 }
-function leagueAudit(by, action, team, detail, reason) {
-  league.audit.unshift({ at: Date.now(), by, action, competition: "Champions League", ...(team ? { team } : {}), ...(detail ? { detail } : {}), reason });
+// The Rising League beside it (2026-11-10): three clubs, one game played, its own adjustments and order.
+const RL = "Rising League";
+const LEAGUES = [{ name: "Champions League", short: "CL", color: "#F5C542", badge: "champions_league", default: true },
+  { name: RL, short: "RL", color: "#3FB8AF", badge: "rising_league", default: false }];
+const rlClubs = {
+  red_lions: { name: "Red Lions", flag: "", g: [1, 1, 0, 0, 6, 2], form: ["W"] },
+  blue_eagles: { name: "Blue Eagles", flag: "", g: [1, 0, 0, 1, 2, 6], form: ["L"] },
+  green_owls: { name: "Green Owls", flag: "", g: [0, 0, 0, 0, 0, 0], form: [] },
+};
+const rl = { adjustments: [], order: null };
+const isRl = (c) => String(c || "").toLowerCase().replace(/\s+/g, " ").trim() === "rising league" || String(c || "").toLowerCase() === "rl";
+function rlRows(withOrder) {
+  const rows = Object.entries(rlClubs).map(([key, c]) => {
+    const [played, won, drawn, lost, goalsFor, goalsAgainst] = c.g;
+    const r = { key, club: { id: key, name: c.name, flag: c.flag, color: "#ffffff", league: RL }, played, won, drawn, lost, goalsFor, goalsAgainst, points: won * 3 + drawn, form: c.form.slice(-5) };
+    const adj = { points: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 };
+    for (const a of rl.adjustments) if (a.team === key) for (const k of Object.keys(adj)) adj[k] += a[k];
+    for (const k of Object.keys(adj)) r[k] += adj[k];
+    r.played += adj.won + adj.drawn + adj.lost;
+    r.goalDifference = r.goalsFor - r.goalsAgainst;
+    if (Object.values(adj).some(Boolean)) r.adjustment = adj;
+    return r;
+  });
+  rows.sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor || a.key.localeCompare(b.key));
+  rows.forEach((r, i) => { r.position = i + 1; });
+  if (!withOrder || !rl.order) return rows;
+  const auto = Object.fromEntries(rows.map((r) => [r.key, r.position]));
+  const out = [...rl.order.teams.map((k) => rows.find((r) => r.key === k)).filter(Boolean), ...rows.filter((r) => !rl.order.teams.includes(r.key))];
+  out.forEach((r, i) => { r.position = i + 1; r.autoPosition = auto[r.key]; });
+  return out;
+}
+/** The pretend Rising League's table writes; null when the call isn't about it. */
+function rlBench(op, q, ok, bad) {
+  const by = q.get("by"), reason = q.get("reason");
+  const nm = (k) => (rlClubs[k] || {}).name || k;
+  if (op === "unadjust") {
+    const i = rl.adjustments.findIndex((a) => a.id === q.get("id"));
+    if (i < 0) return null;   // a Champions League one
+    const [a] = rl.adjustments.splice(i, 1);
+    leagueAudit(by, "unadjust", a.team, `${a.id} taken out`, reason, RL);
+    return ok({ message: `Took out ${a.id} for ${a.teamName}.` });
+  }
+  if (!isRl(q.get("competition"))) return null;
+  console.log(`  (bench) pretend Rising League ${op} ${q}`);
+  if (op === "adjust") {
+    const team = q.get("team");
+    if (!rlClubs[team]) return bad(400, `${team} isn't in the Rising League table.`);
+    const a = { id: `adj-${league.next++}`, competition: RL, team, teamName: nm(team), reason, by, at: Date.now() };
+    for (const k of ["points", "won", "drawn", "lost", "goalsFor", "goalsAgainst"]) a[k] = Number(q.get(k) || 0);
+    rl.adjustments.push(a);
+    leagueAudit(by, "adjust", team, a.id, reason, RL);
+    return ok({ message: `Adjusted ${nm(team)} in the Rising League table (bench).` });
+  }
+  if (op === "order") {
+    const teams = (q.get("teams") || "").split(",").filter(Boolean);
+    if (teams.length !== Object.keys(rlClubs).length || teams.some((t) => !rlClubs[t])) return bad(400, `Put all ${Object.keys(rlClubs).length} sides in the order (${teams.length} given).`);
+    rl.order = { teams, reason, by, at: Date.now() };
+    leagueAudit(by, "order", null, teams.join(", "), reason, RL);
+    return ok({ message: "The Rising League table is in your order now, until it's cleared." });
+  }
+  if (op === "unorder") {
+    if (!rl.order) return bad(400, "That table isn't in a manual order.");
+    rl.order = null;
+    leagueAudit(by, "unorder", null, null, reason, RL);
+    return ok({ message: "The Rising League table goes by the numbers again." });
+  }
+  return bad(400, "(bench) replace and remove are pretend for the Champions League only.");
+}
+
+function leagueAudit(by, action, team, detail, reason, competition = "Champions League") {
+  league.audit.unshift({ at: Date.now(), by, action, competition, ...(team ? { team } : {}), ...(detail ? { detail } : {}), reason });
 }
 function leagueBench(method, p, q) {
   if (LEAGUE_MODE === "real" || !p.startsWith("/discord/admin/league/")) return null;
@@ -528,16 +603,24 @@ function leagueBench(method, p, q) {
   const nm = (k) => (leagueClubs[k] || {}).name || k;
   const adjText = (a) => ["points", "won", "drawn", "lost", "goalsFor", "goalsAgainst"].filter((k) => a[k]).map((k) => `${a[k] > 0 ? "+" : ""}${a[k]} ${{ points: "pts", won: "W", drawn: "D", lost: "L", goalsFor: "GF", goalsAgainst: "GA" }[k]}`).join(", ");
   const active = league.changes.filter((x) => x.active);
+  if (method === "POST") {
+    const r = rlBench(op, q, ok, bad);
+    if (r) return r;
+  }
   if (method === "GET" && op === "standings") {
     const rows = leagueRows(true);
-    return ok({ defaultCompetition: "Champions League", adjustMax: 99, tables: [{ competition: "Champions League", manualOrder: !!league.order, adjusted: rows.some((r) => r.adjustment),
+    const rRows = rlRows(true);
+    const rlTable = { competition: RL, short: "RL", color: "#3FB8AF", manualOrder: !!rl.order, adjusted: rRows.some((r) => r.adjustment),
+      ...(rl.order ? { order: rl.order } : {}), replaced: [], removed: [], rows: rRows };
+    return ok({ defaultCompetition: "Champions League", leagues: LEAGUES, adjustMax: 99, tables: [{ competition: "Champions League", short: "CL", color: "#F5C542", manualOrder: !!league.order, adjusted: rows.some((r) => r.adjustment),
       ...(league.order ? { order: league.order } : {}),
       replaced: active.filter((x) => x.kind === "replace").map((x) => ({ change: x.id, key: x.from.key, name: x.from.name, by: benchKey(x.from.key), byName: nm(benchKey(x.from.key)), at: x.at })),
       removed: active.filter((x) => x.kind === "remove").map((x) => ({ change: x.id, key: x.from.key, name: x.from.name, voidGames: x.voidGames, at: x.at })),
-      rows }],
-      adjustments: league.adjustments.map((a) => ({ ...a, text: adjText(a) })),
+      rows }, rlTable],
+      adjustments: [...league.adjustments, ...rl.adjustments].map((a) => ({ ...a, text: adjText(a) })),
       changes: [...league.changes].reverse(),
-      clubs: Object.entries(leagueClubs).filter(([, c]) => !c.deleted).map(([id, c]) => ({ id, name: c.name, color: "#ffffff", flag: c.flag })).sort((a, b) => a.name.localeCompare(b.name)),
+      clubs: [...Object.entries(leagueClubs).filter(([, c]) => !c.deleted).map(([id, c]) => ({ id, name: c.name, color: "#ffffff", flag: c.flag, league: "Champions League" })),
+        ...Object.entries(rlClubs).map(([id, c]) => ({ id, name: c.name, color: "#ffffff", flag: c.flag, league: RL }))].sort((a, b) => a.name.localeCompare(b.name)),
       audit: league.audit.slice(0, 100) });
   }
   if (method === "GET" && op === "restorable") return ok({ historyReady: true, fixtures: league.restored ? [] : [{ id: "17", competition: "Champions League", label: "Week 3", kickoff: Date.parse("2026-11-02T02:00:00Z"),
@@ -701,7 +784,7 @@ async function pluginBench(req, url, sent) {
     // without the admin secret the real server answers 401 (or 404 for a route it lacks): use samples
     if ((r.status === 404 || r.status === 401) && admin) {
       if (p === "/discord/admin/clubs/show") return { status: 200, body: JSON.stringify({ ok: true, club: { id: url.searchParams.get("club"), name: "Bench Club", flag: null, flagCode: null, crest: null,
-        color: "gold", colorHex: "#ffaa00", gradient: [], shortName: "", code: "", codeShown: "BEN", logo: null, logoUrl: null, members: 0, inPlay: false, playingOn: null,
+        color: "gold", colorHex: "#ffaa00", gradient: [], shortName: "", code: "", codeShown: "BEN", logo: null, logoUrl: null, league: "Rising League", members: 0, inPlay: false, playingOn: null,
         fixtures: { scheduled: 0, live: 0, finished: 0, cancelled: 0 }, memberList: [], suffix: "", fixtureList: [], standing: null } }) };
       if (p.startsWith("/discord/admin/bows/tex/")) return { status: 200, body: SAMPLE_PNG, type: "image/png" };
       if (p === "/discord/admin/knobs" && !url.searchParams.get("scope")) return { status: 200, body: JSON.stringify({ scopes: SCOPES }) };
