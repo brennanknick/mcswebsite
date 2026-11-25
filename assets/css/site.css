@@ -1759,3 +1759,125 @@ code, kbd {
   .legal-sec h2 { font-size: 1.4rem; }
   .legal-short { padding: 1.3rem 1.2rem 1.1rem; }
 }
+
+/* ── season: snow (Christmas 2026) ─────────────────────────────────
+   On while site.config.js says season: "snow" (site.js then sets
+   html[data-season="snow"]). Frost on the gradient headlines, a pixel
+   snow layer on every card, button and the footer, icicles under the
+   nav, a cold night over the hero, and falling pixel snow (site.js:
+   the snowflake button turns it off; reduced motion never starts it).
+   All of it is decoration on top: season: "" undoes it. */
+
+html[data-season="snow"] {
+  --grad-1: #ffffff;
+  --grad-2: #d7f0ff;
+  --grad-3: #7fdcb8;
+  --accent-soft: #d8f1ff;
+  --snow-cap: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%205'%20width='16'%20height='5'%20shape-rendering='crispEdges'%3E%3Crect%20x='0'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='0'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='1'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='1'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='2'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='2'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='3'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='3'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='4'%20y='0'%20width='1'%20height='2'%20fill='%23eef8ff'/%3E%3Crect%20x='4'%20y='2'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='5'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='5'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='6'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='6'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='7'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='7'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='8'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='8'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='9'%20y='0'%20width='1'%20height='2'%20fill='%23eef8ff'/%3E%3Crect%20x='9'%20y='2'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='10'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='10'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='11'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='11'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='12'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='12'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='13'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='13'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='14'%20y='0'%20width='1'%20height='2'%20fill='%23eef8ff'/%3E%3Crect%20x='14'%20y='2'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='15'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='15'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='1'%20y='0'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='6'%20y='0'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='11'%20y='0'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3C/svg%3E");
+  --snow-drift: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%207'%20width='16'%20height='7'%20shape-rendering='crispEdges'%3E%3Crect%20x='0'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='0'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='1'%20y='0'%20width='1'%20height='5'%20fill='%23eef8ff'/%3E%3Crect%20x='1'%20y='5'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='2'%20y='0'%20width='1'%20height='5'%20fill='%23eef8ff'/%3E%3Crect%20x='2'%20y='5'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='3'%20y='0'%20width='1'%20height='6'%20fill='%23eef8ff'/%3E%3Crect%20x='3'%20y='6'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='4'%20y='0'%20width='1'%20height='5'%20fill='%23eef8ff'/%3E%3Crect%20x='4'%20y='5'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='5'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='5'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='6'%20y='0'%20width='1'%20height='3'%20fill='%23eef8ff'/%3E%3Crect%20x='6'%20y='3'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='7'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='7'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='8'%20y='0'%20width='1'%20height='5'%20fill='%23eef8ff'/%3E%3Crect%20x='8'%20y='5'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='9'%20y='0'%20width='1'%20height='6'%20fill='%23eef8ff'/%3E%3Crect%20x='9'%20y='6'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='10'%20y='0'%20width='1'%20height='6'%20fill='%23eef8ff'/%3E%3Crect%20x='10'%20y='6'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='11'%20y='0'%20width='1'%20height='5'%20fill='%23eef8ff'/%3E%3Crect%20x='11'%20y='5'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='12'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='12'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='13'%20y='0'%20width='1'%20height='4'%20fill='%23eef8ff'/%3E%3Crect%20x='13'%20y='4'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='14'%20y='0'%20width='1'%20height='5'%20fill='%23eef8ff'/%3E%3Crect%20x='14'%20y='5'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='15'%20y='0'%20width='1'%20height='5'%20fill='%23eef8ff'/%3E%3Crect%20x='15'%20y='5'%20width='1'%20height='1'%20fill='%23b9d8ee'%20fill-opacity='.6'/%3E%3Crect%20x='1'%20y='0'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='6'%20y='0'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3Crect%20x='11'%20y='0'%20width='1'%20height='1'%20fill='%23ffffff'/%3E%3C/svg%3E");
+  --snow-ice: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%208'%20width='24'%20height='8'%20shape-rendering='crispEdges'%3E%3Crect%20x='0'%20y='0'%20width='24'%20height='1'%20fill='%23e6f6ff'/%3E%3Crect%20x='0'%20y='1'%20width='1'%20height='3'%20fill='%23c4ebff'/%3E%3Crect%20x='0'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='0'%20y='3'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='2'%20y='1'%20width='1'%20height='5'%20fill='%23c4ebff'/%3E%3Crect%20x='2'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='2'%20y='5'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='3'%20y='1'%20width='1'%20height='1'%20fill='%23c4ebff'/%3E%3Crect%20x='3'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='3'%20y='1'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='5'%20y='1'%20width='1'%20height='7'%20fill='%23c4ebff'/%3E%3Crect%20x='5'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='5'%20y='7'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='6'%20y='1'%20width='1'%20height='2'%20fill='%23c4ebff'/%3E%3Crect%20x='6'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='6'%20y='2'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='8'%20y='1'%20width='1'%20height='4'%20fill='%23c4ebff'/%3E%3Crect%20x='8'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='8'%20y='4'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='10'%20y='1'%20width='1'%20height='1'%20fill='%23c4ebff'/%3E%3Crect%20x='10'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='10'%20y='1'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='11'%20y='1'%20width='1'%20height='6'%20fill='%23c4ebff'/%3E%3Crect%20x='11'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='11'%20y='6'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='13'%20y='1'%20width='1'%20height='3'%20fill='%23c4ebff'/%3E%3Crect%20x='13'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='13'%20y='3'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='15'%20y='1'%20width='1'%20height='2'%20fill='%23c4ebff'/%3E%3Crect%20x='15'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='15'%20y='2'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='16'%20y='1'%20width='1'%20height='5'%20fill='%23c4ebff'/%3E%3Crect%20x='16'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='16'%20y='5'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='18'%20y='1'%20width='1'%20height='1'%20fill='%23c4ebff'/%3E%3Crect%20x='18'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='18'%20y='1'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='19'%20y='1'%20width='1'%20height='3'%20fill='%23c4ebff'/%3E%3Crect%20x='19'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='19'%20y='3'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='21'%20y='1'%20width='1'%20height='6'%20fill='%23c4ebff'/%3E%3Crect%20x='21'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='21'%20y='6'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='22'%20y='1'%20width='1'%20height='1'%20fill='%23c4ebff'/%3E%3Crect%20x='22'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='22'%20y='1'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3Crect%20x='23'%20y='1'%20width='1'%20height='2'%20fill='%23c4ebff'/%3E%3Crect%20x='23'%20y='1'%20width='1'%20height='1'%20fill='%23ffffff'%20fill-opacity='.85'/%3E%3Crect%20x='23'%20y='2'%20width='1'%20height='1'%20fill='%238fd0ff'/%3E%3C/svg%3E");
+}
+
+/* snow settled on top of every card */
+html[data-season="snow"] .card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 10px;
+  background: var(--snow-cap) repeat-x 0 0 / 32px 10px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* and on every button, over its top bevel */
+html[data-season="snow"] .btn { position: relative; }
+html[data-season="snow"] .btn::before {
+  content: "";
+  position: absolute;
+  left: -4px; right: -1px; top: -9px;
+  height: 10px;
+  background: var(--snow-cap) repeat-x 0 0 / 32px 10px;
+  pointer-events: none;
+}
+
+/* icicles hanging off the nav bar */
+html[data-season="snow"] .nav::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 100%;
+  height: 24px;
+  background: var(--snow-ice) repeat-x 0 0 / 72px 24px;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .3));
+  pointer-events: none;
+}
+
+/* a drift along the top of the footer */
+html[data-season="snow"] .footer { position: relative; }
+html[data-season="snow"] .footer::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 14px;
+  background: var(--snow-drift) repeat-x 0 0 / 32px 14px;
+  pointer-events: none;
+}
+
+/* a cold night over the hero: blue sky, snow lying at the far end of the pitch */
+html[data-season="snow"] .standin::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(0deg, rgba(232, 244, 255, .3) 0%, rgba(232, 244, 255, .12) 32%, transparent 58%),
+    linear-gradient(180deg, rgba(60, 110, 210, .28), transparent 62%);
+}
+
+/* frost creeping in from the edges of the screen, like a cold window */
+html[data-season="snow"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 125% 115% at 50% 45%, transparent 58%, rgba(214, 236, 255, .09) 78%, rgba(232, 245, 255, .2) 100%);
+}
+
+@media print {
+  html[data-season="snow"] body::before, .snowfall, .snow-toggle { display: none !important; }
+}
+
+/* falling snow (site.js): over everything, never in the way of a click */
+.snowfall {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.snow-toggle {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 41;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: #eef8ff;
+  background: rgba(7, 12, 10, .8);
+  border: 0;
+  border-top: 3px solid #3a4a43;
+  border-left: 3px solid #040705;
+  border-bottom: 3px solid #040705;
+  border-right: 1px solid rgba(7, 12, 10, .8);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.snow-toggle[aria-pressed="false"] svg { opacity: .4; }
+.snow-toggle:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }

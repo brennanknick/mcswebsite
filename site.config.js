@@ -79,4 +79,9 @@ window.MCS = {
   // swaps the Store ID, ?paynowTag=<slug> reads another product tag, and
   // ?ranks=1 shows the ranks before ranksOpen does. Each lasts for the
   // tab. They do nothing on mcsoccer.net.
+
+  // The season's look. "snow" (Christmas 2026): falling pixel snow with a
+  // button to turn it off, snow on the cards and buttons, icicles under the
+  // nav and frost on the headlines. "" puts the normal look back.
+  season: "snow",
 };

@@ -12,6 +12,109 @@
   const has = (k) => Object.prototype.hasOwnProperty.call(CFG, k);
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /* ── the season: "snow" dresses the site for Christmas ─────────────
+     html[data-season="snow"] turns on the frost, snow caps and icicles
+     (site.css). The falling snow is a canvas over the page that never
+     takes a click; the snowflake button turns it off and remembers that
+     on this browser. With reduced motion it never starts. */
+  if (CFG.season === "snow") {
+    document.documentElement.dataset.season = "snow";
+    if (!reduceMotion) startSnow();
+  }
+
+  function startSnow() {
+    const KEY = "mcs-snow";
+    let on = true;
+    try { on = localStorage.getItem(KEY) !== "off"; } catch (e) { /* private window: just snow */ }
+
+    const canvas = document.createElement("canvas");
+    canvas.className = "snowfall";
+    canvas.setAttribute("aria-hidden", "true");
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+    let w = 0, h = 0, dpr = 1, raf = 0, last = 0;
+    const flakes = [];
+    const rand = (a, b) => a + Math.random() * (b - a);
+    // square pixel flakes in three depths: far ones small, faint and slow, near ones big, bright
+    // and quick; some of the nearer ones are little pixel snowflakes (a plus)
+    const LAYERS = [
+      { share: 0.55, s: [2, 2, 3], v: [14, 26], a: [0.3, 0.55], plus: 0 },
+      { share: 0.33, s: [3, 3, 4], v: [26, 44], a: [0.55, 0.85], plus: 0.12 },
+      { share: 0.12, s: [5, 6], v: [46, 70], a: [0.85, 1], plus: 0.3 },
+    ];
+    const pick = (list) => list[Math.floor(Math.random() * list.length)];
+    const flake = (anywhere) => {
+      const r = Math.random();
+      const L = r < LAYERS[0].share ? LAYERS[0] : r < LAYERS[0].share + LAYERS[1].share ? LAYERS[1] : LAYERS[2];
+      return {
+        x: rand(0, w), y: anywhere ? rand(0, h) : rand(-40, -8),
+        s: pick(L.s), v: rand(L.v[0], L.v[1]), a: rand(L.a[0], L.a[1]),
+        sway: rand(4, 18), f: rand(0.4, 1.2), p: rand(0, 6.28), plus: Math.random() < L.plus,
+      };
+    };
+    function size() {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      const want = Math.max(50, Math.min(190, Math.round((w * h) / 8000)));
+      while (flakes.length < want) flakes.push(flake(true));
+      flakes.length = want;
+    }
+    function draw(t) {
+      const dt = Math.min(0.05, (t - (last || t)) / 1000);
+      last = t;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      for (const f of flakes) {
+        f.y += f.v * dt;
+        f.p += f.f * dt;
+        if (f.y > h + 8) Object.assign(f, flake(false));
+        const x = Math.round(f.x + Math.sin(f.p) * f.sway);
+        const y = Math.round(f.y);
+        ctx.fillStyle = "rgba(255, 255, 255, " + f.a + ")";
+        if (f.plus) {
+          const u = f.s >= 5 ? 3 : 2;
+          ctx.fillRect(x, y - u, u, u * 3);
+          ctx.fillRect(x - u, y, u * 3, u);
+        } else {
+          ctx.fillRect(x, y, f.s, f.s);
+        }
+      }
+    }
+    function tick(t) { raf = 0; draw(t); run(); }
+    function run() { if (!raf && on && !document.hidden) raf = requestAnimationFrame(tick); }
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; last = 0; }
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "snow-toggle";
+    btn.innerHTML = '<svg viewBox="0 0 7 7" width="21" height="21" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">' +
+      '<path d="M3 0h1v7H3zM0 3h7v1H0zM1 1h1v1H1zM5 1h1v1H5zM1 5h1v1H1zM5 5h1v1H5z"/></svg>';
+    const label = () => {
+      btn.setAttribute("aria-pressed", String(on));
+      btn.setAttribute("aria-label", on ? "Turn the snow off" : "Turn the snow on");
+      btn.title = on ? "Snow on" : "Snow off";
+    };
+    btn.addEventListener("click", () => {
+      on = !on;
+      try { localStorage.setItem(KEY, on ? "on" : "off"); } catch (e) { /* not remembered, fine */ }
+      label();
+      canvas.hidden = !on;
+      if (on) run(); else { stop(); ctx.clearRect(0, 0, w, h); }
+    });
+    document.body.appendChild(btn);
+    label();
+
+    size();
+    canvas.hidden = !on;
+    let resizing = 0;
+    window.addEventListener("resize", () => { cancelAnimationFrame(resizing); resizing = requestAnimationFrame(size); });
+    document.addEventListener("visibilitychange", () => (document.hidden ? stop() : run()));
+    run();
+  }
+
   /* ── config into the page ──────────────────────────────────────────
      A value set to "" hides whatever depends on it, as site.config.js
      promises. A value that's missing entirely (config failed to load)
